@@ -5,14 +5,26 @@ import PortPanel from "./PortPanel";
 import RouteMap from "./RouteMap";
 import ServicePanel from "./ServicePanel";
 import ServiceSidebar from "./ServiceSidebar";
+import TimeScrubber from "./TimeScrubber";
+import VesselPanel from "./VesselPanel";
 import { formatDate } from "@/lib/format";
-import type { Port, PortCall, Service, TransitTime } from "@/lib/types";
+import { stepTimestamp } from "@/lib/vesselPosition";
+import type {
+  Port,
+  PortCall,
+  Service,
+  TransitTime,
+  VesselSpec,
+  VesselTrack,
+} from "@/lib/types";
 
 interface Props {
   services: Service[];
   portCalls: PortCall[];
   transitTimes: TransitTime[];
   ports: Port[];
+  vesselSpecs: VesselSpec[];
+  vesselTracks: VesselTrack[];
   asOf: string | null;
   region: string;
 }
@@ -22,6 +34,8 @@ export default function Explorer({
   portCalls,
   transitTimes,
   ports,
+  vesselSpecs,
+  vesselTracks,
   asOf,
   region,
 }: Props) {
@@ -32,6 +46,10 @@ export default function Explorer({
   const [selectedServiceCode, setSelectedServiceCode] = useState<
     string | null
   >(null);
+  const [selectedVesselName, setSelectedVesselName] = useState<string | null>(
+    null,
+  );
+  const [stepIndex, setStepIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const portsByKey = useMemo(
@@ -44,6 +62,18 @@ export default function Explorer({
   const selectedService = selectedServiceCode
     ? (services.find((s) => s.code === selectedServiceCode) ?? null)
     : null;
+
+  const selectedVesselSpec = selectedVesselName
+    ? (vesselSpecs.find((v) => v.name === selectedVesselName) ?? null)
+    : null;
+  const selectedVesselTrack = selectedVesselName
+    ? (vesselTracks.find((t) => t.name === selectedVesselName) ?? null)
+    : null;
+
+  // Every track shares one time grid, so the scrubber's range and label can
+  // come from any of them.
+  const clock = vesselTracks[0] ?? null;
+  const stepCount = clock?.portCodes.length ?? 0;
 
   const toggleService = useCallback((code: string) => {
     setVisibleServices((prev) =>
@@ -58,19 +88,32 @@ export default function Explorer({
 
   const selectPort = useCallback((key: string | null) => {
     setSelectedKey(key);
-    // The port and service detail panels share one slot — picking a port
-    // closes any open service detail.
-    if (key) setSelectedServiceCode(null);
-    // A narrow screen only has room for one overlay at a time.
-    if (key) setSidebarOpen(false);
+    // The port, service and vessel detail panels share one slot — picking a
+    // port closes whichever of the others is open.
+    if (key) {
+      setSelectedServiceCode(null);
+      setSelectedVesselName(null);
+      // A narrow screen only has room for one overlay at a time.
+      setSidebarOpen(false);
+    }
   }, []);
 
   const selectService = useCallback((code: string) => {
     setSelectedServiceCode(code);
     setSelectedKey(null);
+    setSelectedVesselName(null);
     // Viewing a service's detail panel is independent of the sidebar's
     // on/off toggles, but on a narrow screen they still compete for space.
     setSidebarOpen(false);
+  }, []);
+
+  const selectVessel = useCallback((name: string | null) => {
+    setSelectedVesselName(name);
+    if (name) {
+      setSelectedKey(null);
+      setSelectedServiceCode(null);
+      setSidebarOpen(false);
+    }
   }, []);
 
   const openSidebar = useCallback(() => {
@@ -159,13 +202,38 @@ export default function Explorer({
           <RouteMap
             ports={ports}
             portCalls={portCalls}
+            vesselTracks={vesselTracks}
             visibleServices={visibleServices}
             selectedKey={selectedKey}
+            stepIndex={stepIndex}
+            selectedVesselName={selectedVesselName}
             onSelectPort={selectPort}
+            onSelectVessel={selectVessel}
           />
+          {clock && stepCount > 0 && (
+            <TimeScrubber
+              stepCount={stepCount}
+              stepIndex={stepIndex}
+              label={stepTimestamp(clock, stepIndex)}
+              onChange={setStepIndex}
+            />
+          )}
         </main>
 
-        {selectedPort ? (
+        {selectedVesselSpec ? (
+          <VesselPanel
+            spec={selectedVesselSpec}
+            track={selectedVesselTrack}
+            service={
+              services.find(
+                (s) => s.code === selectedVesselTrack?.serviceCode,
+              ) ?? null
+            }
+            portCalls={portCalls}
+            stepIndex={stepIndex}
+            onClose={() => setSelectedVesselName(null)}
+          />
+        ) : selectedPort ? (
           <PortPanel
             port={selectedPort}
             portCalls={portCalls}

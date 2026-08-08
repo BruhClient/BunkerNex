@@ -1,0 +1,29 @@
+parameter,value,unit,clause,notes
+guaranteed_pumping_rate,400-800,MT/hour,3.3,"Warranted range, or such other rate as awarded under the applicable tender. Seller liable for delay caused by underperformance; barge may not surge later to offset demurrage"
+barge_arrival_window,2 or 4,hours,3.1,Barge alongside on vessel arrival or within this window; the Term Contract elects which
+demurrage_regime_default,ii,enum,3.2(b),"Regime (i) = payable on any delay beyond the window; regime (ii) = payable only where barge delay solely causes delayed departure. Absent express election, (ii) applies"
+demurrage_rate_basis,charter party rate,rate,3.2(a),Demurrage payable at the rate in the charter party under which the receiving vessel is hired
+single_barge_preferred,true,boolean,3.4(a),Delivery by a single barge where reasonably practicable
+multi_barge_consent_lead_time,2,days before ETA,3.4(b),Buyer's prior written consent required for multiple barges
+succeeding_barge_gap,1-2,hours,3.4(b),Each succeeding barge alongside within this window of the preceding barge casting off
+master_may_cancel_and_sail,true,boolean,3.5,"On Article 3 non-compliance the Master may cancel and sail with no compensation to Seller; Buyer may claim deviation and replacement bunkering costs"
+monthly_pre_nomination,25,day of preceding month,1.2(a),"Non-binding estimate; Seller confirms provisional acceptance within 3 working days. Cancellation carries no liability"
+firm_nomination_window,5-10,working days before ETA,1.2(b),Extendable to 15 working days where agreed in writing
+committed_volume_basis,minimum of range,rule,1.1(a),Where a volume range is specified the minimum quantity is the Committed Volume
+underlift_rollover_option,true,boolean,1.1(c),Under-lifted volume may roll to a later period on the same terms; Seller's agreement not to be unreasonably withheld
+lifting_liability_suspended_on_dispute,true,boolean,1.3,Buyer may suspend orders pending dispute resolution and is not liable for missed Committed Volume during suspension
+fuel_spec_standard,ISO 8217:2010,standard,2.1,"Applies to HSFO, VLSFO, LSMGO, LSMDO and ULSFO at the time and point of delivery"
+advanced_screening_rights,GC/MS; ASTM D7845,test,2.2(a),At Buyer's account; ISO 8217 alone may not detect complex contaminants
+rejection_notice_period,5,days,2.2(b),Written notice to reject off-spec fuel and cancel the affected transaction
+single_source_homogeneity,true,boolean,2.3,Product must be from one homogeneous source and not commingled
+debunkering_at_seller_cost,true,boolean,2.4,"Seller removes non-compliant product at own cost and covers deviation, extra port stay and demurrage"
+surveyor_cost_split,50/50,share,4.1(b),Independent surveyor measurements are final and binding save for manifest error
+mfm_required_jurisdictions,Singapore,list,4.2,Mass flow meter profiles provided on request where MFM delivery is legally mandated
+primary_dispute_sample,vessel retained sample,rule,4.3(b),"Taken at the vessel's manifold per MARPOL Annex VI, ISO 13739 (SS600) or TR48"
+quantity_claim_deadline,14,days,4.4(a),Requires a Letter of Protest at delivery plus surveyor evidence; otherwise waived
+quality_claim_deadline,30,days,4.4(b),Written claim to Seller; otherwise waived
+withhold_disputed_invoice,true,boolean,5.1,Disputed portion may be withheld without late fees or suspension; undisputed portion remains due
+invoice_validity_limit,1,year,5.2,Invoices issued more than one year after delivery are void
+suspend_payment_on_lien_risk,true,boolean,5.3,Payments may be suspended where a supplier lien risks vessel arrest; Seller indemnifies
+governing_law,Singapore,jurisdiction,6.4(a),Non-negotiable
+arbitration_forum,SCMA Singapore,forum,6.4(b),Referred after 30 days without amicable resolution

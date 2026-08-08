@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { serviceColor } from "@/lib/colors";
 import { greatCircleArc, multiPointArc, type LonLat } from "@/lib/geo";
+import { seaRoute } from "@/lib/searoutes";
+import { createTrackResolver, type VesselFix } from "@/lib/vesselPosition";
 import { formatPrice } from "@/lib/format";
-import type { Port, PortCall } from "@/lib/types";
+import type { Port, PortCall, VesselTrack } from "@/lib/types";
 
 // CARTO's Dark Matter needs no API key.
 const STYLE_URL =
@@ -14,30 +16,11 @@ const STYLE_URL =
 const PORTS_SOURCE = "ports";
 
 /**
- * A handful of legs run from Singapore toward the Bay of Bengal or down the
- * Vietnamese coast; a direct great-circle arc between those endpoints cuts
- * straight across the Malay Peninsula or Vietnam/Cambodia. These open-water
- * waypoints bend the affected legs around the landmass instead. Everything
- * not listed in ROUTE_VIA already tracks open water as a direct arc.
+ * Screen-space gap between neighbouring services, in pixels. Services sharing
+ * a port pair (CAS and CCS both run Singapore-Kolkata) would otherwise draw
+ * exactly on top of each other.
  */
-const MALACCA_MOUTH: LonLat = [95.35, 5.85]; // NW mouth of the Malacca Strait, off Aceh
-const CAM_RANH_EAST: LonLat = [109.5, 11.9]; // South China Sea, off Vietnam's Cam Ranh bulge
-const CA_MAU_SOUTH: LonLat = [104.7, 8.3]; // South China Sea, south of Vietnam's Ca Mau cape
-
-const ROUTE_VIA: Record<string, LonLat[]> = {
-  "BDCGP|SGSIN": [MALACCA_MOUTH],
-  "BDMGL|SGSIN": [MALACCA_MOUTH],
-  "INCCU|SGSIN": [MALACCA_MOUTH],
-  "MMRGN|SGSIN": [MALACCA_MOUTH],
-  // Ordered north (Haiphong) to south (Singapore) — Vietnam's coast bulges
-  // east around Cam Ranh, so a single waypoint near Ca Mau still cuts
-  // across the country; this needs both to stay offshore the whole way.
-  "SGSIN|VNHPH": [CAM_RANH_EAST, CA_MAU_SOUTH],
-};
-
-function routeViaWaypoints(a: string, b: string): LonLat[] | null {
-  return ROUTE_VIA[[a, b].sort().join("|")] ?? null;
-}
+const SERVICE_LINE_GAP = 2.5;
 
 /**
  * Must name font stacks the style actually serves glyphs for, or MapLibre
@@ -96,17 +79,16 @@ function portsGeoJson(
 interface Props {
   ports: Port[];
   portCalls: PortCall[];
+  vesselTracks: VesselTrack[];
   visibleServices: string[];
   selectedKey: string | null;
+  /** Index into every track's step arrays; all tracks share one time grid. */
+  stepIndex: number;
+  selectedVesselName: string | null;
   onSelectPort: (key: string | null) => void;
+  onSelectVessel: (name: string | null) => void;
 }
 
-/**
- * Bow an arc sideways so services sharing a port pair (CAS and CCS both run
- * Singapore-Kolkata) do not draw exactly on top of each other. The map is
- * already schematic, so a small deterministic offset costs nothing in accuracy
- * and makes overlapping services readable.
- */
 /**
  * A small right-pointing triangle, tinted per service. MapLibre rotates
  * line-placed icons so the image's local +x axis (the tip, here) follows
@@ -129,36 +111,23 @@ function arrowIconImage(color: string, size = 24): ImageData {
   return ctx.getImageData(0, 0, size, size);
 }
 
-function bowArc(points: LonLat[], bow: number): LonLat[] {
-  if (bow === 0 || points.length < 2) return points;
-  const [x0, y0] = points[0];
-  const [x1, y1] = points[points.length - 1];
-  const dx = x1 - x0;
-  const dy = y1 - y0;
-  const len = Math.hypot(dx, dy);
-  if (len === 0) return points;
-  // Unit normal to the chord.
-  const nx = -dy / len;
-  const ny = dx / len;
-  const amp = len * bow;
-
-  return points.map(([x, y], i) => {
-    const f = i / (points.length - 1);
-    const k = Math.sin(Math.PI * f) * amp;
-    return [x + nx * k, y + ny * k] as LonLat;
-  });
-}
-
 export default function RouteMap({
   ports,
   portCalls,
+  vesselTracks,
   visibleServices,
   selectedKey,
+  stepIndex,
+  selectedVesselName,
   onSelectPort,
+  onSelectVessel,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, HTMLElement>>(new Map());
+  const vesselMarkersRef = useRef<
+    Map<string, { marker: maplibregl.Marker; el: HTMLElement }>
+  >(new Map());
   const readyRef = useRef(false);
   // Re-fits the current view; re-pointed whenever visibility changes.
   const fitRef = useRef<(() => void) | null>(null);
@@ -167,10 +136,33 @@ export default function RouteMap({
   // Keeps the map's click handler pointing at the latest callback.
   const onSelectRef = useRef(onSelectPort);
   onSelectRef.current = onSelectPort;
+  const onSelectVesselRef = useRef(onSelectVessel);
+  onSelectVesselRef.current = onSelectVessel;
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
     [ports],
+  );
+
+  /**
+   * One position resolver per vessel. The synthetic lat/lon in the source sit
+   * thousands of km from the ports they are labelled with, so positions come
+   * from the port index instead, interpolated along the same sea lanes the
+   * route arcs are drawn from.
+   */
+  const resolvers = useMemo(() => {
+    const portLonLat = (key: string): LonLat | null => {
+      const port = portsByKey.get(key);
+      return port ? [port.lon, port.lat] : null;
+    };
+    return new Map(
+      vesselTracks.map((t) => [t.name, createTrackResolver(t, portLonLat)]),
+    );
+  }, [vesselTracks, portsByKey]);
+
+  const trackByName = useMemo(
+    () => new Map(vesselTracks.map((t) => [t.name, t])),
+    [vesselTracks],
   );
 
   const serviceCodes = useMemo(
@@ -182,17 +174,10 @@ export default function RouteMap({
   const routeGeoJson = useMemo(() => {
     const out = new Map<string, GeoJSON.FeatureCollection>();
 
-    const n = serviceCodes.length;
-    // Fan the services symmetrically about the true great-circle path, and
-    // keep the total spread small so an arc still reads as its real route.
-    const spread = n > 1 ? 0.11 / (n - 1) : 0;
-
-    serviceCodes.forEach((code, serviceIndex) => {
+    for (const code of serviceCodes) {
       const calls = portCalls
         .filter((c) => c.serviceCode === code)
         .sort((a, b) => a.sequenceNo - b.sequenceNo);
-
-      const bow = (serviceIndex - (n - 1) / 2) * spread;
 
       const features: GeoJSON.Feature[] = [];
       for (let i = 0; i < calls.length - 1; i++) {
@@ -201,15 +186,16 @@ export default function RouteMap({
         if (!from || !to) continue;
         if (from.key === to.key) continue; // no arc for a same-port leg
 
-        const via = routeViaWaypoints(from.key, to.key);
-        const rawArc = via
-          ? multiPointArc([
-              [from.lon, from.lat],
-              ...via,
-              [to.lon, to.lat],
-            ])
+        // A routed path is already several short hops, so it needs far fewer
+        // steps per hop than one ocean-spanning arc does.
+        const via = seaRoute(from.key, to.key);
+        const arc = via
+          ? multiPointArc(
+              [[from.lon, from.lat], ...via, [to.lon, to.lat]],
+              24,
+            )
           : greatCircleArc([from.lon, from.lat], [to.lon, to.lat]);
-        const arc = bowArc(rawArc, bow);
+
         features.push({
           type: "Feature",
           properties: { service: code },
@@ -217,7 +203,7 @@ export default function RouteMap({
         });
       }
       out.set(code, { type: "FeatureCollection", features });
-    });
+    }
 
     return out;
   }, [portCalls, portsByKey, serviceCodes]);
@@ -255,10 +241,16 @@ export default function RouteMap({
         .getStyle()
         .layers.find((l) => l.type === "symbol")?.id;
 
-      for (const code of serviceCodes) {
+      serviceCodes.forEach((code, serviceIndex) => {
         const data = routeGeoJson.get(code);
-        if (!data) continue;
+        if (!data) return;
         const color = serviceColor(code);
+
+        // Fan the services apart in *screen* space rather than by displacing
+        // the geometry. The arcs now follow real sea lanes, so bending them
+        // sideways to separate them would push them straight back onto land.
+        const offset =
+          (serviceIndex - (serviceCodes.length - 1) / 2) * SERVICE_LINE_GAP;
 
         map.addSource(`route-${code}`, { type: "geojson", data });
         map.addLayer(
@@ -272,6 +264,7 @@ export default function RouteMap({
               "line-width": 7,
               "line-opacity": 0.13,
               "line-blur": 3,
+              "line-offset": offset,
             },
           },
           firstSymbolId,
@@ -286,6 +279,7 @@ export default function RouteMap({
               "line-color": color,
               "line-width": 1.8,
               "line-opacity": 0.92,
+              "line-offset": offset,
             },
           },
           firstSymbolId,
@@ -306,6 +300,11 @@ export default function RouteMap({
               "icon-image": arrowIcon,
               "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.45, 8, 0.8],
               "icon-rotation-alignment": "map",
+              // Symbol layers have no line-offset, so the arrows would sit on
+              // the un-offset centreline. icon-offset rotates with the icon,
+              // so a y-shift moves each arrow perpendicular to its direction
+              // of travel — onto its own service's line.
+              "icon-offset": [0, offset],
               // Arrows are a direction hint, not a navigational label — they
               // should never fight port labels for collision space.
               "icon-allow-overlap": true,
@@ -315,7 +314,7 @@ export default function RouteMap({
           },
           firstSymbolId,
         );
-      }
+      });
 
       // --- Port name labels ---
       map.addSource(PORTS_SOURCE, {
@@ -441,6 +440,25 @@ export default function RouteMap({
           .addTo(map);
       }
 
+      // Vessel markers are created once and then *moved* on every scrub —
+      // rebuilding them per step would churn DOM 480 times per playback.
+      for (const track of vesselTracks) {
+        const el = buildVesselElement(track);
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onSelectVesselRef.current(track.name);
+        });
+        const marker = new maplibregl.Marker({
+          element: el,
+          // Rotation is applied to our own inner chevron so the tooltip stays
+          // upright; the marker itself must not spin.
+          rotationAlignment: "viewport",
+        })
+          .setLngLat([0, 0])
+          .addTo(map);
+        vesselMarkersRef.current.set(track.name, { marker, el });
+      }
+
       readyRef.current = true;
       map.resize();
     });
@@ -466,6 +484,7 @@ export default function RouteMap({
       map.remove();
       mapRef.current = null;
       markersRef.current.clear();
+      vesselMarkersRef.current.clear();
       readyRef.current = false;
     };
     // Built once — the underlying schedule data does not change at runtime.
@@ -526,6 +545,55 @@ export default function RouteMap({
     else map.once("load", apply);
   }, [visibleKey, ports, serviceCodes]);
 
+  // --- Move vessels to the scrubbed time ---
+  // Runs on every scrubber tick, so it only mutates existing markers: a
+  // setLngLat plus a transform per vessel, no React re-render and no new DOM.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const visible = new Set(visibleServices);
+
+    const apply = () => {
+      for (const [name, { marker, el }] of vesselMarkersRef.current) {
+        const track = trackByName.get(name);
+        const fix = resolvers.get(name)?.(stepIndex) ?? null;
+        if (!track || !fix) {
+          el.style.display = "none";
+          continue;
+        }
+
+        // A vessel hides with its own route line, so switching a service off
+        // clears both together.
+        el.style.display = visible.has(track.serviceCode) ? "" : "none";
+        marker.setLngLat(fix.position);
+
+        const chevron = el.querySelector<HTMLElement>(".bn-vessel-icon");
+        if (chevron) {
+          // Berthed vessels have no heading to show, so the chevron squares up
+          // rather than pointing in whatever direction it last sailed.
+          chevron.style.transform = fix.berthed
+            ? "rotate(0deg)"
+            : `rotate(${fix.bearing}deg)`;
+        }
+        el.classList.toggle("is-berthed", fix.berthed);
+        el.classList.toggle("is-bunkering", fix.bunkeredMt !== null);
+
+        updateVesselTip(el, track, fix);
+      }
+    };
+
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [stepIndex, resolvers, trackByName, visibleServices]);
+
+  // --- Selected vessel styling ---
+  useEffect(() => {
+    for (const [name, { el }] of vesselMarkersRef.current) {
+      el.classList.toggle("is-selected", name === selectedVesselName);
+    }
+  }, [selectedVesselName]);
+
   // --- Selected marker styling + always-on label ---
   useEffect(() => {
     for (const [key, el] of markersRef.current) {
@@ -564,6 +632,78 @@ export default function RouteMap({
   // CSS (.maplibregl-map { position: relative }) which outranks any Tailwind
   // utility, since Tailwind's live in @layer. It sets no height, so h-full wins.
   return <div ref={containerRef} className="h-full w-full" />;
+}
+
+/**
+ * Vessel marker DOM: a chevron tinted to match its service's route line, so a
+ * vessel reads as belonging to the line it sits on. Built once per vessel and
+ * mutated thereafter — see the scrub effect above.
+ */
+function buildVesselElement(track: VesselTrack): HTMLElement {
+  const color = serviceColor(track.serviceCode);
+
+  const el = document.createElement("div");
+  el.className = "bn-vessel";
+  el.style.setProperty("--vessel-color", color);
+  el.title = track.name;
+
+  const icon = document.createElement("span");
+  icon.className = "bn-vessel-icon";
+  // A north-pointing chevron: the scrub effect rotates it by the leg bearing,
+  // which is also measured clockwise from north, so the two agree with no
+  // offset term.
+  icon.innerHTML =
+    '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+    '<path d="M8 1 L13.5 14.5 L8 11.5 L2.5 14.5 Z" /></svg>';
+  el.appendChild(icon);
+
+  // Tooltip rows are created once and only their text changes on scrub, so a
+  // playback pass never rebuilds DOM.
+  const tip = document.createElement("div");
+  tip.className = "bn-tip bn-vessel-tip";
+
+  const name = document.createElement("div");
+  name.className = "bn-tip-name";
+  name.textContent = track.name;
+  tip.appendChild(name);
+
+  const where = document.createElement("div");
+  where.className = "bn-tip-meta";
+  tip.appendChild(where);
+
+  const rob = document.createElement("div");
+  rob.className = "bn-tip-meta tnum";
+  tip.appendChild(rob);
+
+  const stem = document.createElement("div");
+  stem.className = "bn-tip-price tnum";
+  tip.appendChild(stem);
+
+  el.appendChild(tip);
+  return el;
+}
+
+/** Refresh a vessel tooltip in place; called on every scrub tick. */
+function updateVesselTip(
+  el: HTMLElement,
+  track: VesselTrack,
+  fix: VesselFix,
+): void {
+  const [, where, rob, stem] = el.querySelectorAll<HTMLElement>(
+    ".bn-vessel-tip > div",
+  );
+  if (!where || !rob || !stem) return;
+
+  where.textContent = fix.berthed
+    ? `${track.serviceCode} · Berthed ${fix.portCode}`
+    : `${track.serviceCode} · ${fix.fromPortCode} → ${fix.portCode}`;
+  rob.textContent = `${track.grade} ${Math.round(fix.robMt).toLocaleString()} MT`;
+
+  stem.textContent =
+    fix.bunkeredMt !== null
+      ? `Bunkering ${Math.round(fix.bunkeredMt).toLocaleString()} MT`
+      : "";
+  stem.style.display = fix.bunkeredMt !== null ? "" : "none";
 }
 
 /** Marker DOM. Tooltip is a CSS-only hover child, so no extra React state. */

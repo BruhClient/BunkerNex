@@ -1,13 +1,28 @@
 import type { Grade } from "./types";
 
-/** One hue per service. Chosen to stay separable on a dark basemap. */
+/**
+ * One hue per service. Chosen to stay separable on a dark basemap.
+ *
+ * Eleven simultaneous routes is past the point where hue alone tells them
+ * apart, so the two sub-regions sit on broadly different parts of the wheel:
+ * East Coast India warm and cyan, Far East Asia red through indigo. The
+ * sidebar toggles, not the palette, are what actually isolate a service.
+ */
 export const SERVICE_COLORS: Record<string, string> = {
+  // Intra Asia · East Coast India
   BD1: "#22D3EE",
   BD2: "#F472B6",
   CAS: "#FBBF24",
   CCS: "#4ADE80",
   CVI: "#A78BFA",
   YGS: "#FB923C",
+
+  // Intra Asia · Far East Asia
+  KCI: "#F87171",
+  KCS: "#818CF8",
+  NCI: "#2DD4BF",
+  SCT: "#D946EF",
+  VCS: "#A3E635",
 };
 
 export const SERVICE_COLOR_FALLBACK = "#64748B";

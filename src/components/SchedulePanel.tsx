@@ -84,6 +84,14 @@ export default function SchedulePanel({
                 schedule.
               </p>
             )}
+
+            {/* Outside the weekday guard — BD2 publishes stems but not days. */}
+            {call.bunkerQuantityMt !== null && (
+              <p className="mt-2 text-[11px] text-muted">
+                Bunker{" "}
+                <span className="tnum text-fg">{call.bunkerQuantityMt} MT</span>
+              </p>
+            )}
           </div>
         );
       })}

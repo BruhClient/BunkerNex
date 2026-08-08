@@ -200,6 +200,135 @@ body {
     0 0 14px 2px rgba(34, 211, 238, 0.5);
 }
 
+/* ---------------------------------------------------------------
+   Vessel markers. A chevron rather than a disc, so a moving ship is
+   never mistaken for a fixed port, tinted to its service so it reads
+   as belonging to the route line it sits on.
+
+   Positions are derived from the port index, not from the movement
+   CSV's own coordinates — those sit thousands of km from the ports
+   they are labelled with. See data/README.md.
+   --------------------------------------------------------------- */
+
+.bn-vessel {
+  /* Same reasoning as .bn-marker: never set `position` here. MapLibre owns
+     it, and overriding it moves every vessel to the wrong place. */
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+
+.bn-vessel-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Rotated per leg bearing by RouteMap. The transition smooths the jump
+     between 3-hour steps so playback reads as motion rather than teleporting,
+     but stays short enough that dragging the scrubber still feels immediate. */
+  transition: transform 200ms ease;
+}
+
+.bn-vessel-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: var(--vessel-color, #9aa6b8);
+  stroke: var(--color-bg);
+  stroke-width: 1.1;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+/* Berthed: dimmed and smaller, so a vessel alongside recedes behind the port
+   marker it is sitting on rather than covering it. */
+.bn-vessel.is-berthed .bn-vessel-icon {
+  transform: scale(0.72);
+  opacity: 0.75;
+}
+
+.bn-vessel:hover .bn-vessel-icon {
+  filter: drop-shadow(0 0 6px var(--vessel-color, #9aa6b8));
+}
+
+.bn-vessel.is-selected .bn-vessel-icon svg {
+  fill: var(--color-accent);
+  stroke: var(--color-bg);
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.75));
+}
+
+/* A stem in progress — the 26 bunker events across the whole series. */
+.bn-vessel.is-bunkering::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid var(--color-accent);
+  animation: selected-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.bn-vessel .bn-tip {
+  bottom: calc(100% + 8px);
+}
+
+/* Time scrubber. Styled by hand because the native track/thumb differ per
+   engine and the default blue ignores the palette. */
+.bn-scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bn-scrub::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-line-strong);
+}
+
+.bn-scrub::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-line-strong);
+}
+
+.bn-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+}
+
+.bn-scrub::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+}
+
+.bn-scrub:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.bn-vessel:hover .bn-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* Hover tooltip — CSS only, so the map needs no extra React state. */
 .bn-tip {
   position: absolute;

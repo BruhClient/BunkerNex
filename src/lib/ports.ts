@@ -31,9 +31,23 @@ export const PORT_COORDS: Record<string, PortMeta> = {
     lat: 3.0,
   },
   MMRGN: { name: "Yangon", country: "Myanmar", lon: 96.17, lat: 16.77 },
+  CNTSN: { name: "Tianjin", country: "China", lon: 117.74, lat: 38.98 },
+  CNTAO: { name: "Qingdao", country: "China", lon: 120.2, lat: 36.05 },
+  CNQZH: { name: "Qinzhou", country: "China", lon: 108.61, lat: 21.68 },
+  KRINC: { name: "Incheon", country: "South Korea", lon: 126.6, lat: 37.45 },
+  VNSGN: { name: "Ho Chi Minh", country: "Vietnam", lon: 106.79, lat: 10.76 },
+  VNUIH: { name: "Qui Nhon", country: "Vietnam", lon: 109.24, lat: 13.77 },
+  THLCH: { name: "Laem Chabang", country: "Thailand", lon: 100.88, lat: 13.08 },
+  THBKK: { name: "Bangkok", country: "Thailand", lon: 100.58, lat: 13.7 },
+  IDJKT: { name: "Jakarta", country: "Indonesia", lon: 106.88, lat: -6.1 },
+  IDSUB: { name: "Surabaya", country: "Indonesia", lon: 112.73, lat: -7.2 },
+  IDSRG: { name: "Semarang", country: "Indonesia", lon: 110.42, lat: -6.94 },
+
+  // Busan is both — a KCS/KCI route port and a quoted bunker hub. It is the
+  // third port (with Singapore and Shanghai) where the two datasets meet.
+  KRPUS: { name: "Busan", country: "South Korea", lon: 129.075, lat: 35.101 },
 
   // --- Bunker pricing hubs (from the pricing CSV column headers) ---
-  KRPUS: { name: "Busan", country: "South Korea", lon: 129.075, lat: 35.101 },
   HKHKG: { name: "Hong Kong", country: "Hong Kong", lon: 114.152, lat: 22.32 },
   JPTYO: { name: "Tokyo", country: "Japan", lon: 139.79, lat: 35.617 },
   NLRTM: { name: "Rotterdam", country: "Netherlands", lon: 4.4, lat: 51.905 },

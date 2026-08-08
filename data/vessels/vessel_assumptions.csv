@@ -1,0 +1,6 @@
+column,basis,ratio_of_DWT,stated_in_source,notes
+Max_ROB_MT,DWT,0.03,yes,
+Min_ROB_MT,DWT,0.01,yes,
+Consumption_Transit_MT_Per_Day,DWT,0.0009,yes,
+Consumption_Berth_MT_Per_Day,DWT,0.00015,yes,Source footnote mislabels this row as 'in transit'; the arithmetic confirms it is the berth rate
+Bunkering_Trigger_MT,DWT,0.015,no,Not stated in the source footnote; derived here from the data. Equals Max_ROB_MT / 2

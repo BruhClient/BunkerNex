@@ -3,9 +3,9 @@ import { PORT_COORDS } from "./ports";
 import type { Port, PortCall, Service, TransitTime } from "./types";
 import { getPriceIndex, latestPoint } from "./prices";
 
-const SERVICE_MASTER = "schedules/PIL_East_Coast_India_Service_Master.csv";
-const PORT_CALLS = "schedules/PIL_East_Coast_India_Port_Calls.csv";
-const TRANSIT_TIMES = "schedules/PIL_East_Coast_India_Transit_Times.csv";
+const SERVICE_MASTER = "schedules/PIL_Intra_Asia_Service_Master.csv";
+const PORT_CALLS = "schedules/PIL_Intra_Asia_Port_Calls.csv";
+const TRANSIT_TIMES = "schedules/PIL_Intra_Asia_Transit_Times.csv";
 
 export function loadServices(): Service[] {
   const { rows } = readCsv(SERVICE_MASTER);
@@ -46,6 +46,7 @@ export function loadPortCalls(): PortCall[] {
       etdDay: num(r, "ETD_Day_Number"),
       dwellDays: num(r, "Dwell_Time_Days"),
       transitToNextDays: num(r, "Transit_To_Next_Days"),
+      bunkerQuantityMt: num(r, "Bunker_Quantity_MT"),
       loopClosure: (str(r, "Loop_Closure_Flag") ?? "0") === "1",
       directionPhase: str(r, "Direction_Phase") ?? "",
       scheduleDataStatus: str(r, "Schedule_Data_Status") ?? "",
@@ -86,9 +87,9 @@ export function serviceRotation(
 /**
  * Union of route ports and pricing ports.
  *
- * Only Singapore and Shanghai appear in both datasets — the other 12 route
- * ports have no bunker quotes and the other ~25 pricing hubs are not on any
- * PIL service here. Both sets are surfaced, flagged, and never conflated.
+ * Only Singapore, Shanghai and Busan appear in both datasets — the other 23
+ * route ports have no bunker quotes and the other ~24 pricing hubs are not on
+ * any PIL service here. Both sets are surfaced, flagged, and never conflated.
  */
 export function buildPortIndex(calls: PortCall[]): Port[] {
   const index = new Map<string, Port>();

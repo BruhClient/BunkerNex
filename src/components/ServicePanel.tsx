@@ -140,6 +140,18 @@ export default function ServicePanel({
                       source schedule.
                     </p>
                   )}
+
+                  {/* Sits outside the weekday guard: BD2 has stem figures even
+                      though its arrival days are unpublished. Loop-closing
+                      calls have no stem and render nothing at all. */}
+                  {call.bunkerQuantityMt !== null && (
+                    <p className="mt-2 text-[11px] text-muted">
+                      Bunker{" "}
+                      <span className="tnum text-fg">
+                        {call.bunkerQuantityMt} MT
+                      </span>
+                    </p>
+                  )}
                 </div>
               );
             })}
