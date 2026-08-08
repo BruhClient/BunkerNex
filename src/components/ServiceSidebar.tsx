@@ -143,7 +143,8 @@ export default function ServiceSidebar({
 
       <p className="border-t border-line px-4 py-3 text-[10px] leading-relaxed text-faint">
         Route lines are schematic great-circle arcs between published port
-        calls, not navigable sailing tracks.
+        calls, not navigable sailing tracks. Arrows show direction of
+        travel.
       </p>
     </aside>
   );

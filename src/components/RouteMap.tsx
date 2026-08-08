@@ -107,6 +107,28 @@ interface Props {
  * already schematic, so a small deterministic offset costs nothing in accuracy
  * and makes overlapping services readable.
  */
+/**
+ * A small right-pointing triangle, tinted per service. MapLibre rotates
+ * line-placed icons so the image's local +x axis (the tip, here) follows
+ * the line's direction of travel — since arcs are built from-stop to
+ * to-stop in sailing order, this makes the arrows point the way the ship
+ * actually sails without any extra bearing math.
+ */
+function arrowIconImage(color: string, size = 24): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(size * 0.92, size * 0.5);
+  ctx.lineTo(size * 0.2, size * 0.1);
+  ctx.lineTo(size * 0.2, size * 0.9);
+  ctx.closePath();
+  ctx.fill();
+  return ctx.getImageData(0, 0, size, size);
+}
+
 function bowArc(points: LonLat[], bow: number): LonLat[] {
   if (bow === 0 || points.length < 2) return points;
   const [x0, y0] = points[0];
@@ -265,6 +287,31 @@ export default function RouteMap({
               "line-width": 1.8,
               "line-opacity": 0.92,
             },
+          },
+          firstSymbolId,
+        );
+
+        const arrowIcon = `arrow-${code}`;
+        if (!map.hasImage(arrowIcon)) {
+          map.addImage(arrowIcon, arrowIconImage(color));
+        }
+        map.addLayer(
+          {
+            id: `route-${code}-arrow`,
+            type: "symbol",
+            source: `route-${code}`,
+            layout: {
+              "symbol-placement": "line",
+              "symbol-spacing": 110,
+              "icon-image": arrowIcon,
+              "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.45, 8, 0.8],
+              "icon-rotation-alignment": "map",
+              // Arrows are a direction hint, not a navigational label — they
+              // should never fight port labels for collision space.
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+            },
+            paint: { "icon-opacity": 0.85 },
           },
           firstSymbolId,
         );
@@ -436,7 +483,7 @@ export default function RouteMap({
 
       for (const code of serviceCodes) {
         const v = visible.has(code) ? "visible" : "none";
-        for (const suffix of ["glow", "line"]) {
+        for (const suffix of ["glow", "line", "arrow"]) {
           const id = `route-${code}-${suffix}`;
           if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", v);
         }
