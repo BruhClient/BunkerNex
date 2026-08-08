@@ -31,6 +31,11 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  /* 100% resolves against the layout viewport, which mobile browsers keep
+     tall even while their address bar covers part of the screen. 100dvh
+     tracks the visible viewport instead, so nothing sits hidden below the
+     fold when the chrome is showing. */
+  height: 100dvh;
 }
 
 /* Every price, delta and day count aligns column-wise. */

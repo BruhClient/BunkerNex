@@ -115,7 +115,7 @@ export default function PriceChart({ grades, brent }: Props) {
               type="button"
               onClick={() => setRange(r)}
               aria-pressed={range === r}
-              className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+              className={`px-2.5 py-1.5 text-[10px] font-medium transition-colors ${
                 range === r
                   ? "bg-accent/15 text-accent"
                   : "text-faint hover:text-fg"
@@ -195,7 +195,7 @@ export default function PriceChart({ grades, brent }: Props) {
                 )
               }
               aria-pressed={on}
-              className="flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[10px] transition-colors hover:border-line-strong"
+              className="flex items-center gap-1.5 rounded border border-line px-2 py-1.5 text-[10px] transition-colors hover:border-line-strong"
               style={{ opacity: on ? 1 : 0.4 }}
             >
               <span

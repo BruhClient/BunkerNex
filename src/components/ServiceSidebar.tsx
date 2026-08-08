@@ -8,6 +8,8 @@ interface Props {
   visibleServices: string[];
   onToggle: (code: string) => void;
   onSetAll: (on: boolean) => void;
+  open: boolean;
+  onClose: () => void;
 }
 
 export default function ServiceSidebar({
@@ -15,11 +17,17 @@ export default function ServiceSidebar({
   visibleServices,
   onToggle,
   onSetAll,
+  open,
+  onClose,
 }: Props) {
   const allOn = visibleServices.length === services.length;
 
   return (
-    <aside className="hidden w-[300px] shrink-0 flex-col border-r border-line bg-surface md:flex">
+    <aside
+      className={`fixed inset-y-0 left-0 z-30 flex w-[85%] max-w-[320px] flex-col border-r border-line bg-surface shadow-2xl transition-transform duration-200 ease-out md:static md:z-auto md:w-[300px] md:max-w-none md:translate-x-0 md:shadow-none ${
+        open ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <span className="label">Services</span>
         <div className="flex items-center gap-1 text-[11px]">
@@ -27,7 +35,7 @@ export default function ServiceSidebar({
             type="button"
             onClick={() => onSetAll(true)}
             disabled={allOn}
-            className="rounded px-1.5 py-0.5 text-muted transition-colors hover:text-fg disabled:cursor-default disabled:text-faint/50"
+            className="rounded px-2 py-1.5 text-muted transition-colors hover:text-fg disabled:cursor-default disabled:text-faint/50 md:px-1.5 md:py-0.5"
           >
             All
           </button>
@@ -36,9 +44,24 @@ export default function ServiceSidebar({
             type="button"
             onClick={() => onSetAll(false)}
             disabled={visibleServices.length === 0}
-            className="rounded px-1.5 py-0.5 text-muted transition-colors hover:text-fg disabled:cursor-default disabled:text-faint/50"
+            className="rounded px-2 py-1.5 text-muted transition-colors hover:text-fg disabled:cursor-default disabled:text-faint/50 md:px-1.5 md:py-0.5"
           >
             None
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close services menu"
+            className="-mr-1 ml-1 flex size-8 items-center justify-center rounded text-faint transition-colors hover:bg-surface-2 hover:text-fg md:hidden"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+              <path
+                d="M1 1l12 12M13 1L1 13"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                fill="none"
+              />
+            </svg>
           </button>
         </div>
       </div>

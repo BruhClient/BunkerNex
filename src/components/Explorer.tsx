@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PortPanel from "./PortPanel";
 import RouteMap from "./RouteMap";
 import ServiceSidebar from "./ServiceSidebar";
@@ -26,6 +26,7 @@ export default function Explorer({
     services.map((s) => s.code),
   );
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
@@ -46,10 +47,47 @@ export default function Explorer({
     [services],
   );
 
+  const selectPort = useCallback((key: string | null) => {
+    setSelectedKey(key);
+    // A narrow screen only has room for one overlay at a time.
+    if (key) setSidebarOpen(false);
+  }, []);
+
+  const openSidebar = useCallback(() => {
+    setSidebarOpen(true);
+    setSelectedKey(null);
+  }, []);
+
+  // Esc closes the mobile services drawer, mirroring PortPanel's Esc handling.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
+
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-5">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-4 sm:px-5">
         <div className="flex items-baseline gap-3">
+          <button
+            type="button"
+            onClick={() => (sidebarOpen ? setSidebarOpen(false) : openSidebar())}
+            aria-label={sidebarOpen ? "Close services menu" : "Open services menu"}
+            aria-expanded={sidebarOpen}
+            className="-ml-1.5 flex size-9 shrink-0 items-center justify-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-fg md:hidden"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+              <path
+                d="M2 5h14M2 9h14M2 13h14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
           <span className="text-[15px] font-semibold tracking-tight text-fg">
             Bunker<span className="text-accent">Nex</span>
           </span>
@@ -79,11 +117,21 @@ export default function Explorer({
       </header>
 
       <div className="relative flex min-h-0 flex-1">
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-20 bg-black/50 md:hidden"
+            aria-hidden
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         <ServiceSidebar
           services={services}
           visibleServices={visibleServices}
           onToggle={toggleService}
           onSetAll={setAll}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         <main className="relative min-w-0 flex-1">
@@ -92,7 +140,7 @@ export default function Explorer({
             portCalls={portCalls}
             visibleServices={visibleServices}
             selectedKey={selectedKey}
-            onSelectPort={setSelectedKey}
+            onSelectPort={selectPort}
           />
         </main>
 
