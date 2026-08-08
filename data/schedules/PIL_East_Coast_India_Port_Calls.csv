@@ -1,0 +1,29 @@
+﻿Service_Code,Sequence_No,Port_Name,Port_Code,Country,Terminal_Name,Arrival_Weekday,Departure_Weekday,ETA_Day_Number,ETD_Day_Number,Dwell_Time_Days,Transit_To_Next_Days,Loop_Closure_Flag,Direction_Phase,Schedule_Data_Status,Source_File,Data_Notes
+BD1,1,Singapore,SGSIN,Singapore,PSA Singapore,Saturday,Monday,0,2,2,5,0,West-Bound,Derived from published weekday sequence,BD1-CHITTAGONG-SERVICE_PIL-L24042026(1).pdf,
+BD1,2,Chittagong,BDCGP,Bangladesh,Chittagong Container Terminal (CCT/NCT/GCB),Saturday,Monday,7,9,2,5,0,East-Bound,Derived from published weekday sequence,BD1-CHITTAGONG-SERVICE_PIL-L24042026(1).pdf,
+BD1,3,Singapore,SGSIN,Singapore,PSA Singapore,Saturday,Monday,14,16,2,,1,Loop Complete,Derived from published weekday sequence,BD1-CHITTAGONG-SERVICE_PIL-L24042026(1).pdf,
+BD2,1,Singapore,SGSIN,Singapore,PSA Singapore,,,,,,5,0,West-Bound,Unavailable in source,BD2-CHITTAGONG-MONGLA-SERVICE_PIL-L24042026.pdf,Arrival and departure shown as N/a.
+BD2,2,Chittagong,BDCGP,Bangladesh,Chittagong Container Terminal (GCB),,,,,,1,0,West-Bound,Unavailable in source,BD2-CHITTAGONG-MONGLA-SERVICE_PIL-L24042026.pdf,Arrival and departure shown as N/a.
+BD2,3,Mongla,BDMGL,Bangladesh,Mongla Port Terminal,,,,,,5,0,East-Bound,Unavailable in source,BD2-CHITTAGONG-MONGLA-SERVICE_PIL-L24042026.pdf,Arrival and departure shown as N/a.
+BD2,4,Singapore,SGSIN,Singapore,PSA Singapore,,,,,,,1,Loop Complete,Unavailable in source,BD2-CHITTAGONG-MONGLA-SERVICE_PIL-L24042026.pdf,Arrival and departure shown as N/a.
+CAS,1,Singapore,SGSIN,Singapore,PSA Singapore,Tuesday,Wednesday,0,1,1,6,0,West-Bound,Derived from published weekday sequence,CAS-CALCUTTA-EXPRESS-SERVICE_PIL-L24042026.pdf,
+CAS,2,Kolkata,INCCU,India,"Syama Prasad Mookerjee Port, Kolkata",Monday,Tuesday,6,7,1,6,0,East-Bound,Derived from published weekday sequence,CAS-CALCUTTA-EXPRESS-SERVICE_PIL-L24042026.pdf,
+CAS,3,Singapore,SGSIN,Singapore,PSA Singapore,Tuesday,Wednesday,14,15,1,,1,Loop Complete,Derived from published weekday sequence,CAS-CALCUTTA-EXPRESS-SERVICE_PIL-L24042026.pdf,
+CCS,1,Xiamen,CNXMN,China,Xiamen Ocean Gate Container Terminal,Wednesday,Wednesday,0,0,0,2,0,West-Bound,Derived from published weekday sequence,CCS-CHINA-CALCUTTA-SERVICE_PIL-L24042026.pdf,Transit to next derived from published transit matrix.
+CCS,2,Shekou,CNSHK,China,Shekou Container Terminal,Friday,Friday,2,2,0,2,0,West-Bound,Derived from published weekday sequence,CCS-CHINA-CALCUTTA-SERVICE_PIL-L24042026.pdf,
+CCS,3,Haiphong,VNHPH,Vietnam,Nam Hai Dinh Vu Terminal,Sunday,Monday,4,5,1,5,0,West-Bound,Derived from published weekday sequence,CCS-CHINA-CALCUTTA-SERVICE_PIL-L24042026.pdf,
+CCS,4,Singapore,SGSIN,Singapore,PSA Singapore,Thursday,Friday,8,9,1,6,0,West-Bound,Derived from published weekday sequence,CCS-CHINA-CALCUTTA-SERVICE_PIL-L24042026.pdf,
+CCS,5,Kolkata,INCCU,India,"Syama Prasad Mookerjee Port, Kolkata",Wednesday,Saturday,14,17,3,10,0,East-Bound,Derived from published weekday sequence,CCS-CHINA-CALCUTTA-SERVICE_PIL-L24042026.pdf,
+CCS,6,Xiamen,CNXMN,China,Xiamen Ocean Gate Container Terminal,Wednesday,Wednesday,21,21,0,,1,Loop Complete,Derived from published weekday sequence,CCS-CHINA-CALCUTTA-SERVICE_PIL-L24042026.pdf,
+CVI,1,Shanghai,CNSHA,China,"Shanghai Mingdong International Container Terminal (SMCT,W5)",Thursday,Thursday,0,0,0,2,0,West-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,Transit to next derived from published transit matrix.
+CVI,2,Ningbo,CNNGB,China,Ningbo Beilun No. 3 Container Terminal,Saturday,Sunday,2,3,1,4,0,West-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,Transit to next derived from published transit matrix.
+CVI,3,Nansha,CNNSA,China,Nansha International Container Terminal (III),Wednesday,Thursday,6,7,1,6,0,West-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+CVI,4,Singapore,SGSIN,Singapore,PSA Singapore,Tuesday,Wednesday,12,13,1,5,0,West-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+CVI,5,Chennai,INMAA,India,Chennai International Terminal,Sunday,Tuesday,17,19,2,1,0,West-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+CVI,6,Gangavaram,INGAV,India,Adani Gangavaram Port Limited,Wednesday,Thursday,20,21,1,5,0,East-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+CVI,7,Port Klang Westport,MYPKG,Malaysia,Westport Terminal,Monday,Tuesday,25,26,1,1,0,East-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+CVI,8,Singapore,SGSIN,Singapore,PSA Singapore,Thursday,Thursday,28,28,0,6,0,East-Bound,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+CVI,9,Shanghai,CNSHA,China,"Shanghai Mingdong International Container Terminal (SMCT,W5)",Thursday,Thursday,35,35,0,,1,Loop Complete,Derived from published weekday sequence,CVI-CHINA-VIZAG-INDIA-SERVICE_PIL-L24042026.pdf,
+YGS,1,Singapore,SGSIN,Singapore,PSA Singapore,Thursday,Thursday,0,0,0,4,0,North-Bound,Derived from published weekday sequence,YGS-YANGON-SERVICE_PIL-L24042026.pdf,
+YGS,2,Yangon,MMRGN,Myanmar,Asia World Port Terminal,Tuesday,Tuesday,5,5,0,5,0,South-Bound,Derived from published weekday sequence,YGS-YANGON-SERVICE_PIL-L24042026.pdf,
+YGS,3,Singapore,SGSIN,Singapore,PSA Singapore,Monday,Monday,11,11,0,,1,Loop Complete,Derived from published weekday sequence,YGS-YANGON-SERVICE_PIL-L24042026.pdf,

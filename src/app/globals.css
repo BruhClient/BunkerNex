@@ -1,0 +1,269 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@theme {
+  --color-bg: #0b0e13;
+  --color-surface: #131822;
+  --color-surface-2: #182031;
+  --color-line: #1f2733;
+  --color-line-strong: #2b3546;
+  --color-fg: #e6eaf0;
+  --color-muted: #8a94a6;
+  --color-faint: #5c6675;
+  --color-accent: #22d3ee;
+  --color-up: #4ade80;
+  --color-down: #f87171;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Every price, delta and day count aligns column-wise. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* Thin, low-contrast scrollbars so panels stay quiet. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* MapLibre's default chrome is too loud for a dark console. */
+.maplibregl-ctrl-group {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-line) !important;
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--color-line) !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(0.85);
+}
+.maplibregl-ctrl-attrib {
+  background: rgba(11, 14, 19, 0.75) !important;
+  color: var(--color-faint) !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-muted) !important;
+}
+.maplibregl-canvas:focus {
+  outline: none;
+}
+
+@keyframes selected-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Map markers. Two visually distinct classes, because only Singapore
+   and Shanghai exist in both the schedule and the pricing datasets:
+     .is-route   a port a PIL service calls at
+     .is-priced  a port with bunker quotes
+     .is-both    both of the above
+   --------------------------------------------------------------- */
+
+.bn-marker {
+  --marker-size: 12px;
+  /* Deliberately no `position` here. MapLibre sets position:absolute on
+     .maplibregl-marker and positions it with a transform; overriding that to
+     relative drops the marker into normal flow, so its translate resolves
+     from the wrong origin and every marker lands at the wrong latitude.
+     position:absolute already makes it a containing block for .bn-tip. */
+  width: var(--marker-size);
+  height: var(--marker-size);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: opacity 180ms ease;
+}
+
+.bn-marker.is-dimmed {
+  opacity: 0.28;
+}
+
+.bn-dot {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+/* Route port: filled disc with a dark ring so it reads over any line, plus
+   a drop shadow so it still separates over pale basemap areas. */
+.bn-marker.is-route .bn-dot {
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--color-bg);
+  box-shadow:
+    0 0 0 1px rgba(230, 234, 240, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
+/* Pricing-only port: hollow diamond, quieter than a route port. */
+.bn-marker.is-priced:not(.is-route) .bn-dot {
+  transform: rotate(45deg);
+  background: var(--color-bg);
+  border: 2px solid #9aa6b8;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+/* In both datasets — only Singapore and Shanghai. The most prominent
+   markers on the map, since they are the only ports with routes and prices. */
+.bn-marker.is-both .bn-dot {
+  background: var(--color-accent);
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    0 0 14px 2px rgba(34, 211, 238, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
+.bn-marker:hover .bn-dot {
+  transform: scale(1.3);
+}
+.bn-marker.is-priced:not(.is-route):hover .bn-dot {
+  transform: rotate(45deg) scale(1.3);
+}
+
+.bn-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bn-marker.is-selected .bn-pulse {
+  animation: selected-pulse 1.8s ease-out infinite;
+}
+
+.bn-marker.is-selected .bn-dot {
+  background: var(--color-accent);
+  border-color: var(--color-bg);
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    0 0 14px 2px rgba(34, 211, 238, 0.5);
+}
+
+/* Hover tooltip — CSS only, so the map needs no extra React state. */
+.bn-tip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  min-width: 148px;
+  padding: 8px 10px;
+  background: rgba(19, 24, 34, 0.97);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 130ms ease,
+    transform 130ms ease;
+  z-index: 5;
+}
+
+.bn-marker:hover .bn-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.bn-tip-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+.bn-tip-meta {
+  margin-top: 1px;
+  font-size: 10px;
+  color: var(--color-faint);
+  white-space: nowrap;
+}
+
+.bn-tip-price {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.bn-tip-none {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-faint);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.bn-tip-services {
+  margin-top: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bn-tip-services span {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 1px 4px;
+  border: 1px solid;
+  border-radius: 2px;
+  opacity: 0.9;
+}
