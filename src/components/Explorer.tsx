@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PortPanel from "./PortPanel";
 import RouteMap from "./RouteMap";
+import ServicePanel from "./ServicePanel";
 import ServiceSidebar from "./ServiceSidebar";
 import { formatDate } from "@/lib/format";
-import type { Port, PortCall, Service } from "@/lib/types";
+import type { Port, PortCall, Service, TransitTime } from "@/lib/types";
 
 interface Props {
   services: Service[];
   portCalls: PortCall[];
+  transitTimes: TransitTime[];
   ports: Port[];
   asOf: string | null;
   region: string;
@@ -18,6 +20,7 @@ interface Props {
 export default function Explorer({
   services,
   portCalls,
+  transitTimes,
   ports,
   asOf,
   region,
@@ -26,6 +29,9 @@ export default function Explorer({
     services.map((s) => s.code),
   );
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedServiceCode, setSelectedServiceCode] = useState<
+    string | null
+  >(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const portsByKey = useMemo(
@@ -34,6 +40,9 @@ export default function Explorer({
   );
   const selectedPort = selectedKey
     ? (portsByKey.get(selectedKey) ?? null)
+    : null;
+  const selectedService = selectedServiceCode
+    ? (services.find((s) => s.code === selectedServiceCode) ?? null)
     : null;
 
   const toggleService = useCallback((code: string) => {
@@ -49,8 +58,19 @@ export default function Explorer({
 
   const selectPort = useCallback((key: string | null) => {
     setSelectedKey(key);
+    // The port and service detail panels share one slot — picking a port
+    // closes any open service detail.
+    if (key) setSelectedServiceCode(null);
     // A narrow screen only has room for one overlay at a time.
     if (key) setSidebarOpen(false);
+  }, []);
+
+  const selectService = useCallback((code: string) => {
+    setSelectedServiceCode(code);
+    setSelectedKey(null);
+    // Viewing a service's detail panel is independent of the sidebar's
+    // on/off toggles, but on a narrow screen they still compete for space.
+    setSidebarOpen(false);
   }, []);
 
   const openSidebar = useCallback(() => {
@@ -130,6 +150,7 @@ export default function Explorer({
           visibleServices={visibleServices}
           onToggle={toggleService}
           onSetAll={setAll}
+          onSelectService={selectService}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
@@ -144,11 +165,20 @@ export default function Explorer({
           />
         </main>
 
-        <PortPanel
-          port={selectedPort}
-          portCalls={portCalls}
-          onClose={() => setSelectedKey(null)}
-        />
+        {selectedPort ? (
+          <PortPanel
+            port={selectedPort}
+            portCalls={portCalls}
+            onClose={() => setSelectedKey(null)}
+          />
+        ) : (
+          <ServicePanel
+            service={selectedService}
+            portCalls={portCalls}
+            transitTimes={transitTimes}
+            onClose={() => setSelectedServiceCode(null)}
+          />
+        )}
       </div>
     </div>
   );

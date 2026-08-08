@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { serviceColor } from "@/lib/colors";
-import { greatCircleArc, type LonLat } from "@/lib/geo";
+import { greatCircleArc, multiPointArc, type LonLat } from "@/lib/geo";
 import { formatPrice } from "@/lib/format";
 import type { Port, PortCall } from "@/lib/types";
 
@@ -12,6 +12,32 @@ const STYLE_URL =
   "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 const PORTS_SOURCE = "ports";
+
+/**
+ * A handful of legs run from Singapore toward the Bay of Bengal or down the
+ * Vietnamese coast; a direct great-circle arc between those endpoints cuts
+ * straight across the Malay Peninsula or Vietnam/Cambodia. These open-water
+ * waypoints bend the affected legs around the landmass instead. Everything
+ * not listed in ROUTE_VIA already tracks open water as a direct arc.
+ */
+const MALACCA_MOUTH: LonLat = [95.35, 5.85]; // NW mouth of the Malacca Strait, off Aceh
+const CAM_RANH_EAST: LonLat = [109.5, 11.9]; // South China Sea, off Vietnam's Cam Ranh bulge
+const CA_MAU_SOUTH: LonLat = [104.7, 8.3]; // South China Sea, south of Vietnam's Ca Mau cape
+
+const ROUTE_VIA: Record<string, LonLat[]> = {
+  "BDCGP|SGSIN": [MALACCA_MOUTH],
+  "BDMGL|SGSIN": [MALACCA_MOUTH],
+  "INCCU|SGSIN": [MALACCA_MOUTH],
+  "MMRGN|SGSIN": [MALACCA_MOUTH],
+  // Ordered north (Haiphong) to south (Singapore) — Vietnam's coast bulges
+  // east around Cam Ranh, so a single waypoint near Ca Mau still cuts
+  // across the country; this needs both to stay offshore the whole way.
+  "SGSIN|VNHPH": [CAM_RANH_EAST, CA_MAU_SOUTH],
+};
+
+function routeViaWaypoints(a: string, b: string): LonLat[] | null {
+  return ROUTE_VIA[[a, b].sort().join("|")] ?? null;
+}
 
 /**
  * Must name font stacks the style actually serves glyphs for, or MapLibre
@@ -153,10 +179,15 @@ export default function RouteMap({
         if (!from || !to) continue;
         if (from.key === to.key) continue; // no arc for a same-port leg
 
-        const arc = bowArc(
-          greatCircleArc([from.lon, from.lat], [to.lon, to.lat]),
-          bow,
-        );
+        const via = routeViaWaypoints(from.key, to.key);
+        const rawArc = via
+          ? multiPointArc([
+              [from.lon, from.lat],
+              ...via,
+              [to.lon, to.lat],
+            ])
+          : greatCircleArc([from.lon, from.lat], [to.lon, to.lat]);
+        const arc = bowArc(rawArc, bow);
         features.push({
           type: "Feature",
           properties: { service: code },

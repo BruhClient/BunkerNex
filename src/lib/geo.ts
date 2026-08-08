@@ -6,9 +6,13 @@ const toDeg = (r: number) => (r * 180) / Math.PI;
 /**
  * Great-circle arc between two lon/lat points, as a smooth polyline.
  *
- * These are schematic curves, not navigable sailing routes — they cut across
- * land. Every port in this dataset sits between 80E and 122E, so no
- * antimeridian wrapping is needed and the maths stays simple.
+ * These are schematic curves, not navigable sailing routes. For most port
+ * pairs in this dataset the direct arc already tracks open water closely
+ * enough; for the handful where it would cut across a landmass, callers
+ * chain several arcs through open-water waypoints via multiPointArc (see
+ * the routing table in RouteMap.tsx). Every port in this dataset sits
+ * between 80E and 122E, so no antimeridian wrapping is needed and the maths
+ * stays simple.
  */
 export function greatCircleArc(from: LonLat, to: LonLat, steps = 64): LonLat[] {
   const lon1 = toRad(from[0]);
@@ -46,4 +50,20 @@ export function greatCircleArc(from: LonLat, to: LonLat, steps = 64): LonLat[] {
     ]);
   }
   return points;
+}
+
+/**
+ * Great-circle arc through a sequence of waypoints, e.g. [from, viaPoint,
+ * to]. Each consecutive pair is arced with greatCircleArc; the shared
+ * endpoint between segments is not duplicated.
+ */
+export function multiPointArc(points: LonLat[], stepsPerLeg = 64): LonLat[] {
+  if (points.length < 2) return points;
+
+  const out: LonLat[] = [points[0]];
+  for (let i = 0; i < points.length - 1; i++) {
+    const leg = greatCircleArc(points[i], points[i + 1], stepsPerLeg);
+    out.push(...leg.slice(1));
+  }
+  return out;
 }

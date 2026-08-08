@@ -1,6 +1,11 @@
 import Explorer from "@/components/Explorer";
 import { latestDataDate } from "@/lib/prices";
-import { buildPortIndex, loadPortCalls, loadServices } from "@/lib/schedules";
+import {
+  buildPortIndex,
+  loadPortCalls,
+  loadServices,
+  loadTransitTimes,
+} from "@/lib/schedules";
 
 // CSVs are read from disk per request, so a data edit shows up on reload.
 export const dynamic = "force-dynamic";
@@ -8,6 +13,7 @@ export const dynamic = "force-dynamic";
 export default function Page() {
   const services = loadServices();
   const portCalls = loadPortCalls();
+  const transitTimes = loadTransitTimes();
   const ports = buildPortIndex(portCalls);
   const asOf = latestDataDate();
 
@@ -19,6 +25,7 @@ export default function Page() {
     <Explorer
       services={services}
       portCalls={portCalls}
+      transitTimes={transitTimes}
       ports={ports}
       asOf={asOf}
       region={region}

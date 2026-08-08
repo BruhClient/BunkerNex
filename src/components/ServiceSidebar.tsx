@@ -8,6 +8,7 @@ interface Props {
   visibleServices: string[];
   onToggle: (code: string) => void;
   onSetAll: (on: boolean) => void;
+  onSelectService: (code: string) => void;
   open: boolean;
   onClose: () => void;
 }
@@ -17,6 +18,7 @@ export default function ServiceSidebar({
   visibleServices,
   onToggle,
   onSetAll,
+  onSelectService,
   open,
   onClose,
 }: Props) {
@@ -71,28 +73,33 @@ export default function ServiceSidebar({
           const on = visibleServices.includes(service.code);
           const color = serviceColor(service.code);
           return (
-            <button
+            <div
               key={service.code}
-              type="button"
-              onClick={() => onToggle(service.code)}
-              aria-pressed={on}
-              className="group flex w-full items-start gap-3 border-b border-line/60 px-4 py-3 text-left transition-colors hover:bg-surface-2"
+              className="group flex w-full items-start gap-3 border-b border-line/60 px-4 py-3 transition-colors hover:bg-surface-2"
             >
-              <span
-                aria-hidden
-                className="mt-[3px] size-3 shrink-0 rounded-[3px] border transition-colors"
-                style={{
-                  borderColor: on ? color : "var(--color-line-strong)",
-                  background: on ? color : "transparent",
-                }}
-              />
-              <span className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => onToggle(service.code)}
+                className="min-w-0 flex-1 text-left"
+                aria-pressed={on}
+                aria-label={`${on ? "Hide" : "Show"} ${service.code} on map`}
+              >
                 <span className="flex items-baseline justify-between gap-2">
-                  <span
-                    className="tnum text-[13px] font-semibold tracking-wide transition-colors"
-                    style={{ color: on ? color : "var(--color-faint)" }}
-                  >
-                    {service.code}
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span
+                      aria-hidden
+                      className="block size-2.5 shrink-0 rounded-[3px] border transition-colors"
+                      style={{
+                        borderColor: on ? color : "var(--color-line-strong)",
+                        background: on ? color : "transparent",
+                      }}
+                    />
+                    <span
+                      className="tnum text-[13px] font-semibold tracking-wide transition-colors"
+                      style={{ color: on ? color : "var(--color-faint)" }}
+                    >
+                      {service.code}
+                    </span>
                   </span>
                   <span className="tnum shrink-0 text-[10px] text-faint">
                     {service.uniquePortCount} ports · {service.frequency}
@@ -111,8 +118,25 @@ export default function ServiceSidebar({
                     {service.keyFeatures[0]}
                   </span>
                 )}
-              </span>
-            </button>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectService(service.code)}
+                aria-label={`View ${service.code} route details`}
+                className="-m-1.5 mt-[1.5px] shrink-0 rounded p-1.5 text-faint transition-colors hover:bg-surface hover:text-fg"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+                  <path
+                    d="M5 2l5 5-5 5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
           );
         })}
       </div>
