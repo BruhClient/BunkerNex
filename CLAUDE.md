@@ -23,10 +23,19 @@ A single-page maritime explorer: PIL container-service schedules drawn on a MapL
 
 There is no database, no ORM, and no build step that generates data. `readCsv` ([src/lib/csv.ts](src/lib/csv.ts)) reads files off disk relative to `data/` at request time and **caches them in a module-level Map for the life of the server process**. Editing a CSV therefore requires a server restart, not just a page reload — `export const dynamic = "force-dynamic"` in [src/app/page.tsx](src/app/page.tsx) re-renders per request but does not clear that cache.
 
-Two independent datasets live there:
+Three datasets live there:
 
 - `data/schedules/PIL_Intra_Asia_{Service_Master,Port_Calls,Transit_Times}.csv` — service metadata, ordered port rotations, and published port-pair transit times.
 - `data/pricing/*.csv` — wide sheets, one `Date` column plus one column per port-and-grade.
+- `data/vessels/*.csv` — the 109-vessel specification sheet and the simulated fleet movement series.
+
+### `PIL_Fleet_Live_Movement.csv` is the timeline, and it is generated
+
+Nothing in `src/` hardcodes a start or end date. The scrubbed window is **entirely** derived from `data/vessels/PIL_Fleet_Live_Movement.csv`: `loadVesselTracks` ([src/lib/vessels.ts](src/lib/vessels.ts)) keeps only the first `Timestamp` and the row count, and every date the UI shows is index arithmetic from there against a hardcoded `STEP_HOURS = 3`. It currently runs **2026-05-05 00:00:00 → 2026-08-05 21:00:00** — 26,040 rows, 35 vessels × 744 three-hour steps.
+
+**To move the timeline, edit `WINDOW_START` and `STEPS` at the top of `scripts/gen-vessel-movement.mjs` and re-run it.** Those two constants are the whole window; rotations, phases, loop offsets and the ROB model are all derived, so the same fleet replays over the new dates. The script asserts every invariant in `data/README.md`'s "Refreshing" list before writing — including the one nothing at runtime checks, that every port in every rotation is actually visited — and is idempotent. Editing that CSV by hand instead will silently break those invariants.
+
+The window deliberately ends on 2026-08-05, the last date in `data/pricing/*.csv`, so every bunker stem falls inside the priced period. If you move it past that date, stems again get priced off an assessment weeks older than the stem.
 
 ### UN/LOCODE is the join key, and `PORT_COORDS` is load-bearing
 
@@ -41,6 +50,24 @@ Ports appearing in both datasets (currently Singapore, Shanghai, Busan) resolve 
 [src/lib/prices.ts](src/lib/prices.ts) splits headers like `"LA LongBeach IFO380"` into port + grade by matching `GRADE_SUFFIXES` **longest-first** (so `MEOH VLSFOe` is not read as `VLSFO`), then resolving the prefix through `PRICE_PORT_ALIASES`. The source spells ports inconsistently and misspells several (`ROTERDAM`, `NORFORK`, `STPETERS`); every variant is aliased onto one key. Source rows are newest-first and get reversed for charting. Brent is stored under a `__BRENT` pseudo-port key in $/mt so it shares the chart's y-axis; the raw $/bbl column is deliberately ignored.
 
 Adding a pricing port needs both an alias entry and a `PORT_COORDS` entry, or the column is dropped.
+
+### Most price columns are modelled, and nothing marks them
+
+Only 3 of the 26 ports this fleet stems at are assessed — Singapore, Busan and Shanghai. The other 23 carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `LSMGO_MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
+
+`MGO` follows the same hub table as VLSFO and was added for chart completeness only — `PRICE_SERIES` in `src/lib/bunkerEvents.ts` never reads it, so it can't reach a valuation. `Methanol Prices.csv` was deliberately **not** extended: researched and found to have no bunkering market at any of the 23 ports as of August 2026 (infrastructure exists only at Singapore, Shanghai/Zhoushan and emerging Korea/India facilities, none of which are in this fleet's unassessed set) — see `data/README.md` for sources.
+
+They are deliberately indistinguishable downstream. They resolve through `PRICE_PORT_ALIASES`, chart like any other series, and **flow through `bunkerPriceSnapshot()` into stem valuations** — so a stem at Chittagong is priced off Singapore plus a judgment differential and reads exactly like a quoted one. `data/README.md` is the only record of which columns are which; check it before presenting any figure as an assessment.
+
+**Re-run `node scripts/gen-modelled-prices.mjs` after every price refresh.** Modelled columns are computed from the hub columns beside them, so updating the hubs leaves them stale, and nothing at runtime can detect it. The script is idempotent.
+
+Working rules:
+
+- A blank `Basis_USD_Per_MT` means *no market for that grade at that port*; `0` means *parity with the hub*. Never conflate them — `Number("")` is `0`, so check emptiness before converting.
+- Blanks may only **lead** a series. An interior blank would leave a null-run that the chart's `connectNulls` draws straight across; the generator throws instead.
+- Every `judgment` row must bracket its figure between two assessed spreads from this dataset, recorded in `Rationale`.
+- Published spreads do **not** reproduce here: S&P's Shanghai–Singapore LSFO spread of $14/mt on 2026-04-07 is **+78.0** in `VLSFO Prices.csv`. Calibrate on the repo's own assessed spreads.
+- Adding a modelled port needs three things in one change — a `PORT_HEADER` entry in the generator, a `PRICE_PORT_ALIASES` entry, and a `PORT_COORDS` entry — or the column is silently dropped.
 
 ### Server/client boundary
 

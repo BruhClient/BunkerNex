@@ -31,13 +31,145 @@ have the account activated with the service provider.
 | File | Columns | Rows | Coverage |
 |---|---|---|---|
 | `Brent Prices.csv` | `Brent`, `BrentPMT` | 1966 | 2019-01-02 → 2026-08-05 |
-| `VLSFO Prices.csv` | 25 ports | 1973 | 2019-01-02 → 2026-08-05 |
-| `HSGO Prices.csv` | 12 ports, `IFO380` | 1973 | 2019-01-02 → 2026-08-05 |
-| `LSMGO_MGO Prices.csv` | 28 columns, `LSMGO`/`MGO` | 1973 | 2019-01-02 → 2026-08-05 |
-| `Methanol Prices.csv` | 12 columns, `MEOH` + `VLSFOe`/`MGOe` equivalents | 188 | 2022-12-16 → 2026-08-03 |
+| `VLSFO Prices.csv` | 25 assessed ports + **23 modelled** | 1973 | 2019-01-02 → 2026-08-05 |
+| `HSGO Prices.csv` | 12 assessed ports + **12 modelled**, `IFO380` | 1973 | 2019-01-02 → 2026-08-05 |
+| `LSMGO_MGO Prices.csv` | 28 assessed columns + **23 modelled** `MGO` | 1973 | 2019-01-02 → 2026-08-05 |
+| `Methanol Prices.csv` | 12 columns, `MEOH` + `VLSFOe`/`MGOe` equivalents — **no modelled columns; see below** | 188 | 2022-12-16 → 2026-08-03 |
+| `bunker_basis.csv` | provenance for the modelled columns — **not a price sheet**, and not read by the app | 217 | segments from 2019-01-02 |
 
 Coverage is the *date range of the file*, not of every column. Most columns start
 much later than the first row — see "sparsity" below.
+
+### Modelled columns — 23 ports nobody assesses
+
+**Not every column in these files is an assessment, and nothing in the app marks which
+is which.** Read this section before quoting any figure from a port outside the
+assessed set.
+
+Only 3 of the 26 ports this fleet stems at are quoted anywhere — Singapore, Busan and
+Shanghai. The other 23 have no assessment and no obtainable history: Ship & Bunker
+403s automated fetch and gates history behind Bunker Prices Pro, Bunker Index answers
+"Subscribe to view this information" on every port page, OilMonster and LiveBunkers are
+login-walled. Each is therefore **modelled**, the way an unassessed port is genuinely
+quoted in the market:
+
+```
+modelled(port, grade, date) = assessed_hub(hub, grade, date) + basis(port, grade, date)
+```
+
+The basis lives in `bunker_basis.csv` and is materialised into the wide CSVs by
+[`scripts/gen-modelled-prices.mjs`](../scripts/gen-modelled-prices.mjs).
+
+**Re-run that script after every price refresh.** The modelled columns are computed
+from the hub columns beside them, so the moment the hubs are updated the modelled
+values are stale — and nothing at runtime can detect it. That is the standing cost of
+keeping modelled and assessed data in one file.
+
+Modelled ports, by hub:
+
+| Hub | Ports |
+|---|---|
+| `SINGAPORE` | Port Klang, Chittagong, Mongla, Kolkata, Chennai, Gangavaram, Yangon, Haiphong, Ho Chi Minh, Qui Nhon, Laem Chabang, Bangkok, Jakarta, Surabaya, Semarang |
+| `HONGKONG` | Shekou, Nansha, Xiamen, Qinzhou (+ all Chinese IFO380 — Shanghai has no IFO380 column) |
+| `SHANGHAI` | Ningbo, Qingdao, Tianjin (VLSFO only) |
+| `BUSAN` | Incheon |
+
+`MGO` rides the same hub assignment as VLSFO, added for all 23 ports for chart
+completeness — see "MGO and Methanol" below.
+
+`bunker_basis.csv` columns: `Port_Code, Port_Name, Grade, Hub_Port_Code, Hub_Grade,
+Effective_From, Basis_USD_Per_MT, Confidence, Source_Name, Source_URL, Source_Date,
+Rationale, Data_Notes`. A segment runs until the next `Effective_From` for that
+`(port, grade)`; there is no `Effective_To`. **Blank `Basis_USD_Per_MT` means no market
+for that grade at that port; `0` means parity with the hub** — the same distinction as
+"zeros here are real" in the vessel file. Blanks may only *lead* a series, so trimming
+the leading nulls removes every null a blank basis can produce and the chart's
+`connectNulls` never bridges a period we declared had no price.
+
+`Confidence` is `sourced` (a published spread — only Qingdao and Jakarta),
+`inferred` (read across from an assessed spread), or `judgment` (no source). **Every
+`judgment` row brackets its number between two assessed spreads from this dataset** —
+Port Klang between Singapore (hub, 0) and assessed Hong Kong (+11), Chittagong above
+assessed Colombo (+65–70) — so each invented figure stays auditable against data
+already in the repo.
+
+**Calibrate on this dataset's own spreads, not published ones.** S&P reported the
+Zhoushan/Shanghai–Singapore LSFO spread at $14/mt on 2026-04-07 and $18/mt on
+2024-12-30; `VLSFO Prices.csv` gives **+78.0** and **+28.0** on those exact dates. It is
+a different assessment series. The spreads to calibrate against, mean ± sd $/mt vs
+Singapore:
+
+```
+SHANGHAI  2020:14±16  2021:10±9   2022:22±22  2023:21±15  2024:17±16  2025:13±11  2026:2±32
+HONGKONG  2020:-1±13  2021:-5±8   2022:10±22  2023:11±12  2024:11±11  2025:12±6   2026:21±27
+BUSAN     2020:12±14  2021:24±16  2022:33±41  2023:30±19  2024:21±12  2025:27±19  2026:67±86
+COLOMBO   2020:54±53  2021:50±17  2022:90±67  2023:65±27  2024:70±17  2025:65±15  2026:130±101
+```
+
+2026 is anomalous on every pair (sd 27–101), so the open-ended final segment is
+calibrated on 2024–25 deliberately.
+
+#### What this costs, stated plainly
+
+- **A modelled column moves in lockstep with its hub.** A constant basis models the
+  level, not the shape. The assessed spread standard deviations above (±9 to ±32) are
+  comparable to several of the basis values themselves.
+- **Modelled figures price bunker stems.** They sit in the files `bunkerPriceSnapshot()`
+  reads, so a stem at Chittagong is valued off Singapore plus a judgment differential
+  and looks identical to a quoted one in the bunker log. Any total built from those
+  values is part modelled.
+- **11 ports get no IFO380 column at all** — Chittagong, Mongla, Yangon, Kolkata,
+  Gangavaram, Haiphong, Qui Nhon, Bangkok, Jakarta, Surabaya, Semarang. There is no
+  HSFO bunker market at any of them. `PIL_Fleet_Live_Movement.csv` still records HSFO
+  stems at Chittagong (473 MT), Yangon (300 MT) and Laem Chabang (400 MT), because it
+  assigns grade purely by scrubber fitting and never checks what the port can supply.
+  The missing column is correct; the movement file is the thing that is wrong.
+- **Jakarta's column steps ~$143/mt on 2023-05-01.** Real: Pertamina moved to
+  market-based pricing and exempted ocean-going vessels from 11% VAT, and the assessed
+  premium narrowed from $210–256 to ~$87 (Argus). It is not smoothed — ramping would
+  invent intra-period structure with no source.
+- **Most `Source_URL`s are gated.** `Source_Name` + `Source_Date` + the figure quoted in
+  `Rationale` are what make a `sourced` claim checkable; the URL is a pointer, not the
+  evidence.
+
+#### MGO and Methanol — one extended, one deliberately not
+
+Neither grade is read by `bunkerPriceSnapshot()` — `PRICE_SERIES` in
+`src/lib/bunkerEvents.ts` maps only `VLSFO`/`HSFO` to `VLSFO`/`IFO380` — so both of the
+following are chart-completeness decisions with zero effect on stem valuations.
+
+**`MGO` was modelled for all 23 ports**, same hub assignment as VLSFO, entirely
+`inferred`/`judgment` confidence (no published spread was found for any of them).
+Marine gasoil is treated as realistically universal at ports that already take
+VLSFO/HSFO stems on a live rotation — it is what generators and auxiliary engines run
+on. Directly confirmed for the hardest cases: Chittagong and Mongla (Selim Shah Marine
+Enterprise supplies IFO/MGO/MDO at both — [dieselduck.info](https://www.dieselduck.info/forum/viewtopic.php?t=1503)),
+Jakarta ([livebunkers.com](https://www.livebunkers.com/jakarta)), and Port Klang
+([oilmonster.com](https://www.oilmonster.com/bunker-fuel-prices/far-east-and-south-pacific/port-klang/76)).
+Every port gets a single `MGO` column, not a parallel `LSMGO`, matching the file's own
+regional convention — Busan, Hong Kong and Shanghai are already labelled `MGO`, while
+`LSMGO` shows up mostly at Japan/Europe/Americas ports.
+
+The basis itself reads across the assessed `HONGKONG MGO`, `SHANGHAI MGO` and
+`BUSAN MGO` minus `SINGAPORE MGO` spreads already in `LSMGO_MGO Prices.csv`. That
+spread is considerably noisier than VLSFO's — `SHANGHAI MGO − SINGAPORE MGO` swings
+from a 2019 mean of −385 (sd 318, almost certainly thin-liquidity days rather than a
+real signal) to a 2022 mean of +98 — so Singapore-hub ports are bracketed against the
+calmer `BUSAN MGO` spread (+13 to +46 across the period) rather than Shanghai's.
+
+**Methanol was researched and found to have no market at any of the 23 ports — left
+unmodelled by finding, not by oversight.** As of August 2026, methanol bunkering
+infrastructure exists only at Singapore (MPA licences to Golden Island/GET/PetroChina
+effective 2026-01-01, plus the new Jurong Port green-methanol terminal —
+[MPA](https://www.mpa.gov.sg/media-centre/details/singapore-to-award-licences-for-methanol-bunkering),
+[Splash247](https://splash247.com/singapore-locks-in-methanol-suppliers-for-2026-takeoff/)),
+Shanghai/Zhoushan (PetroChina's first China licence), and emerging South Korea/India
+facilities that name Kandla specifically — not any port in this fleet's rotation,
+including Incheon, the one Korean port in scope. Modelling it anyway would price a fuel
+this fleet never burns (`VesselGrade` is `"VLSFO" | "HSFO"` only) off a hub set where
+only Singapore is assessed, with no comparable Asian port to calibrate a basis against —
+fabrication with no anchor, unlike the `judgment` rows above which all bracket against a
+real spread in this dataset.
 
 ### Conventions
 
@@ -142,7 +274,7 @@ block. Sheet last modified 2026-08-08; **extracted 2026-08-09**.
 |---|---|
 | `PIL_Fleet_Vessel_Specifications.csv` | one row per vessel (109) |
 | `vessel_assumptions.csv` | one row per derived column (5) |
-| `PIL_Fleet_Live_Movement.csv` | one row per vessel per 3-hour step (16,800) |
+| `PIL_Fleet_Live_Movement.csv` | one row per vessel per 3-hour step (26,040) |
 
 109 vessels: 101 named `KOTA *` plus ASTERIOS, LITTLE MERMAID, PACANDA, SALAM MAJU,
 SC MARA, SELATAN DAMAI, ZHONG HANG SHENG and ZHU CHENG XIN ZHOU. Eleven flags,
@@ -256,9 +388,14 @@ been replaced** — see "Regenerated from the rotations" below. The Drive sheet 
 longer the shape of this file; only its column vocabulary survives.
 
 One row per vessel per 3-hour step: destination port, operational phase,
-remaining-on-board fuel by grade, and any bunker delivered. 16,800 rows — **35 vessels ×
-exactly 480 steps**, 2026-08-01 00:00:00 → 2026-09-29 21:00:00, no gaps. This is the only
+remaining-on-board fuel by grade, and any bunker delivered. 26,040 rows — **35 vessels ×
+exactly 744 steps**, 2026-05-05 00:00:00 → 2026-08-05 21:00:00, no gaps. This is the only
 file in `data/` with a real timestamp and a fuel level that moves over time.
+
+**This file is the app's timeline.** Nothing in `src/` hardcodes a start or end date:
+`loadVesselTracks` keeps the first `Timestamp` and the row count, and every date the UI
+shows is index arithmetic from there. The window closes on **2026-08-05**, the last date in
+`pricing/`, so every stem falls inside the priced period — see "The bunkering trigger" below.
 
 ### It is a simulation, not telemetry — and it is generated from `vessel_assumptions.csv`
 
@@ -296,8 +433,11 @@ visits **every** port in its rotation, in sequence, on the published loop length
 - Vessel *k* of *n* on a service starts at loop offset `round(k × steps_per_loop / n)`, so
   sisters are spread around the rotation instead of moving in lockstep.
 
-Regenerating requires the vessel roster (above) and these rules; there is no script in the
-repo. Re-derive it and re-check the invariants listed under "Refreshing".
+All of the above is implemented by [`scripts/gen-vessel-movement.mjs`](../scripts/gen-vessel-movement.mjs),
+which holds the roster and these rules and asserts every invariant under "Refreshing" before
+it writes. **To move the timeline, edit `WINDOW_START` and `STEPS` at the top of that script
+and re-run it** — those two constants are the whole window, and the fleet simply replays over
+the new dates. It is idempotent.
 
 ### `Synthetic_Latitude` / `Synthetic_Longitude` are now blank. Never map them.
 
@@ -333,8 +473,11 @@ as feasible operations was optimising an impossible schedule.
 The regenerated file enforces the rule the source omitted:
 
 - ROB opens at `Max_ROB_MT` and burns `Consumption_Transit_MT_Per_Day ÷ 8` per transit step
-  and `Consumption_Berth_MT_Per_Day ÷ 8` per berthed step, to three decimals — the
-  consumption model is unchanged, and still comes from `vessel_assumptions.csv`.
+  and `Consumption_Berth_MT_Per_Day ÷ 8` per berthed step — the consumption model is
+  unchanged, and still comes from `vessel_assumptions.csv`. **The running ROB is rounded to
+  three decimals after each step; the burn rate itself is not.** The distinction is not
+  cosmetic: KOTA SEJATI burns 46.58 ÷ 8 = 5.8225 MT per transit step, so pre-rounding the
+  rate shifts thousands of cells and the odd step legitimately drops 5.823 rather than 5.822.
 - At the first berthed step of a call carrying a `Bunker_Quantity_MT`, a stem is lifted if
   ROB has fallen to `Bunkering_Trigger_MT` **or** if ROB minus the fuel needed to reach the
   next stem opportunity would fall below `Min_ROB_MT`. The second clause is the
@@ -342,8 +485,9 @@ The regenerated file enforces the rule the source omitted:
 - The stem is `min(Bunker_Quantity_MT, Max_ROB_MT − ROB)`, so a call's published quantity is
   never exceeded and the tank never overfills. Where capacity cuts the stem short, the row
   says so in `Data_Notes`.
-- **Invariant, verified over all 16,800 rows: `Min_ROB_MT ≤ ROB ≤ Max_ROB_MT`.** ROB never
-  reaches 0. 86 stems now occur across the fleet's 60 days, up from 26.
+- **Invariant, verified over all 26,040 rows: `Min_ROB_MT ≤ ROB ≤ Max_ROB_MT`.** ROB never
+  reaches 0, and the tightest margin anywhere in the file is 3.445 MT above `Min_ROB_MT`.
+  154 stems occur across the fleet's 93 days — 1.7 a day, against the Drive extract's 0.4.
 
 The ROB curves are still a model, not measurements — the consumption rates are a flat
 percentage of DWT, so this remains a worked example. What changed is that it is now a
@@ -404,10 +548,11 @@ does not apply. Don't "clean" them into blanks.
 ### Refreshing
 
 This file is no longer a transform of the Drive sheet, so re-exporting that sheet will not
-refresh it. Regenerate it from `schedules/PIL_Intra_Asia_Port_Calls.csv` using the roster
-and the timetable/ROB rules above, then assert all of the following before trusting it:
+refresh it. Run `node scripts/gen-vessel-movement.mjs`, which regenerates it from
+`schedules/PIL_Intra_Asia_Port_Calls.csv` and asserts all of the following **before** it
+writes, throwing rather than emitting a file that violates any of them:
 
-- 480 rows per vessel, a gapless 3-hour grid per vessel, one `Service_Code` per vessel.
+- 744 rows per vessel, a gapless 3-hour grid per vessel, one `Service_Code` per vessel.
 - Every `Port_Code` a vessel visits is in **that service's** rotation — no vessel calling a
   port off its line.
 - **Every port in every rotation is visited by at least one vessel of that service.** This
@@ -417,10 +562,19 @@ and the timetable/ROB rules above, then assert all of the following before trust
   `Port_Code` in both `PORT_COORDS` and `PORT_APPROACH`.
 
 `loadVesselTracks` in [`lib/vessels.ts`](../src/lib/vessels.ts) throws on an unknown vessel
-name or a port outside `PORT_COORDS`, so those two are caught at build time. The rotation
-and ROB invariants are **not** — nothing in the app checks them, which is exactly how the
-eight uncalled ports survived. Check them yourself.
+name or a port outside `PORT_COORDS`, so those two are also caught at build time. The
+rotation and ROB invariants are **not** checked anywhere in the app — which is exactly how
+the eight uncalled ports survived — so if you ever build this file by any route other than
+the generator, assert them yourself.
 
-If the fleet grows much beyond 35, watch the payload: these tracks ship as props from
-`app/page.tsx`, roughly 250 KB of RSC payload at 35 vessels. Pricing moved behind
-`GET /api/prices/[portKey]` at ~700 KB; that is the threshold to compare against.
+The generator reads `PORT_COORDS` and `PORT_APPROACH` by scraping `src/lib/ports.ts` and
+`src/lib/searoutes.ts`, since no CSV carries port geometry. That scrape throws if it finds
+fewer than 26 codes, so reformatting either object literal fails loudly instead of turning
+the check into a vacuous pass.
+
+Watch the payload: these tracks ship as props from `app/page.tsx`, roughly **390 KB of RSC
+payload at 35 vessels × 744 steps** (up from ~250 KB at 480 steps). Pricing moved behind
+`GET /api/prices/[portKey]` at ~700 KB; that is the threshold to compare against. There is
+room for the fleet to grow to roughly 55 vessels *or* for a longer window, not both — the
+next expansion of either dimension should move tracks behind an API route on the same
+pattern.

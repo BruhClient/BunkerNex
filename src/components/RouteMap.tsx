@@ -506,7 +506,7 @@ export default function RouteMap({
       }
 
       // Vessel markers are created once and then *moved* on every scrub —
-      // rebuilding them per step would churn DOM 480 times per playback.
+      // rebuilding them per step would churn DOM 744 times per playback.
       for (const track of vesselTracks) {
         const el = buildVesselElement(track);
         el.addEventListener("click", (event) => {

@@ -1,5 +1,5 @@
 import Explorer from "@/components/Explorer";
-import { latestDataDate } from "@/lib/prices";
+import { bunkerPriceSnapshot, latestDataDate } from "@/lib/prices";
 import {
   buildPortIndex,
   loadPortCalls,
@@ -17,6 +17,9 @@ export default function Page() {
   const transitTimes = loadTransitTimes();
   const ports = buildPortIndex(portCalls);
   const asOf = latestDataDate();
+  // A few dozen numbers, so the arrival toasts can price a stem from props
+  // rather than fetching per event.
+  const bunkerPrices = bunkerPriceSnapshot();
 
   // Only 11 of the 109 vessels have a movement series, and only those can be
   // placed on the map — so ship the specs for those alone rather than the
@@ -43,6 +46,7 @@ export default function Page() {
       ports={ports}
       vesselSpecs={vesselSpecs}
       vesselTracks={vesselTracks}
+      bunkerPrices={bunkerPrices}
       asOf={asOf}
       region={region}
     />

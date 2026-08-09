@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import BunkerLog from "./BunkerLog";
 import PortPanel from "./PortPanel";
 import RouteMap from "./RouteMap";
 import ServicePanel from "./ServicePanel";
 import ServiceSidebar from "./ServiceSidebar";
 import TimeScrubber from "./TimeScrubber";
 import VesselPanel from "./VesselPanel";
+import { allBunkerEvents } from "@/lib/bunkerEvents";
 import { formatDate } from "@/lib/format";
 import { stepTimestamp } from "@/lib/vesselPosition";
+import type { BunkerPriceSnapshot } from "@/lib/bunkerEvents";
 import type {
   Port,
   PortCall,
@@ -25,6 +28,8 @@ interface Props {
   ports: Port[];
   vesselSpecs: VesselSpec[];
   vesselTracks: VesselTrack[];
+  /** Latest assessment per port and grade, for pricing a stem in the log. */
+  bunkerPrices: BunkerPriceSnapshot;
   asOf: string | null;
   region: string;
 }
@@ -36,6 +41,7 @@ export default function Explorer({
   ports,
   vesselSpecs,
   vesselTracks,
+  bunkerPrices,
   asOf,
   region,
 }: Props) {
@@ -54,6 +60,9 @@ export default function Explorer({
   );
   const [stepIndex, setStepIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Collapsed by default: the map is the point, and a shut drawer costs
+  // nothing per playback tick since only its header renders.
+  const [logOpen, setLogOpen] = useState(false);
 
   /**
    * The one service the map brings forward. A selection holds; a hover is
@@ -98,6 +107,24 @@ export default function Explorer({
   // come from any of them.
   const clock = vesselTracks[0] ?? null;
   const stepCount = clock?.portCodes.length ?? 0;
+
+  // Every stem in the window, built once. The log filters and sorts it; the
+  // scrubber only needs the distinct steps to tick.
+  const bunkerEvents = useMemo(
+    () => allBunkerEvents(vesselTracks, bunkerPrices),
+    [vesselTracks, bunkerPrices],
+  );
+
+  const stemSteps = useMemo(
+    () => [
+      ...new Set(
+        bunkerEvents
+          .filter((e) => visibleServices.includes(e.serviceCode))
+          .map((e) => e.step),
+      ),
+    ],
+    [bunkerEvents, visibleServices],
+  );
 
   const toggleService = useCallback((code: string) => {
     setVisibleServices((prev) =>
@@ -222,13 +249,31 @@ export default function Explorer({
             onSelectPort={selectPort}
             onSelectVessel={selectVessel}
           />
+          {/* Log and scrubber share one bottom-anchored column so the drawer
+              pushes the scrubber down by its own height — nothing has to know
+              how tall the other is. */}
           {clock && stepCount > 0 && (
-            <TimeScrubber
-              stepCount={stepCount}
-              stepIndex={stepIndex}
-              label={stepTimestamp(clock, stepIndex)}
-              onChange={setStepIndex}
-            />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col">
+              <BunkerLog
+                events={bunkerEvents}
+                visibleServices={visibleServices}
+                stepIndex={stepIndex}
+                asOf={asOf}
+                open={logOpen}
+                onToggle={() => setLogOpen((o) => !o)}
+                onSeek={setStepIndex}
+                onSelectVessel={selectVessel}
+              />
+              <div className="pointer-events-auto">
+                <TimeScrubber
+                  stepCount={stepCount}
+                  stepIndex={stepIndex}
+                  label={stepTimestamp(clock, stepIndex)}
+                  markSteps={stemSteps}
+                  onChange={setStepIndex}
+                />
+              </div>
+            </div>
           )}
         </main>
 
@@ -243,6 +288,8 @@ export default function Explorer({
             }
             portCalls={portCalls}
             stepIndex={stepIndex}
+            events={bunkerEvents}
+            onSeek={setStepIndex}
             onClose={() => setSelectedVesselName(null)}
           />
         ) : selectedPort ? (

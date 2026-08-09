@@ -37,7 +37,7 @@ export function loadVesselSpecs(): VesselSpec[] {
 }
 
 /**
- * Reshape the 16,800-row movement CSV into one columnar track per vessel.
+ * Reshape the 26,040-row movement CSV into one columnar track per vessel.
  *
  * Two things are dropped on purpose. The synthetic coordinates are never read
  * — they are blank in every row, and were fictional before that, so positions

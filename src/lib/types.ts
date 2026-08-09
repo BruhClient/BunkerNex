@@ -106,7 +106,7 @@ export interface VesselSpec {
 }
 
 /**
- * One vessel's movement series, stored columnar: 480 steps × 35 vessels as
+ * One vessel's movement series, stored columnar: 744 steps × 35 vessels as
  * plain rows would be pricing-sized, which does not belong in props.
  *
  * Timestamps are a perfect 3-hour grid, so only the first is carried and the
@@ -114,11 +114,17 @@ export interface VesselSpec {
  * absent — they place vessels thousands of km from their own ports, and
  * positions are derived from portCodes via PORT_COORDS instead.
  */
+/**
+ * What a vessel burns and stems. Narrower than `Grade`, which is the set of
+ * assessed price columns — the fleet only ever moves these two.
+ */
+export type VesselGrade = "VLSFO" | "HSFO";
+
 export interface VesselTrack {
   name: string;
   serviceCode: string;
   /** The single grade this vessel actually burns, per its scrubber fitting. */
-  grade: "VLSFO" | "HSFO";
+  grade: VesselGrade;
   /** Constant for the whole series — MGO is never burned or stemmed. */
   mgoRobMt: number | null;
   /** Source wall-clock string, no timezone. Opaque; never parsed as UTC. */
@@ -130,7 +136,7 @@ export interface VesselTrack {
   phases: string;
   /** Per step, remaining-on-board of `grade`. */
   robMt: number[];
-  /** Sparse: step index → MT delivered. 86 entries across the fleet. */
+  /** Sparse: step index → MT delivered. 154 entries across the fleet. */
   bunkered: Record<number, number>;
 }
 

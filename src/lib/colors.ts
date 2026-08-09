@@ -17,6 +17,10 @@ export const THEME = {
   muted: "#9AA6B8",
   faint: "#5C6675",
   accent: "#22D3EE",
+  /** --color-down. The scrubbed-moment rule on the ROB chart. */
+  down: "#F87171",
+  /** --color-warn. Reserved for derived figures and threshold breaches. */
+  warn: "#F59E0B",
 } as const;
 
 /**

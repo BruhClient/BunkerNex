@@ -9,6 +9,18 @@ export function formatPrice(value: number | null | undefined): string {
   });
 }
 
+/**
+ * Tonnages, to the nearest tonne. The source quotes stems and ROB to a
+ * fraction the trade does not use, and a thousands separator is what makes a
+ * four-figure stem readable at a glance.
+ */
+export function formatMt(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+  return Math.round(value).toLocaleString("en-US");
+}
+
 export function formatDelta(delta: number | null): string {
   if (delta === null || !Number.isFinite(delta)) return "—";
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";

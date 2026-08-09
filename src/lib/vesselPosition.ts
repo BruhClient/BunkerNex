@@ -73,7 +73,7 @@ export function buildLegs(track: VesselTrack): VesselLeg[] {
  * *that*. These tracks are cyclic rotations, so it recovers the true origin.
  * Reusing the *last* leg's port instead would invent a leg the vessel never
  * sails: a track opening mid-rotation would appear to sail from wherever the
- * 60-day window happened to stop, cutting across the whole loop.
+ * 93-day window happened to stop, cutting across the whole loop.
  */
 function originFor(legs: VesselLeg[], index: number): string {
   if (index > 0) return legs[index - 1].toKey;

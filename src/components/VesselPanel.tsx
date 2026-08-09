@@ -3,6 +3,10 @@
 import { useEffect, useMemo } from "react";
 import { serviceColor } from "@/lib/colors";
 import { buildLegs, stepTimestamp } from "@/lib/vesselPosition";
+import VesselFuelBar from "./VesselFuelBar";
+import VesselRobChart from "./VesselRobChart";
+import VesselStems from "./VesselStems";
+import type { BunkerEvent } from "@/lib/bunkerEvents";
 import type {
   PortCall,
   Service,
@@ -17,6 +21,9 @@ interface Props {
   service: Service | null;
   portCalls: PortCall[];
   stepIndex: number;
+  /** Every stem in the window. Filtered to this vessel here. */
+  events: BunkerEvent[];
+  onSeek: (step: number) => void;
   onClose: () => void;
 }
 
@@ -57,6 +64,8 @@ export default function VesselPanel({
   service,
   portCalls,
   stepIndex,
+  events,
+  onSeek,
   onClose,
 }: Props) {
   const vesselName = spec?.name ?? null;
@@ -72,6 +81,14 @@ export default function VesselPanel({
   }, [vesselName, onClose]);
 
   const legs = useMemo(() => (track ? buildLegs(track) : []), [track]);
+
+  // Explorer already builds the fleet-wide list once; narrowing it here is the
+  // same filter BunkerLog applies for services, and avoids a second walk of
+  // every track's bunkered map.
+  const stems = useMemo(
+    () => events.filter((e) => e.vesselName === vesselName),
+    [events, vesselName],
+  );
 
   // The published rotation for this service, plus the ports the simulated
   // track never calls at. Sorted inline for the same reason sizeClassFor is
@@ -170,13 +187,23 @@ export default function VesselPanel({
                 : "—"
             }
           />
-          <Row label={`${track.grade} remaining`} value={`${int(rob)} MT`} />
-          {track.mgoRobMt !== null && (
-            <Row label="MGO remaining" value={`${int(track.mgoRobMt)} MT`} />
-          )}
           {lifted !== null && (
             <Row label="Bunkering now" value={`${int(lifted)} MT`} />
           )}
+
+          {/* Replaces the three scalar rows this section used to carry: the bar
+              states grade, quantity and MGO at once, and against capacity
+              rather than as bare tonnages. */}
+          <div className="mt-2.5">
+            <VesselFuelBar
+              grade={track.grade}
+              robMt={rob}
+              mgoRobMt={track.mgoRobMt}
+              maxRobMt={spec.maxRobMt}
+              minRobMt={spec.minRobMt}
+              triggerMt={spec.bunkeringTriggerMt}
+            />
+          </div>
 
           {(belowMin || belowTrigger) && (
             <div className="mx-4 mt-2 rounded border border-warn/40 bg-warn/10 px-3 py-2">
@@ -202,6 +229,34 @@ export default function VesselPanel({
               </p>
             </div>
           )}
+        </section>
+
+        {/* --- The whole window, not just the scrubbed step --- */}
+        <section className="mt-4 border-t border-line pt-3.5">
+          <div className="px-4 pb-2">
+            <span className="label">{track.grade} remaining · trend</span>
+          </div>
+          <VesselRobChart
+            track={track}
+            spec={spec}
+            stepIndex={stepIndex}
+            onSeek={onSeek}
+          />
+        </section>
+
+        {/* --- Every stem, relative to where the scrubber sits --- */}
+        <section className="mt-4 border-t border-line pt-3.5">
+          <div className="px-4 pb-2">
+            <span className="label">
+              Bunkering history
+              {stems.length > 0 && ` · ${stems.length}`}
+            </span>
+          </div>
+          <VesselStems
+            events={stems}
+            stepIndex={stepIndex}
+            onSeek={onSeek}
+          />
         </section>
 
         {/* --- Measured specifications --- */}
