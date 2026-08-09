@@ -37,13 +37,13 @@ export function loadVesselSpecs(): VesselSpec[] {
 }
 
 /**
- * Reshape the 5,280-row movement CSV into one columnar track per vessel.
+ * Reshape the 16,800-row movement CSV into one columnar track per vessel.
  *
  * Two things are dropped on purpose. The synthetic coordinates are never read
- * — they sit thousands of km from the ports they are labelled with, so
- * positions are derived from portCodes via PORT_COORDS downstream. And the
- * per-row timestamps collapse to a start plus a fixed step, since the grid is
- * exactly 3-hourly with no gaps.
+ * — they are blank in every row, and were fictional before that, so positions
+ * are derived from portCodes via PORT_COORDS downstream. And the per-row
+ * timestamps collapse to a start plus a fixed step, since the grid is exactly
+ * 3-hourly with no gaps.
  *
  * A movement row for an unknown vessel, or a port missing from PORT_COORDS,
  * throws rather than quietly disappearing from the map.

@@ -71,8 +71,9 @@ export function buildLegs(track: VesselTrack): VesselLeg[] {
  * first leg has no predecessor in the file — the window opens mid-voyage — so
  * we look forward to the next call at the same port and take whatever preceded
  * *that*. These tracks are cyclic rotations, so it recovers the true origin.
- * Reusing the last leg's port instead would invent a leg the vessel never
- * sails (ASTERIOS would appear to run IDSUB->CNTAO, skipping CNTSN).
+ * Reusing the *last* leg's port instead would invent a leg the vessel never
+ * sails: a track opening mid-rotation would appear to sail from wherever the
+ * 60-day window happened to stop, cutting across the whole loop.
  */
 function originFor(legs: VesselLeg[], index: number): string {
   if (index > 0) return legs[index - 1].toKey;

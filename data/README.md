@@ -142,7 +142,7 @@ block. Sheet last modified 2026-08-08; **extracted 2026-08-09**.
 |---|---|
 | `PIL_Fleet_Vessel_Specifications.csv` | one row per vessel (109) |
 | `vessel_assumptions.csv` | one row per derived column (5) |
-| `PIL_Fleet_Live_Movement.csv` | one row per vessel per 3-hour step (5,280) |
+| `PIL_Fleet_Live_Movement.csv` | one row per vessel per 3-hour step (16,800) |
 
 109 vessels: 101 named `KOTA *` plus ASTERIOS, LITTLE MERMAID, PACANDA, SALAM MAJU,
 SC MARA, SELATAN DAMAI, ZHONG HANG SHENG and ZHU CHENG XIN ZHOU. Eleven flags,
@@ -209,44 +209,106 @@ Two defects in the source's footnote block, both settled by arithmetic:
   may lawfully burn". Anything that switches fuel by port needs a compliance rule of
   its own; this column will not supply one. (64 vessels are scrubber-fitted.)
 
-### Open gap: no vessel ↔ service link, for 98 of 109 vessels
+### The vessel ↔ service link lives only in the movement file, and covers 35 of 109
 
 The specifications sheet carries no `Service_Code`, and no vessel name appears anywhere
-in `schedules/`. `PIL_Fleet_Live_Movement.csv` supplies the link for the **11 vessels
-it covers** and no others, so for the remaining 98 there is still no way to say which
-ship runs a given service, and no way to tie a port call's `Bunker_Quantity_MT` to a
-specific vessel's tank capacity. That needs a deployment or vessel-schedule source.
-Same caution as `suppliers.ports`: don't infer it from vessel size or trade lane.
+in `schedules/`. `PIL_Fleet_Live_Movement.csv` is the only place the link exists. It now
+covers **35 vessels across all 11 services**, 2–5 per service, replacing an earlier
+11-vessel slice that left BD1, BD2, CAS and YGS with no vessels at all.
+
+Three services carry PIL's **published** deployment; the rest are **derived**, and every
+vessel's first movement row states which in `Data_Notes`:
+
+| Service | Vessels | Basis |
+|---|---|---|
+| NCI | KOTA SEJATI, SEMPENA, SABAS, SAHABAT, SALAM | first three published for the 2025-06-17 launch; the other two are sisters standing in for the HMM and X-Press partner ships, which are not in this fleet file |
+| CCS | KOTA RIA, RUKUN, RAKYAT | published for the 2024-07-02 launch — geared, sized for the Hooghly |
+| KCS | KOTA GABUNG, GADANG, GANDING, GAYA | PIL publishes "four vessels of about 2,800 TEU" unnamed; the G-class is the only exact-size group of four |
+| KCI | KOTA SEGAR, SEJARAH, SETIA, SINGA | derived — 3,889 TEU, the band PIL states for the comparable NCI service |
+| CVI | ASTERIOS, KOTA JOHAN, NABIL, NAGA, NALURI | derived — PIL's 2,200 TEU consortium average includes RCL/Interasia tonnage absent here |
+| CAS | KOTA RAJA, RATNA, RATU, RAHMAT | derived — master states four vessels; geared R-class as on CCS |
+| BD1 | KOTA ANGGUN, AZAM | derived — 1,454 TEU for Chittagong's draft and LOA |
+| BD2 | KOTA DAHLIA, DUNIA | derived — 628 TEU for Mongla, the shallowest port here |
+| YGS | KOTA HAKIM, HALUS | derived — sisters of KOTA HAPAS, the ship PIL actually runs |
+| SCT | KOTA RAJIN, RANCAK | derived — 943 TEU for Bangkok Klong Toey |
+| VCS | KOTA HANDAL, HARUM | derived — 1,080 TEU feeder berths |
+
+**The derived rows are sized by port constraint, not by trade lane or by what looks
+plausible.** Draft and LOA are the binding facts: Kolkata sits up the Hooghly at roughly
+7 m, Mongla is shallower still, and Bangkok Klong Toey caps near 1,200 TEU and 172 m LOA.
+The earlier slice ignored this and had the 6,606 TEU KOTA CARUM calling Kolkata and
+KOTA CABAR calling Bangkok — neither ship can physically reach either berth. **All six
+6,606 TEU KOTA C-class ships were removed from this file for that reason**: that class
+belongs on PIL's long-haul trades, not on an Intra-Asia feeder loop. If you extend the
+deployment, size the ship to the tightest port in its rotation first.
+
+Still open: 74 of 109 vessels have no service, and `suppliers.ports` in `contracts/`
+remains empty.
 
 ---
 
 ## `PIL_Fleet_Live_Movement.csv` — simulated movement and ROB series
 
-**Source:** same Drive folder → **Vessel Live Movement** (Google Sheet
+**Originally from:** same Drive folder → **Vessel Live Movement** (Google Sheet
 `1qcFyBa9_51cdK_Ul6pyEi3VGzel85BEo2a1F9Rbi1C8`, formerly titled "Wip - live vessel
-mvt"). Sheet last modified 2026-08-08; **extracted 2026-08-09**.
+mvt"), sheet last modified 2026-08-08, extracted 2026-08-09. **That extract has since
+been replaced** — see "Regenerated from the rotations" below. The Drive sheet is no
+longer the shape of this file; only its column vocabulary survives.
 
-One row per vessel per 3-hour step: position, operational phase, remaining-on-board
-fuel by grade, and any bunker delivered. 5,280 rows — **11 vessels × exactly 480
-steps**, 2026-08-01 00:00:00 → 2026-09-29 21:00:00, no gaps. This is the only file in
-`data/` with a real timestamp and a fuel level that moves over time.
+One row per vessel per 3-hour step: destination port, operational phase,
+remaining-on-board fuel by grade, and any bunker delivered. 16,800 rows — **35 vessels ×
+exactly 480 steps**, 2026-08-01 00:00:00 → 2026-09-29 21:00:00, no gaps. This is the only
+file in `data/` with a real timestamp and a fuel level that moves over time.
 
 ### It is a simulation, not telemetry — and it is generated from `vessel_assumptions.csv`
 
 Each vessel's fuel drop per 3-hour step equals its assumed daily rate ÷ 8, to three
-decimals, in both phases (ASTERIOS 2.559 observed vs 2.560 expected; KOTA CABAR 10.026
-vs 10.026). The file is the assumption played forward in time, so it is a worked
-example of the fuel model and **carries no independent evidence about real voyages**.
-Reconciling it against actual noon reports would be circular.
+decimals, in both phases. The file is the assumption played forward in time, so it is a
+worked example of the fuel model and **carries no independent evidence about real
+voyages**. Reconciling it against actual noon reports would be circular.
 
-The 11 vessels are the first 11 rows of the specifications sheet in alphabetical order
-(ASTERIOS → KOTA DUNIA) — a demo slice, not an operational selection.
+### Regenerated from the rotations
 
-### `Synthetic_Latitude` / `Synthetic_Longitude` are fictional. Never map them.
+The Drive extract's 11 tracks did not follow the schedules they claimed. They visited a
+*subset* of each rotation and repeated the wrong loop length — ASTERIOS cycled every 22
+days on a service PIL publishes as a 35-day loop, KOTA CABAR every 10 days against SCT's
+14. Worse, **eight ports in `schedules/` were called by no vessel at all**: `SGSIN`,
+`MYPKG`, `VNSGN`, `THLCH`, `INGAV`, `BDCGP`, `BDMGL` and `MMRGN`. Singapore is in 8 of the
+11 rotations and carries the largest stems in the data, and every single track skipped it.
 
-The columns are renamed from the source's plain `Latitude`/`Longitude` because the
-positions are not real. Every berth position is thousands of km from the port named in
-the same row:
+The file is now generated from `schedules/PIL_Intra_Asia_Port_Calls.csv`, so a vessel
+visits **every** port in its rotation, in sequence, on the published loop length:
+
+- Loop length is the loop-closing row's `ETA_Day_Number`; steps per loop = days × 8.
+- A call is berthed over `[ETA_Day_Number × 8, ETD_Day_Number × 8)`. Every other step is
+  transit toward the next call, labelled with **that** call's port — the file's existing
+  convention that `Port_Name` is the leg destination while in transit.
+- **Zero-dwell calls get one berthed step.** Several rotations publish `ETA == ETD` (CCS
+  Xiamen day 0, YGS Singapore day 0). Without a minimum berth the call would have no row
+  and nowhere to land its bunker stem.
+- **A port change always gets at least one transit step.** SCT publishes Laem Chabang and
+  Bangkok arriving the same day; without this the leg would not be drawn.
+- **BD2's timetable is synthesised**, from `Transit_To_Next_Days` (5, 1, 5) plus 1-day
+  dwells, giving the same 14-day loop as BD1 on the same trade. BD2's
+  `Schedule_Data_Status` is `Unavailable in source` and its day-number cells are blank.
+  Those blanks were **not** backfilled into the port calls CSV — the derivation lives in
+  the generator only, and each BD2 vessel's first row says so in `Data_Notes`.
+- Vessel *k* of *n* on a service starts at loop offset `round(k × steps_per_loop / n)`, so
+  sisters are spread around the rotation instead of moving in lockstep.
+
+Regenerating requires the vessel roster (above) and these rules; there is no script in the
+repo. Re-derive it and re-check the invariants listed under "Refreshing".
+
+### `Synthetic_Latitude` / `Synthetic_Longitude` are now blank. Never map them.
+
+**Both columns are empty in every row**, so `num()` yields `null`. Nothing in `src/` reads
+them. They are kept only so the header still matches the source's column vocabulary.
+
+They are blank rather than carried forward because the source's values were fictional
+*and* the rows are now re-timed, which would have paired invented coordinates with new
+timestamps for no benefit. For the record, here is what the original extract contained —
+the columns were renamed from the source's plain `Latitude`/`Longitude` precisely because
+every berth position sat thousands of km from the port named in the same row:
 
 | Row says | Position given | Actual port | Off by |
 |---|---|---|---|
@@ -255,34 +317,44 @@ the same row:
 | Busan | 9.17°S 85.71°E | 35.10°N 129.04°E | ~6,300 km |
 | Surabaya | 12.42°N 175.46°W | 7.20°S 112.73°E | ~31,800 km |
 
-All 5,280 points lie in a narrow equatorial band (lat −9.2 to +13.5) with longitude
-covering the whole globe including the antimeridian. Fed to `RouteMap` they would
-scatter the fleet across open Pacific, unrelated to the arcs drawn from `PORT_COORDS`.
-**Use `Port_Code` → `PORT_COORDS` for anything geographic.** The columns are retained
-only so the extract stays faithful to its source.
+All 5,280 of those points lay in a narrow equatorial band (lat −9.2 to +13.5) with
+longitude covering the whole globe including the antimeridian. Fed to `RouteMap` they
+would have scattered the fleet across open Pacific, unrelated to the arcs drawn from
+`PORT_COORDS`. **Use `Port_Code` → `PORT_COORDS` for anything geographic**, and if a
+future refresh reintroduces coordinates, verify them against the port before mapping.
 
-### The simulation breaks its own safety limits
+### The bunkering trigger is now enforced — it used to be ignored
 
-Every vessel spends much of the window below the `Min_ROB_MT` from
-`vessel_assumptions.csv`, and only 26 bunker events occur across 60 days:
+The Drive extract broke its own safety limits. Every vessel spent much of the window below
+`Min_ROB_MT`, only 26 bunker events occurred across 60 days, and **KOTA CANTIK and
+KOTA DUNIA reached exactly 0 MT** — not a survivable state. Anything treating those curves
+as feasible operations was optimising an impossible schedule.
 
-| Vessel | rows below `Min_ROB_MT` | rows below `Bunkering_Trigger_MT` |
-|---|---|---|
-| KOTA DUNIA | 283 / 480 | 463 / 480 |
-| KOTA CANTIK | 242 / 480 | 418 / 480 |
-| KOTA AZAM | 226 / 480 | 375 / 480 |
-| *(all 11)* | 55–283 | 185–463 |
+The regenerated file enforces the rule the source omitted:
 
-**KOTA CANTIK and KOTA DUNIA reach exactly 0 MT** on 5 rows — no fuel onboard at all,
-which is not a survivable state. Those rows are flagged in `Data_Notes`. The bunkering
-trigger is plainly not enforced here, so **an optimiser that treats these ROB curves as
-feasible operations is optimising an impossible schedule.** Fix the generator before
-drawing conclusions about bunker timing from this file.
+- ROB opens at `Max_ROB_MT` and burns `Consumption_Transit_MT_Per_Day ÷ 8` per transit step
+  and `Consumption_Berth_MT_Per_Day ÷ 8` per berthed step, to three decimals — the
+  consumption model is unchanged, and still comes from `vessel_assumptions.csv`.
+- At the first berthed step of a call carrying a `Bunker_Quantity_MT`, a stem is lifted if
+  ROB has fallen to `Bunkering_Trigger_MT` **or** if ROB minus the fuel needed to reach the
+  next stem opportunity would fall below `Min_ROB_MT`. The second clause is the
+  safety-critical one: it stops a vessel sailing past a bunker port it cannot skip.
+- The stem is `min(Bunker_Quantity_MT, Max_ROB_MT − ROB)`, so a call's published quantity is
+  never exceeded and the tank never overfills. Where capacity cuts the stem short, the row
+  says so in `Data_Notes`.
+- **Invariant, verified over all 16,800 rows: `Min_ROB_MT ≤ ROB ≤ Max_ROB_MT`.** ROB never
+  reaches 0. 86 stems now occur across the fleet's 60 days, up from 26.
+
+The ROB curves are still a model, not measurements — the consumption rates are a flat
+percentage of DWT, so this remains a worked example. What changed is that it is now a
+*feasible* one. If you regenerate, re-assert the invariant: a vessel whose `Max_ROB_MT`
+cannot cover its longest inter-stem leg is the wrong ship for the service, and the fix is
+the deployment, not a clamp.
 
 ### Fuel grade does follow scrubber status
 
 Scrubber-fitted vessels burn HSFO (`VLSFO_ROB_MT` flat at 0); non-scrubber vessels burn
-VLSFO (`HSFO_ROB_MT` flat at 0). Exact across all 11. This is the MARPOL Annex VI rule
+VLSFO (`HSFO_ROB_MT` flat at 0). Exact across all 35. This is the MARPOL Annex VI rule
 that the specifications sheet does *not* encode — that sheet lists `VLSFO; HSFO; MGO`
 for every vessel regardless of scrubber. Where the two disagree, this file is the more
 careful one.
@@ -290,18 +362,29 @@ careful one.
 `MGO_ROB_MT` is constant per vessel: MGO is never burned and never stemmed. It is a
 static number, not a series.
 
+**It is blank for the 30 vessels the Drive extract did not cover.** The source's figure has
+no derivable basis — across its 11 vessels it ranges from 0.13 to 0.72 of `Min_ROB_MT`, so
+it is neither a ratio of DWT nor of any other column, unlike the five assumption columns in
+the specifications sheet. There is nothing to extrapolate, so per the null discipline it
+stays empty rather than invented. The five carried-over vessels (ASTERIOS, KOTA ANGGUN,
+KOTA AZAM, KOTA DAHLIA, KOTA DUNIA) keep their real source values. `VesselPanel` hides the
+"MGO remaining" row when it is null.
+
 ### Conventions
 
-- **`Port_Code` is added, not from the source.** The sheet's column is titled "Port /
-  Location Code" but holds port *names* (`Qingdao`, not `CNTAO`). The name is kept as
-  `Port_Name` and the LOCODE resolved beside it from `PIL_Intra_Asia_Port_Calls.csv` —
-  never invented. All 18 distinct ports resolve, and all 18 exist in `PORT_COORDS`.
+- **`Port_Code` and `Port_Name` both come from `PIL_Intra_Asia_Port_Calls.csv`**, copied as
+  a pair so the name↔LOCODE mapping cannot drift. (The Drive sheet's column was titled
+  "Port / Location Code" but held port *names* — `Qingdao`, not `CNTAO` — and the LOCODE was
+  resolved from the port calls file, never invented. Same source, now for both columns.)
+  All 26 distinct ports exist in `PORT_COORDS`, and all 26 in `PORT_APPROACH` too, so every
+  leg routes through the sea-lane graph rather than falling back to a continent-crossing
+  great-circle arc.
 - **`Port_Name` is the leg *destination*, not the current location.** While
   `Operational_Phase` is `Transit` it names the port being sailed to; it only means
   "where the ship is" once the phase is `Berthed`. The source's "Location" wording is
   misleading.
 - **`Berthed` and `Transit` columns were dropped.** Both were fully derivable from
-  `Operational_Phase`, with zero disagreements across all 5,280 source rows.
+  `Operational_Phase`, with zero disagreements across all 5,280 rows of the Drive extract.
 - **`Timestamp` is `YYYY-MM-DD HH:MM:SS` with no timezone.** The source states none;
   it is read as an opaque sortable string, like `Source_Effective_Date` in the service
   master. Don't append `Z` or an offset — that would assert a fact the source lacks.
@@ -320,7 +403,24 @@ does not apply. Don't "clean" them into blanks.
 
 ### Refreshing
 
-Re-export the sheet as CSV, then reapply the transform: rename headers as above, drop
-`Berthed`/`Transit`, resolve `Port_Code` from the port calls by name, and re-flag any
-zero-ROB rows. Re-check that every port name still resolves — a new port in the feed
-that is absent from `PORT_COORDS` would disappear from the map with no error.
+This file is no longer a transform of the Drive sheet, so re-exporting that sheet will not
+refresh it. Regenerate it from `schedules/PIL_Intra_Asia_Port_Calls.csv` using the roster
+and the timetable/ROB rules above, then assert all of the following before trusting it:
+
+- 480 rows per vessel, a gapless 3-hour grid per vessel, one `Service_Code` per vessel.
+- Every `Port_Code` a vessel visits is in **that service's** rotation — no vessel calling a
+  port off its line.
+- **Every port in every rotation is visited by at least one vessel of that service.** This
+  is the check that was silently failing before, and the one worth running first.
+- `Min_ROB_MT ≤ ROB ≤ Max_ROB_MT` on every row; the non-burned grade flat at 0.
+- Every `Vessel_Name` resolves in `PIL_Fleet_Vessel_Specifications.csv`, and every
+  `Port_Code` in both `PORT_COORDS` and `PORT_APPROACH`.
+
+`loadVesselTracks` in [`lib/vessels.ts`](../src/lib/vessels.ts) throws on an unknown vessel
+name or a port outside `PORT_COORDS`, so those two are caught at build time. The rotation
+and ROB invariants are **not** — nothing in the app checks them, which is exactly how the
+eight uncalled ports survived. Check them yourself.
+
+If the fleet grows much beyond 35, watch the payload: these tracks ship as props from
+`app/page.tsx`, roughly 250 KB of RSC payload at 35 vessels. Pricing moved behind
+`GET /api/prices/[portKey]` at ~700 KB; that is the threshold to compare against.

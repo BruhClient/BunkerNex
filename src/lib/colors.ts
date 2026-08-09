@@ -1,6 +1,25 @@
 import type { Grade } from "./types";
 
 /**
+ * The palette from globals.css `@theme`, repeated as literals.
+ *
+ * MapLibre paint expressions and Recharts props are both read outside the
+ * cascade, so neither resolves `var(--color-…)` — they need real hex. Keep
+ * these in sync with the `@theme` block by hand; there is no build step that
+ * checks it.
+ */
+export const THEME = {
+  bg: "#0B0E13",
+  surface: "#131822",
+  line: "#1F2733",
+  lineStrong: "#2B3546",
+  fg: "#E6EAF0",
+  muted: "#9AA6B8",
+  faint: "#5C6675",
+  accent: "#22D3EE",
+} as const;
+
+/**
  * One hue per service. Chosen to stay separable on a dark basemap.
  *
  * Eleven simultaneous routes is past the point where hue alone tells them

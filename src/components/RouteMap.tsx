@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import maplibregl from "maplibre-gl";
-import { serviceColor } from "@/lib/colors";
+import { serviceColor, THEME } from "@/lib/colors";
 import { greatCircleArc, multiPointArc, type LonLat } from "@/lib/geo";
 import { seaRoute } from "@/lib/searoutes";
 import { createTrackResolver, type VesselFix } from "@/lib/vesselPosition";
@@ -21,6 +21,29 @@ const PORTS_SOURCE = "ports";
  * exactly on top of each other.
  */
 const SERVICE_LINE_GAP = 2.5;
+
+/**
+ * How a service's line is drawn in each of the three focus states.
+ *
+ * With eleven services on at once, drawing them all at full strength is what
+ * made the map hard to read. Nothing is focused until the user hovers or
+ * selects a service in the sidebar; then that one service comes forward and
+ * the rest recede far enough to read as context.
+ */
+const FOCUS_STYLE = {
+  /** Nothing focused: every visible service drawn equally. */
+  neutral: { widthScale: 1, lineOpacity: 0.85, glowOpacity: 0.1 },
+  focused: { widthScale: 1.6, lineOpacity: 1, glowOpacity: 0.22 },
+  dimmed: { widthScale: 0.7, lineOpacity: 0.18, glowOpacity: 0 },
+} as const;
+
+/**
+ * Route lines were a flat 1.8px at every zoom, which is heavy across a
+ * regional view and thin once you are inside a port cluster.
+ */
+function lineWidth(scale: number): maplibregl.ExpressionSpecification {
+  return ["interpolate", ["linear"], ["zoom"], 3, 1.2 * scale, 8, 2.4 * scale];
+}
 
 /**
  * Must name font stacks the style actually serves glyphs for, or MapLibre
@@ -82,6 +105,11 @@ interface Props {
   vesselTracks: VesselTrack[];
   visibleServices: string[];
   selectedKey: string | null;
+  /**
+   * The one service brought forward on the map — hovered or selected in the
+   * sidebar. `null` draws every visible service at equal weight.
+   */
+  focusedService: string | null;
   /** Index into every track's step arrays; all tracks share one time grid. */
   stepIndex: number;
   selectedVesselName: string | null;
@@ -89,26 +117,53 @@ interface Props {
   onSelectVessel: (name: string | null) => void;
 }
 
+/** CSS pixels; `icon-size` stays at 1 so this is the size actually drawn. */
+const CHEVRON_SIZE = 13;
+/** Drawn at 2x and tagged `pixelRatio: 2`, or the mark is soft on HiDPI. */
+const CHEVRON_RATIO = 2;
+
 /**
- * A small right-pointing triangle, tinted per service. MapLibre rotates
- * line-placed icons so the image's local +x axis (the tip, here) follows
- * the line's direction of travel — since arcs are built from-stop to
- * to-stop in sailing order, this makes the arrows point the way the ship
+ * An *open, stroked* chevron — deliberately not a filled triangle.
+ *
+ * The vessel marker is a solid hull silhouette (see `buildVesselElement`), so
+ * a filled triangle here read as a second kind of ship rather than as a
+ * direction hint. Keeping direction marks hollow and ships solid is what
+ * separates the two at a glance.
+ *
+ * MapLibre rotates line-placed icons so the image's local +x axis (the apex,
+ * here) follows the line's direction of travel — since arcs are built
+ * from-stop to to-stop in sailing order, this points the way the ship
  * actually sails without any extra bearing math.
  */
-function arrowIconImage(color: string, size = 24): ImageData {
+function chevronIconImage(color: string): ImageData {
+  const s = CHEVRON_SIZE * CHEVRON_RATIO;
   const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = s;
+  canvas.height = s;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(size * 0.92, size * 0.5);
-  ctx.lineTo(size * 0.2, size * 0.1);
-  ctx.lineTo(size * 0.2, size * 0.9);
-  ctx.closePath();
-  ctx.fill();
-  return ctx.getImageData(0, 0, size, size);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(s * 0.3, s * 0.17);
+    ctx.lineTo(s * 0.75, s * 0.5);
+    ctx.lineTo(s * 0.3, s * 0.83);
+  };
+
+  // A dark casing underneath, so the mark still reads where a route crosses a
+  // pale basemap patch.
+  trace();
+  ctx.strokeStyle = THEME.bg;
+  ctx.lineWidth = 3.2 * CHEVRON_RATIO;
+  ctx.stroke();
+
+  trace();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.6 * CHEVRON_RATIO;
+  ctx.stroke();
+
+  return ctx.getImageData(0, 0, s, s);
 }
 
 export default function RouteMap({
@@ -117,6 +172,7 @@ export default function RouteMap({
   vesselTracks,
   visibleServices,
   selectedKey,
+  focusedService,
   stepIndex,
   selectedVesselName,
   onSelectPort,
@@ -129,6 +185,12 @@ export default function RouteMap({
     Map<string, { marker: maplibregl.Marker; el: HTMLElement }>
   >(new Map());
   const readyRef = useRef(false);
+  /**
+   * Current screen-space fan offset per service, keyed by code. Recomputed
+   * whenever visibility changes and read back by the vessel effect, so ships
+   * ride the same offset line their service is drawn on.
+   */
+  const offsetsRef = useRef<Map<string, number>>(new Map());
   // Re-fits the current view; re-pointed whenever visibility changes.
   const fitRef = useRef<(() => void) | null>(null);
   // Once the user pans or zooms, stop re-framing the map for them.
@@ -241,16 +303,13 @@ export default function RouteMap({
         .getStyle()
         .layers.find((l) => l.type === "symbol")?.id;
 
-      serviceCodes.forEach((code, serviceIndex) => {
+      // Offsets and focus styling are both applied by their own effects,
+      // which run straight after load — these layers start at neutral, on the
+      // centreline, with their direction marks switched off.
+      for (const code of serviceCodes) {
         const data = routeGeoJson.get(code);
-        if (!data) return;
+        if (!data) continue;
         const color = serviceColor(code);
-
-        // Fan the services apart in *screen* space rather than by displacing
-        // the geometry. The arcs now follow real sea lanes, so bending them
-        // sideways to separate them would push them straight back onto land.
-        const offset =
-          (serviceIndex - (serviceCodes.length - 1) / 2) * SERVICE_LINE_GAP;
 
         map.addSource(`route-${code}`, { type: "geojson", data });
         map.addLayer(
@@ -262,9 +321,9 @@ export default function RouteMap({
             paint: {
               "line-color": color,
               "line-width": 7,
-              "line-opacity": 0.13,
+              "line-opacity": FOCUS_STYLE.neutral.glowOpacity,
               "line-blur": 3,
-              "line-offset": offset,
+              "line-offset": 0,
             },
           },
           firstSymbolId,
@@ -277,44 +336,50 @@ export default function RouteMap({
             layout: { "line-cap": "round", "line-join": "round" },
             paint: {
               "line-color": color,
-              "line-width": 1.8,
-              "line-opacity": 0.92,
-              "line-offset": offset,
+              "line-width": lineWidth(FOCUS_STYLE.neutral.widthScale),
+              "line-opacity": FOCUS_STYLE.neutral.lineOpacity,
+              "line-offset": 0,
             },
           },
           firstSymbolId,
         );
 
-        const arrowIcon = `arrow-${code}`;
-        if (!map.hasImage(arrowIcon)) {
-          map.addImage(arrowIcon, arrowIconImage(color));
+        const chevronIcon = `chevron-${code}`;
+        if (!map.hasImage(chevronIcon)) {
+          map.addImage(chevronIcon, chevronIconImage(color), {
+            pixelRatio: CHEVRON_RATIO,
+          });
         }
         map.addLayer(
           {
-            id: `route-${code}-arrow`,
+            id: `route-${code}-chevron`,
             type: "symbol",
             source: `route-${code}`,
+            // Direction marks only ever appear on the focused service; the
+            // focus effect turns exactly one of these on.
             layout: {
+              visibility: "none",
               "symbol-placement": "line",
-              "symbol-spacing": 110,
-              "icon-image": arrowIcon,
-              "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.45, 8, 0.8],
+              // Sparse, because they are never competing with ten other
+              // services' marks any more.
+              "symbol-spacing": 190,
+              "icon-image": chevronIcon,
+              // Must stay 1. icon-offset is *multiplied* by icon-size, so any
+              // other value silently scales the fan offset below and the
+              // chevrons drift off their own line as you zoom.
+              "icon-size": 1,
               "icon-rotation-alignment": "map",
-              // Symbol layers have no line-offset, so the arrows would sit on
-              // the un-offset centreline. icon-offset rotates with the icon,
-              // so a y-shift moves each arrow perpendicular to its direction
-              // of travel — onto its own service's line.
-              "icon-offset": [0, offset],
-              // Arrows are a direction hint, not a navigational label — they
-              // should never fight port labels for collision space.
+              "icon-offset": [0, 0],
+              // A direction hint, not a navigational label — it should never
+              // fight port labels for collision space.
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },
-            paint: { "icon-opacity": 0.85 },
+            paint: { "icon-opacity": 0.7 },
           },
           firstSymbolId,
         );
-      });
+      }
 
       // --- Port name labels ---
       map.addSource(PORTS_SOURCE, {
@@ -346,8 +411,8 @@ export default function RouteMap({
             "symbol-sort-key": ["-", 0, ["get", "callCount"]],
           },
           paint: {
-            "text-color": "#E6EAF0",
-            "text-halo-color": "#0B0E13",
+            "text-color": THEME.fg,
+            "text-halo-color": THEME.bg,
             "text-halo-width": 1.4,
             "text-halo-blur": 0.4,
             "text-opacity": ["case", ["get", "active"], 1, 0.4],
@@ -370,8 +435,8 @@ export default function RouteMap({
             "text-size": ["interpolate", ["linear"], ["zoom"], 4.6, 10, 8, 12],
           },
           paint: {
-            "text-color": "#9AA6B8",
-            "text-halo-color": "#0B0E13",
+            "text-color": THEME.muted,
+            "text-halo-color": THEME.bg,
             "text-halo-width": 1.4,
             "text-halo-blur": 0.4,
           },
@@ -393,8 +458,8 @@ export default function RouteMap({
             "text-ignore-placement": true,
           },
           paint: {
-            "text-color": "#22D3EE",
-            "text-halo-color": "#0B0E13",
+            "text-color": THEME.accent,
+            "text-halo-color": THEME.bg,
             "text-halo-width": 1.6,
           },
         },
@@ -500,11 +565,42 @@ export default function RouteMap({
     const apply = () => {
       const visible = new Set(visibleKey ? visibleKey.split(",") : []);
 
+      // Fan the services apart in *screen* space rather than by displacing the
+      // geometry. The arcs follow real sea lanes, so bending them sideways to
+      // separate them would push them straight back onto land.
+      //
+      // Spread only the services actually on screen: fanning across all
+      // eleven regardless left a lone visible service drawn up to 12.5px off
+      // its own lane, with nothing beside it to justify the gap.
+      const shown = [...visible].sort();
+      const offsets = new Map<string, number>(
+        shown.map((code, i) => [
+          code,
+          (i - (shown.length - 1) / 2) * SERVICE_LINE_GAP,
+        ]),
+      );
+      offsetsRef.current = offsets;
+
       for (const code of serviceCodes) {
-        const v = visible.has(code) ? "visible" : "none";
-        for (const suffix of ["glow", "line", "arrow"]) {
+        const on = visible.has(code);
+        const offset = offsets.get(code) ?? 0;
+
+        for (const suffix of ["glow", "line"]) {
           const id = `route-${code}-${suffix}`;
-          if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", v);
+          if (!map.getLayer(id)) continue;
+          map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+          map.setPaintProperty(id, "line-offset", offset);
+        }
+
+        // Chevron visibility belongs to the focus effect — a hidden service
+        // must stay hidden whether or not it is focused — but the offset is
+        // this effect's to keep in step with the line it sits on.
+        const chevronId = `route-${code}-chevron`;
+        if (map.getLayer(chevronId)) {
+          // Symbol layers have no line-offset. icon-offset rotates with the
+          // icon, so a y-shift moves each chevron perpendicular to its
+          // direction of travel — onto its own service's line.
+          map.setLayoutProperty(chevronId, "icon-offset", [0, offset]);
         }
       }
 
@@ -545,6 +641,61 @@ export default function RouteMap({
     else map.once("load", apply);
   }, [visibleKey, ports, serviceCodes]);
 
+  // --- Bring the focused service forward, push the rest back ---
+  // Also owns chevron visibility: direction marks belong to one service at a
+  // time, which is what keeps them from being mistaken for vessels.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const apply = () => {
+      const visible = new Set(visibleKey ? visibleKey.split(",") : []);
+
+      for (const code of serviceCodes) {
+        const style = !focusedService
+          ? FOCUS_STYLE.neutral
+          : code === focusedService
+            ? FOCUS_STYLE.focused
+            : FOCUS_STYLE.dimmed;
+
+        const lineId = `route-${code}-line`;
+        if (map.getLayer(lineId)) {
+          map.setPaintProperty(lineId, "line-opacity", style.lineOpacity);
+          map.setPaintProperty(lineId, "line-width", lineWidth(style.widthScale));
+        }
+
+        const glowId = `route-${code}-glow`;
+        if (map.getLayer(glowId)) {
+          map.setPaintProperty(glowId, "line-opacity", style.glowOpacity);
+        }
+
+        const chevronId = `route-${code}-chevron`;
+        if (map.getLayer(chevronId)) {
+          const on = visible.has(code) && code === focusedService;
+          map.setLayoutProperty(
+            chevronId,
+            "visibility",
+            on ? "visible" : "none",
+          );
+        }
+      }
+    };
+
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [focusedService, visibleKey, serviceCodes]);
+
+  // --- Vessels recede with their service's line ---
+  useEffect(() => {
+    for (const [name, { el }] of vesselMarkersRef.current) {
+      const code = trackByName.get(name)?.serviceCode;
+      el.classList.toggle(
+        "is-dimmed",
+        focusedService !== null && code !== focusedService,
+      );
+    }
+  }, [focusedService, trackByName]);
+
   // --- Move vessels to the scrubbed time ---
   // Runs on every scrubber tick, so it only mutates existing markers: a
   // setLngLat plus a transform per vessel, no React re-render and no new DOM.
@@ -568,14 +719,38 @@ export default function RouteMap({
         el.style.display = visible.has(track.serviceCode) ? "" : "none";
         marker.setLngLat(fix.position);
 
-        const chevron = el.querySelector<HTMLElement>(".bn-vessel-icon");
-        if (chevron) {
-          // Berthed vessels have no heading to show, so the chevron squares up
-          // rather than pointing in whatever direction it last sailed.
-          chevron.style.transform = fix.berthed
-            ? "rotate(0deg)"
+        const hull = el.querySelector<HTMLElement>(".bn-vessel-icon");
+        if (hull) {
+          // Berthed vessels have no heading to show, so the hull squares up
+          // rather than pointing in whatever direction it last sailed, and
+          // shrinks back behind the port marker it is sitting on. Both live
+          // here rather than in CSS because an inline transform would
+          // otherwise override the class rule and drop the scale silently.
+          hull.style.transform = fix.berthed
+            ? "rotate(0deg) scale(0.72)"
             : `rotate(${fix.bearing}deg)`;
         }
+
+        // Ride the same fanned line the service is drawn on, instead of the
+        // shared centreline every service's geometry actually runs down.
+        // MapLibre offsets a line to the *right* of travel; with screen y
+        // pointing down and bearing measured clockwise from north, right of
+        // travel is (cos, sin).
+        const fan = el.querySelector<HTMLElement>(".bn-vessel-fan");
+        if (fan) {
+          const offset = fix.berthed
+            ? 0
+            : (offsetsRef.current.get(track.serviceCode) ?? 0);
+          if (offset === 0) {
+            fan.style.transform = "";
+          } else {
+            const rad = (fix.bearing * Math.PI) / 180;
+            const dx = (offset * Math.cos(rad)).toFixed(2);
+            const dy = (offset * Math.sin(rad)).toFixed(2);
+            fan.style.transform = `translate(${dx}px, ${dy}px)`;
+          }
+        }
+
         el.classList.toggle("is-berthed", fix.berthed);
         el.classList.toggle("is-bunkering", fix.bunkeredMt !== null);
 
@@ -635,9 +810,18 @@ export default function RouteMap({
 }
 
 /**
- * Vessel marker DOM: a chevron tinted to match its service's route line, so a
- * vessel reads as belonging to the line it sits on. Built once per vessel and
- * mutated thereafter — see the scrub effect above.
+ * Vessel marker DOM: a solid hull silhouette tinted to match its service's
+ * route line, so a vessel reads as belonging to the line it sits on. Built
+ * once per vessel and mutated thereafter — see the scrub effect above.
+ *
+ * Shape carries the ship/direction distinction and colour carries the
+ * service: ships are solid hulls, direction marks are hollow chevrons. A
+ * chevron here read as an arrow, which is exactly what made the two
+ * indistinguishable.
+ *
+ * Two nested spans, because the two transforms change on different
+ * schedules: `.bn-vessel-fan` holds the service's screen-space fan offset,
+ * `.bn-vessel-icon` holds the heading rotation and its easing.
  */
 function buildVesselElement(track: VesselTrack): HTMLElement {
   const color = serviceColor(track.serviceCode);
@@ -647,15 +831,20 @@ function buildVesselElement(track: VesselTrack): HTMLElement {
   el.style.setProperty("--vessel-color", color);
   el.title = track.name;
 
+  const fan = document.createElement("span");
+  fan.className = "bn-vessel-fan";
+
   const icon = document.createElement("span");
   icon.className = "bn-vessel-icon";
-  // A north-pointing chevron: the scrub effect rotates it by the leg bearing,
-  // which is also measured clockwise from north, so the two agree with no
-  // offset term.
+  // A north-pointing hull — tapered bow, flat stern. The scrub effect rotates
+  // it by the leg bearing, which is also measured clockwise from north, so
+  // the two agree with no offset term.
   icon.innerHTML =
     '<svg viewBox="0 0 16 16" aria-hidden="true">' +
-    '<path d="M8 1 L13.5 14.5 L8 11.5 L2.5 14.5 Z" /></svg>';
-  el.appendChild(icon);
+    '<path d="M8 1 C9.7 3 11 4.7 11 6.3 L11 13 L5 13 L5 6.3 C5 4.7 6.3 3 8 1 Z" />' +
+    "</svg>";
+  fan.appendChild(icon);
+  el.appendChild(fan);
 
   // Tooltip rows are created once and only their text changes on scrub, so a
   // playback pass never rebuilds DOM.

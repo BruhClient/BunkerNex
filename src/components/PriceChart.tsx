@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { GRADE_COLORS, GRADE_LABELS, sortGrades } from "@/lib/colors";
+import { GRADE_COLORS, GRADE_LABELS, sortGrades, THEME } from "@/lib/colors";
 import { formatDate, formatDateShort, formatPrice } from "@/lib/format";
 import { RANGES, downsample, rangeStart, type Range } from "@/lib/series";
 import type { Grade, PortPrices, PricePoint } from "@/lib/types";
@@ -134,15 +134,15 @@ export default function PriceChart({ grades, brent }: Props) {
             margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
           >
             <CartesianGrid
-              stroke="#1f2733"
+              stroke={THEME.line}
               strokeDasharray="2 4"
               vertical={false}
             />
             <XAxis
               dataKey="date"
               tickFormatter={formatDateShort}
-              tick={{ fill: "#5c6675", fontSize: 10 }}
-              axisLine={{ stroke: "#1f2733" }}
+              tick={{ fill: THEME.faint, fontSize: 10 }}
+              axisLine={{ stroke: THEME.line }}
               tickLine={false}
               minTickGap={44}
             />
@@ -151,12 +151,15 @@ export default function PriceChart({ grades, brent }: Props) {
               domain={yDomain}
               allowDataOverflow
               tickCount={6}
-              tick={{ fill: "#5c6675", fontSize: 10 }}
+              tick={{ fill: THEME.faint, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v: number) => Math.round(v).toString()}
             />
-            <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#2b3546" }} />
+            <Tooltip
+              content={<ChartTooltip />}
+              cursor={{ stroke: THEME.lineStrong }}
+            />
             {series.map((grade) => (
               <Line
                 key={grade}

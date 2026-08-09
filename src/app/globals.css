@@ -13,6 +13,9 @@
   --color-accent: #22d3ee;
   --color-up: #4ade80;
   --color-down: #f87171;
+  /* Pairs with up/down for provenance caveats — figures the source did not
+     publish and the app derives. */
+  --color-warn: #f59e0b;
 
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -36,6 +39,14 @@ body {
      tracks the visible viewport instead, so nothing sits hidden below the
      fold when the chrome is showing. */
   height: 100dvh;
+}
+
+/* Keyboard focus. Wrapped in :where() so specificity stays at 0 and any
+   component can override it without an !important. */
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Every price, delta and day count aligns column-wise. */
@@ -201,9 +212,11 @@ body {
 }
 
 /* ---------------------------------------------------------------
-   Vessel markers. A chevron rather than a disc, so a moving ship is
-   never mistaken for a fixed port, tinted to its service so it reads
-   as belonging to the route line it sits on.
+   Vessel markers. A solid hull silhouette rather than a disc or an
+   arrow: a ship must never be mistaken for a fixed port, nor for the
+   hollow direction chevrons drawn along a focused route line. Shape
+   carries that distinction; the service tint carries which line the
+   vessel belongs to.
 
    Positions are derived from the port index, not from the movement
    CSV's own coordinates — those sit thousands of km from the ports
@@ -213,21 +226,38 @@ body {
 .bn-vessel {
   /* Same reasoning as .bn-marker: never set `position` here. MapLibre owns
      it, and overriding it moves every vessel to the wrong place. */
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
   display: grid;
   place-items: center;
   z-index: 2;
+  transition: opacity 180ms ease;
+}
+
+/* Vessels of an unfocused service recede with their route line. */
+.bn-vessel.is-dimmed {
+  opacity: 0.3;
+}
+
+/* Carries only the service's screen-space fan offset, so the ship rides the
+   same offset line its route is drawn on. Kept separate from the rotation
+   below because the two are written on different schedules. */
+.bn-vessel-fan {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .bn-vessel-icon {
   width: 100%;
   height: 100%;
   display: block;
-  /* Rotated per leg bearing by RouteMap. The transition smooths the jump
-     between 3-hour steps so playback reads as motion rather than teleporting,
-     but stays short enough that dragging the scrubber still feels immediate. */
+  /* Rotated per leg bearing by RouteMap — which also writes the berthed
+     scale, since an inline transform would otherwise override any scale set
+     here and drop it with no warning. The transition smooths the jump between
+     3-hour steps so playback reads as motion rather than teleporting, but
+     stays short enough that dragging the scrubber still feels immediate. */
   transition: transform 200ms ease;
 }
 
@@ -238,14 +268,15 @@ body {
   fill: var(--vessel-color, #9aa6b8);
   stroke: var(--color-bg);
   stroke-width: 1.1;
+  stroke-linejoin: round;
   paint-order: stroke fill;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
 }
 
-/* Berthed: dimmed and smaller, so a vessel alongside recedes behind the port
-   marker it is sitting on rather than covering it. */
+/* Berthed: dimmed, so a vessel alongside recedes behind the port marker it is
+   sitting on rather than covering it. The matching scale is applied inline by
+   RouteMap — see the note above. */
 .bn-vessel.is-berthed .bn-vessel-icon {
-  transform: scale(0.72);
   opacity: 0.75;
 }
 

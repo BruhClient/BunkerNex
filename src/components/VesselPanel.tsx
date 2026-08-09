@@ -179,8 +179,8 @@ export default function VesselPanel({
           )}
 
           {(belowMin || belowTrigger) && (
-            <div className="mx-4 mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-              <p className="text-[11px] leading-relaxed text-amber-200">
+            <div className="mx-4 mt-2 rounded border border-warn/40 bg-warn/10 px-3 py-2">
+              <p className="text-[11px] leading-relaxed text-warn">
                 {rob <= 0 ? (
                   <>
                     <span className="font-semibold">No fuel onboard.</span> The
@@ -315,7 +315,7 @@ export default function VesselPanel({
               {skipped.length > 0 && (
                 <p className="px-4 pt-2.5 text-[11px] leading-relaxed text-faint">
                   The simulated track never calls at{" "}
-                  <span className="text-amber-200">
+                  <span className="text-warn">
                     {[...new Set(skipped)].join(", ")}
                   </span>
                   , though the published rotation includes{" "}

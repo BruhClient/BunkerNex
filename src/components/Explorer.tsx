@@ -49,13 +49,37 @@ export default function Explorer({
   const [selectedVesselName, setSelectedVesselName] = useState<string | null>(
     null,
   );
+  const [hoveredServiceCode, setHoveredServiceCode] = useState<string | null>(
+    null,
+  );
   const [stepIndex, setStepIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /**
+   * The one service the map brings forward. A selection holds; a hover is
+   * transient and only applies while nothing is selected, so moving the mouse
+   * across the sidebar cannot pull focus off the service you just opened.
+   */
+  const focusedService = selectedServiceCode ?? hoveredServiceCode;
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
     [ports],
   );
+
+  /**
+   * Vessels the movement series actually follows, per service. Not the same as
+   * the fleet a service runs — four of the eleven have no tracked vessel at
+   * all, and CAS's own blurb claims four — so anything showing this must say
+   * "tracked" rather than implying a fleet size.
+   */
+  const trackedVessels = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const track of vesselTracks) {
+      counts.set(track.serviceCode, (counts.get(track.serviceCode) ?? 0) + 1);
+    }
+    return counts;
+  }, [vesselTracks]);
   const selectedPort = selectedKey
     ? (portsByKey.get(selectedKey) ?? null)
     : null;
@@ -156,26 +180,11 @@ export default function Explorer({
           </span>
           <span className="hidden text-xs text-muted sm:inline">{region}</span>
         </div>
-        <div className="flex items-center gap-5">
-          {/* Mirrors the three marker styles in globals.css. */}
-          <div className="hidden items-center gap-4 text-[11px] text-faint md:flex">
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full bg-white ring-1 ring-fg/50" />
-              Route port
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-2 rotate-45 border-2 border-[#9AA6B8]" />
-              Bunker price port
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full bg-accent ring-2 ring-accent/60" />
-              Both
-            </span>
-          </div>
-          <div className="text-right">
-            <div className="label leading-none">Prices as of</div>
-            <div className="tnum mt-0.5 text-xs text-fg">{formatDate(asOf)}</div>
-          </div>
+        {/* The map key lives in the sidebar footer, where there is room to
+            explain route lines and vessels rather than only port markers. */}
+        <div className="text-right">
+          <div className="label leading-none">Prices as of</div>
+          <div className="tnum mt-0.5 text-xs text-fg">{formatDate(asOf)}</div>
         </div>
       </header>
 
@@ -194,6 +203,8 @@ export default function Explorer({
           onToggle={toggleService}
           onSetAll={setAll}
           onSelectService={selectService}
+          onHoverService={setHoveredServiceCode}
+          trackedVessels={trackedVessels}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
@@ -205,6 +216,7 @@ export default function Explorer({
             vesselTracks={vesselTracks}
             visibleServices={visibleServices}
             selectedKey={selectedKey}
+            focusedService={focusedService}
             stepIndex={stepIndex}
             selectedVesselName={selectedVesselName}
             onSelectPort={selectPort}

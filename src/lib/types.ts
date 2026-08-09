@@ -106,7 +106,7 @@ export interface VesselSpec {
 }
 
 /**
- * One vessel's movement series, stored columnar: 480 steps × 11 vessels as
+ * One vessel's movement series, stored columnar: 480 steps × 35 vessels as
  * plain rows would be pricing-sized, which does not belong in props.
  *
  * Timestamps are a perfect 3-hour grid, so only the first is carried and the
@@ -130,7 +130,7 @@ export interface VesselTrack {
   phases: string;
   /** Per step, remaining-on-board of `grade`. */
   robMt: number[];
-  /** Sparse: step index → MT delivered. Only 26 entries across the fleet. */
+  /** Sparse: step index → MT delivered. 86 entries across the fleet. */
   bunkered: Record<number, number>;
 }
 
