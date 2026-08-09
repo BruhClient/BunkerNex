@@ -35,6 +35,18 @@ Nothing in `src/` hardcodes a start or end date. The scrubbed window is **entire
 
 **To move the timeline, edit `WINDOW_START` and `STEPS` at the top of `scripts/gen-vessel-movement.mjs` and re-run it.** Those two constants are the whole window; rotations, phases, loop offsets and the ROB model are all derived, so the same fleet replays over the new dates. The script asserts every invariant in `data/README.md`'s "Refreshing" list before writing — including the one nothing at runtime checks, that every port in every rotation is actually visited — and is idempotent. Editing that CSV by hand instead will silently break those invariants.
 
+### Every vessel runs three tanks, and none of it is inferred at runtime
+
+The generator, not the app, applies the fuel rules. Three constants in `scripts/gen-vessel-movement.mjs` carry them, and each has an invariant that fails the run if the output violates it:
+
+- `ECA_PORTS` — the 10 China/Korea ports capping sulphur at **0.10%**. A vessel is on MGO from `ECA_LEAD_STEPS` (8 = 24 h) before a berth there until `ECA_TRAIL_STEPS` (1 = 3 h) after. VLSFO is 0.50% and does **not** clear this, so switching between the two residual grades would be non-compliance dressed as compliance. Consecutive ECA calls merge into one window.
+- `NO_HSFO_PORTS` — the 12 of 26 ports with no `IFO380` column and no high-sulphur market. A scrubber vessel stemming there lifts VLSFO. Assigning grade by scrubber fitting alone is the bug this replaced; `data/README.md` records it.
+- `VLSFO_RESERVE_RATIO` / `MGO_MAX_RATIO` — scrubber vessels open 80/20 HSFO/VLSFO within `Max_ROB_MT`; the MGO tank is 0.20 × `Max_ROB_MT` and sits **outside** it. `MGO_MAX_RATIO` is duplicated as `MGO_TANK_RATIO` in `src/lib/types.ts` because the generator cannot import from `src/` — change one, change the other.
+
+`Active_Fuel` (column 9) names the burning grade per row. **Read it; do not infer it** — a tank standing still is indistinguishable from a tank not being burned, and MGO is flat all window for the 10 vessels on ECA-free rotations (BD1, BD2, CAS, YGS). `activeGradeAt` in `src/lib/vesselPosition.ts` is the only decoder.
+
+Auxiliary and port-generator consumption is **not** modelled. MGO moves only where the main engine is on it.
+
 The window deliberately ends on 2026-08-05, the last date in `data/pricing/*.csv`, so every bunker stem falls inside the priced period. If you move it past that date, stems again get priced off an assessment weeks older than the stem.
 
 ### UN/LOCODE is the join key, and `PORT_COORDS` is load-bearing
@@ -55,7 +67,7 @@ Adding a pricing port needs both an alias entry and a `PORT_COORDS` entry, or th
 
 Only 3 of the 26 ports this fleet stems at are assessed — Singapore, Busan and Shanghai. The other 23 carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `LSMGO_MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
 
-`MGO` follows the same hub table as VLSFO and was added for chart completeness only — `PRICE_SERIES` in `src/lib/bunkerEvents.ts` never reads it, so it can't reach a valuation. `Methanol Prices.csv` was deliberately **not** extended: researched and found to have no bunkering market at any of the 23 ports as of August 2026 (infrastructure exists only at Singapore, Shanghai/Zhoushan and emerging Korea/India facilities, none of which are in this fleet's unassessed set) — see `data/README.md` for sources.
+`MGO` follows the same hub table as VLSFO. It was originally added for chart completeness, but **it now prices stems**: `PRICE_SERIES` in `src/lib/bunkerEvents.ts` maps `MGO → "MGO"`, and the ECA switch means 116 of the fleet's 250 lifts are MGO. At 23 of the 26 ports that figure is modelled at `inferred`/`judgment` confidence with no published spread behind it — softer than the VLSFO basis, and the softest number the app puts a dollar value on. `Methanol Prices.csv` was deliberately **not** extended: researched and found to have no bunkering market at any of the 23 ports as of August 2026 (infrastructure exists only at Singapore, Shanghai/Zhoushan and emerging Korea/India facilities, none of which are in this fleet's unassessed set) — see `data/README.md` for sources.
 
 They are deliberately indistinguishable downstream. They resolve through `PRICE_PORT_ALIASES`, chart like any other series, and **flow through `bunkerPriceSnapshot()` into stem valuations** — so a stem at Chittagong is priced off Singapore plus a judgment differential and reads exactly like a quoted one. `data/README.md` is the only record of which columns are which; check it before presenting any figure as an assessment.
 
@@ -68,6 +80,48 @@ Working rules:
 - Every `judgment` row must bracket its figure between two assessed spreads from this dataset, recorded in `Rationale`.
 - Published spreads do **not** reproduce here: S&P's Shanghai–Singapore LSFO spread of $14/mt on 2026-04-07 is **+78.0** in `VLSFO Prices.csv`. Calibrate on the repo's own assessed spreads.
 - Adding a modelled port needs three things in one change — a `PORT_HEADER` entry in the generator, a `PRICE_PORT_ALIASES` entry, and a `PORT_COORDS` entry — or the column is silently dropped.
+
+### Every priced port is a marketplace, and the offers are invented
+
+`data/contracts/` is read at runtime now. [src/lib/suppliers.ts](src/lib/suppliers.ts)
+turns each of the 50 priced ports into a market per fuel type: the baseline, plus 3–5
+suppliers quoting against it. It reaches the UI through `markets` on
+`GET /api/prices/[portKey]`, rendered by
+[src/components/SupplierOffers.tsx](src/components/SupplierOffers.tsx) inside the port
+panel.
+
+**Offers store a differential, not a price.** `supplier_offers.csv` carries
+`Offer_Basis_USD_Per_MT`; the price is `baseline + diff`, resolved at read time off the
+latest non-null point — the same rule `bunkerPriceSnapshot()` uses, but across every
+grade rather than the two the fleet stems. This is the opposite trade-off to
+`gen-modelled-prices.mjs`: **nothing goes stale on a price refresh and there is nothing
+to re-run.** Re-run `node scripts/gen-supplier-offers.mjs` only when `suppliers.csv`
+changes.
+
+Nothing here is sourced. The PIL supplier list has no rates, no ports and no grades;
+the MSA's `Price Basis` is blank. Every differential and delivery term is generated,
+and at the 23 modelled ports the baseline underneath is not an assessment either — so
+a Chittagong offer is Singapore, plus a judgment basis, plus an invented supplier
+spread, and reads exactly like a quote. The port panel carries that caveat in copy;
+keep it wherever these figures are shown.
+
+Working rules:
+
+- **Three suppliers per port × grade is a floor the generator asserts**, naming the
+  pair when coverage falls short. Adding a supplier needs a `ports` entry, a `grades`
+  entry and a re-run in one change — a LOCODE with no price series throws.
+- Randomness is seeded on `Port_Code|Grade|Supplier`, so the CSV is stable and
+  reviewable. Don't hand-edit it; the next run overwrites it.
+- **Tier 3 (bio/sustainable) is methanol only** — a certified renewable blend is not a
+  like-for-like quote against a fossil grade. `MEOH_VLSFOe` / `MEOH_MGOe` get no offers
+  at all: they are the same physical methanol restated in energy-equivalent terms.
+- The offer differential is **not** coloured with `text-up` / `text-down`. Those mean
+  price direction everywhere else; here the lower number is the better buy, so
+  colouring by sign inverts the scale two panels apart. An accent `BEST` chip on the
+  cheapest quote carries the judgment instead.
+- The script duplicates `PRICE_PORT_ALIASES` and the grade suffixes because `.mjs`
+  can't import the TS source. An unknown column prefix throws rather than being
+  skipped — silently dropping one there would drop a whole marketplace.
 
 ### Server/client boundary
 

@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo } from "react";
 import { serviceColor } from "@/lib/colors";
-import { buildLegs, stepTimestamp } from "@/lib/vesselPosition";
+import { activeGradeAt, buildLegs, stepTimestamp } from "@/lib/vesselPosition";
 import VesselFuelBar from "./VesselFuelBar";
 import VesselRobChart from "./VesselRobChart";
 import VesselStems from "./VesselStems";
 import type { BunkerEvent } from "@/lib/bunkerEvents";
+import { MGO_TANK_MIN_RATIO, MGO_TANK_RATIO } from "@/lib/types";
 import type {
   PortCall,
   Service,
+  VesselGrade,
   VesselSizeClass,
   VesselSpec,
   VesselTrack,
@@ -116,15 +118,28 @@ export default function VesselPanel({
   const leg = legs.find(
     (l) => stepIndex >= l.start && stepIndex < l.start + l.length,
   );
-  const rob = track.robMt[stepIndex] ?? 0;
-  const lifted = track.bunkered[stepIndex] ?? null;
+  // ROB of every tank at this step, plus what the engine is actually on.
+  const robMt: Record<VesselGrade, number> = {
+    HSFO: track.robMt.HSFO[stepIndex] ?? 0,
+    VLSFO: track.robMt.VLSFO[stepIndex] ?? 0,
+    MGO: track.robMt.MGO[stepIndex] ?? 0,
+  };
+  const activeGrade = activeGradeAt(track, stepIndex);
+  const lifted = track.bunkered[activeGrade][stepIndex] ?? null;
+
+  // Thresholds are measured against the residual pair together, since that is
+  // the capacity they were derived from. MGO has its own, smaller tank.
+  const residualRob = robMt.HSFO + robMt.VLSFO;
+  const mgoMaxMt =
+    spec.maxRobMt === null ? null : spec.maxRobMt * MGO_TANK_RATIO;
+  const mgoMinMt = mgoMaxMt === null ? null : mgoMaxMt * MGO_TANK_MIN_RATIO;
 
   // The two thresholds the simulation ignores — see data/README.md. Surfacing
   // them here is the point of the panel: a vessel below its minimum is not a
   // schedule anyone could actually run.
-  const belowMin = spec.minRobMt !== null && rob < spec.minRobMt;
+  const belowMin = spec.minRobMt !== null && residualRob < spec.minRobMt;
   const belowTrigger =
-    spec.bunkeringTriggerMt !== null && rob < spec.bunkeringTriggerMt;
+    spec.bunkeringTriggerMt !== null && residualRob < spec.bunkeringTriggerMt;
 
   return (
     <aside
@@ -187,28 +202,34 @@ export default function VesselPanel({
                 : "—"
             }
           />
+          <Row label="Burning" value={activeGrade} />
           {lifted !== null && (
-            <Row label="Bunkering now" value={`${int(lifted)} MT`} />
+            <Row
+              label="Bunkering now"
+              value={`${int(lifted)} MT ${activeGrade}`}
+            />
           )}
 
           {/* Replaces the three scalar rows this section used to carry: the bar
-              states grade, quantity and MGO at once, and against capacity
-              rather than as bare tonnages. */}
+              states the residual split, the MGO tank and which one is burning
+              at once, and against capacity rather than as bare tonnages. */}
           <div className="mt-2.5">
             <VesselFuelBar
-              grade={track.grade}
-              robMt={rob}
-              mgoRobMt={track.mgoRobMt}
+              robMt={robMt}
+              activeGrade={activeGrade}
+              scrubber={track.scrubber}
               maxRobMt={spec.maxRobMt}
               minRobMt={spec.minRobMt}
               triggerMt={spec.bunkeringTriggerMt}
+              mgoMaxMt={mgoMaxMt}
+              mgoMinMt={mgoMinMt}
             />
           </div>
 
           {(belowMin || belowTrigger) && (
             <div className="mx-4 mt-2 rounded border border-warn/40 bg-warn/10 px-3 py-2">
               <p className="text-[11px] leading-relaxed text-warn">
-                {rob <= 0 ? (
+                {residualRob <= 0 ? (
                   <>
                     <span className="font-semibold">No fuel onboard.</span> The
                     simulation runs this vessel to zero — not a survivable state.
@@ -234,7 +255,7 @@ export default function VesselPanel({
         {/* --- The whole window, not just the scrubbed step --- */}
         <section className="mt-4 border-t border-line pt-3.5">
           <div className="px-4 pb-2">
-            <span className="label">{track.grade} remaining · trend</span>
+            <span className="label">Fuel remaining · trend</span>
           </div>
           <VesselRobChart
             track={track}
@@ -277,7 +298,12 @@ export default function VesselPanel({
             label="Scrubber"
             value={spec.scrubber ? "Fitted" : "Not fitted"}
           />
-          <Row label="Burns" value={track.grade} />
+          <Row
+            label="Carries"
+            value={
+              track.scrubber ? "HSFO + VLSFO + MGO" : "VLSFO + MGO"
+            }
+          />
 
           {spec.nominalTeu === null && (
             <p className="px-4 pt-1.5 text-[11px] leading-relaxed text-faint">
@@ -293,8 +319,15 @@ export default function VesselPanel({
           )}
           <p className="px-4 pt-1.5 text-[11px] leading-relaxed text-faint">
             Engine capability is listed as {spec.fuelTypes.join(", ")} for every
-            vessel in the source. This one burns {track.grade}, following its
-            scrubber fitting.
+            vessel in the source — read as what the engine can burn, not what
+            the vessel may lawfully burn.{" "}
+            {track.scrubber
+              ? "This one is scrubber-fitted, so HSFO is its main fuel and " +
+                "VLSFO its compliant reserve."
+              : "Without a scrubber, HSFO is not compliant on this hull, so " +
+                "VLSFO is its only residual grade."}{" "}
+            MGO is carried by every vessel and burned through China and Korea
+            ECA calls.
           </p>
         </section>
 

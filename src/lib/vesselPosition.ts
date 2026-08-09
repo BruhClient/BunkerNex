@@ -1,6 +1,6 @@
 import { greatCircleArc, multiPointArc, pointAlong, type LonLat } from "./geo";
 import { seaRoute } from "./searoutes";
-import type { VesselTrack } from "./types";
+import type { VesselGrade, VesselTrack } from "./types";
 
 /**
  * A block of consecutive steps sharing one destination port: the transit
@@ -26,9 +26,30 @@ export interface VesselFix {
   portCode: string;
   /** Port departed on this leg. Equals portCode when no origin is knowable. */
   fromPortCode: string;
+  /** The grade the main engine is on at this step, MGO through an ECA call. */
+  grade: VesselGrade;
+  /** ROB of `grade` — the fuel actually being burned, not the vessel total. */
   robMt: number;
-  /** MT lifted at this exact step, if any. */
+  /** MT of `grade` lifted at this exact step, if any. */
   bunkeredMt: number | null;
+}
+
+/**
+ * The grade being burned at a step, unpacked from the track's `activeGrades`.
+ *
+ * The char is written by the generator rather than inferred from which tank is
+ * falling: on the ten rotations that touch no ECA port the MGO tank never
+ * moves, which is indistinguishable from an MGO tank that is simply full.
+ */
+export function activeGradeAt(track: VesselTrack, step: number): VesselGrade {
+  switch (track.activeGrades[step]) {
+    case "H":
+      return "HSFO";
+    case "M":
+      return "MGO";
+    default:
+      return "VLSFO";
+  }
 }
 
 /**
@@ -132,12 +153,16 @@ export function createTrackResolver(
     const destination = portLonLat(leg.toKey);
     if (!destination) return null;
 
+    // The fix reports the tank in use, so a vessel mid-ECA reads as MGO rather
+    // than as a residual figure that is not moving.
+    const grade = activeGradeAt(track, step);
     const base = {
       berthed,
       portCode: leg.toKey,
       fromPortCode: leg.fromKey,
-      robMt: track.robMt[step],
-      bunkeredMt: track.bunkered[step] ?? null,
+      grade,
+      robMt: track.robMt[grade][step],
+      bunkeredMt: track.bunkered[grade][step] ?? null,
     };
 
     // Berthed vessels sit exactly on the port, never an interpolated point

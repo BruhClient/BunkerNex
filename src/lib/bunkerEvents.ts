@@ -15,10 +15,16 @@ import type { Grade, VesselGrade, VesselTrack } from "./types";
  * The assessments quote high-sulphur fuel as IFO380; no column anywhere is
  * headed "HSFO". Mapping the two is the only way a scrubber-fitted vessel's
  * stem can be priced at all.
+ *
+ * MGO maps to the plain `MGO` column rather than `LSMGO`. Both exist in
+ * "LSMGO_MGO Prices.csv", but the split is regional: every one of this fleet's
+ * twenty-six ports carries `<PORT> MGO`, while `LSMGO` appears mostly at
+ * Japan/Europe/Americas ports it never calls. See data/README.md.
  */
 export const PRICE_SERIES: Record<VesselGrade, Grade> = {
   VLSFO: "VLSFO",
   HSFO: "IFO380",
+  MGO: "MGO",
 };
 
 /** The latest real assessment for a port and grade, with its own date. */
@@ -84,8 +90,12 @@ export interface BunkerEvent {
  * Every stem in the movement window, chronological.
  *
  * `bunkered` is sparse — a handful of steps per vessel out of 744 — so this
- * walks the recorded stems rather than scanning the grid. 154 rows fleet-wide,
+ * walks the recorded stems rather than scanning the grid. 250 rows fleet-wide,
  * cheap enough to build once and hold.
+ *
+ * The grade comes from which per-grade map the stem sits in, never from the
+ * vessel's primary grade: a scrubber vessel lifts VLSFO at the twelve ports
+ * with no high-sulphur market, and MGO wherever its ECA legs demand it.
  */
 export function allBunkerEvents(
   tracks: VesselTrack[],
@@ -94,34 +104,44 @@ export function allBunkerEvents(
   const events: BunkerEvent[] = [];
 
   for (const track of tracks) {
-    for (const [key, quantityMt] of Object.entries(track.bunkered)) {
-      const step = Number(key);
+    for (const [grade, byStep] of Object.entries(track.bunkered) as Array<
+      [VesselGrade, Record<number, number>]
+    >) {
+      for (const [key, quantityMt] of Object.entries(byStep)) {
+        const step = Number(key);
 
-      const portCode = track.portCodes[step];
-      if (portCode === undefined) continue;
+        const portCode = track.portCodes[step];
+        if (portCode === undefined) continue;
 
-      const price = snapshot[portCode]?.[track.grade] ?? null;
+        const price = snapshot[portCode]?.[grade] ?? null;
 
-      events.push({
-        id: `${track.name}@${step}`,
-        step,
-        vesselName: track.name,
-        serviceCode: track.serviceCode,
-        portCode,
-        portName: portMeta(portCode)?.name ?? portCode,
-        grade: track.grade,
-        quantityMt,
-        robMt: track.robMt[step] ?? 0,
-        timestamp: stepTimestamp(track, step),
-        price,
-        valueUsd: price ? quantityMt * price.value : null,
-      });
+        events.push({
+          // A vessel can lift two grades on one step — a residual top-up
+          // alongside an MGO one — so the grade is part of the key.
+          id: `${track.name}@${step}@${grade}`,
+          step,
+          vesselName: track.name,
+          serviceCode: track.serviceCode,
+          portCode,
+          portName: portMeta(portCode)?.name ?? portCode,
+          grade,
+          quantityMt,
+          robMt: track.robMt[grade][step] ?? 0,
+          timestamp: stepTimestamp(track, step),
+          price,
+          valueUsd: price ? quantityMt * price.value : null,
+        });
+      }
     }
   }
 
   // Every track shares one time grid, so comparing steps across vessels is
-  // comparing the same instant. Vessel name breaks ties for a stable order.
+  // comparing the same instant. Vessel name then grade breaks ties for a
+  // stable order.
   return events.sort(
-    (a, b) => a.step - b.step || a.vesselName.localeCompare(b.vesselName),
+    (a, b) =>
+      a.step - b.step ||
+      a.vesselName.localeCompare(b.vesselName) ||
+      a.grade.localeCompare(b.grade),
   );
 }

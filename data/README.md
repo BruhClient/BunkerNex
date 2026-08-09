@@ -120,10 +120,17 @@ calibrated on 2024–25 deliberately.
   values is part modelled.
 - **11 ports get no IFO380 column at all** — Chittagong, Mongla, Yangon, Kolkata,
   Gangavaram, Haiphong, Qui Nhon, Bangkok, Jakarta, Surabaya, Semarang. There is no
-  HSFO bunker market at any of them. `PIL_Fleet_Live_Movement.csv` still records HSFO
-  stems at Chittagong (473 MT), Yangon (300 MT) and Laem Chabang (400 MT), because it
-  assigns grade purely by scrubber fitting and never checks what the port can supply.
-  The missing column is correct; the movement file is the thing that is wrong.
+  HSFO bunker market at any of them. Shanghai has none either, which with these makes
+  **12 of the fleet's 26 ports** unable to supply high-sulphur fuel.
+
+  This used to be a live inconsistency: the movement file assigned grade purely by
+  scrubber fitting and never checked what a port could sell, so it recorded HSFO stems
+  at Chittagong and Yangon. **Fixed** — `NO_HSFO_PORTS` in
+  [`scripts/gen-vessel-movement.mjs`](../scripts/gen-vessel-movement.mjs) now holds this
+  list, a scrubber vessel calling one of them lifts VLSFO into its compliant reserve
+  instead, and an invariant fails the run if an HSFO stem ever lands at one. Laem
+  Chabang was named here previously and should not have been: `LAEMCHABANG IFO380`
+  carries 1,715 values through 2026-08-05.
 - **Jakarta's column steps ~$143/mt on 2023-05-01.** Real: Pertamina moved to
   market-based pricing and exempted ocean-going vessels from 11% VAT, and the assessed
   premium narrowed from $210–256 to ~$87 (Argus). It is not smoothed — ramping would
@@ -134,9 +141,15 @@ calibrated on 2024–25 deliberately.
 
 #### MGO and Methanol — one extended, one deliberately not
 
-Neither grade is read by `bunkerPriceSnapshot()` — `PRICE_SERIES` in
-`src/lib/bunkerEvents.ts` maps only `VLSFO`/`HSFO` to `VLSFO`/`IFO380` — so both of the
-following are chart-completeness decisions with zero effect on stem valuations.
+**`MGO` now prices stems.** It was originally extended for chart completeness only, but
+`PRICE_SERIES` in `src/lib/bunkerEvents.ts` maps `VLSFO`/`HSFO`/`MGO` to
+`VLSFO`/`IFO380`/`MGO`, so every one of the 116 MGO lifts recorded in
+`PIL_Fleet_Live_Movement.csv` is valued off these columns. At 23 of the 26 ports that
+figure is modelled, and — unlike the VLSFO basis — it is entirely `inferred`/`judgment`
+confidence. Treat MGO stem values as the softest numbers in the app.
+
+Methanol remains a chart-completeness question with no effect on valuations: no vessel
+stems it.
 
 **`MGO` was modelled for all 23 ports**, same hub assignment as VLSFO, entirely
 `inferred`/`judgment` confidence (no published spread was found for any of them).
@@ -251,16 +264,87 @@ list is prose with no rates and no port coverage. These files therefore support
 
 | File | Grain |
 |---|---|
-| `suppliers.csv` | one row per supplier, tiered as the source groups them |
+| `suppliers.csv` | one row per supplier (74), tiered as the source groups them |
+| `supplier_offers.csv` | one row per port × grade × supplier (465), **generated** |
 | `term_terms.csv` | one row per negotiable commercial parameter, with its clause |
 
-**Open gap:** `suppliers.ports` is empty in every row. The source document does not
-say which supplier serves which port, and guessing would be worse than a blank. Fill
-it from a real supply-coverage source before using suppliers for port feasibility.
+The most load-bearing value in `term_terms.csv` is the guaranteed pumping rate,
+400–800 MT/hour (clause 3.3) — it feeds the `quantity ÷ pump rate` transfer-time
+check, no other file in `data/` carries a pump rate, and it is also the band
+`Pump_Rate_MT_Per_Hour` is drawn from in `supplier_offers.csv`. Lead times come from
+`firm_nomination_window`, 5–10 working days (clause 1.2(b)).
 
-The most load-bearing value here is the guaranteed pumping rate, 400–800 MT/hour
-(clause 3.3) — it feeds the `quantity ÷ pump rate` transfer-time check, and no other
-file in `data/` carries a pump rate.
+### `suppliers.csv` — 24 rows from the source, 50 added
+
+`source_basis` separates them. The 24 `source` rows keep the document's own names,
+tiers and prose; their `ports` and `grades` are **not** from the source and are
+assigned here.
+
+The source roster is Europe- and major-weighted with no Asian regional physicals at
+all, while 25 of the 50 priced ports are Intra-Asia. Making every port reach three
+credible suppliers therefore needed real regional names — Sinopec Zhoushan, Chimbusco,
+SK Energy, ENEOS, IOCL, Pertamina, PTT, Petrolimex, Petronas, ENOC, Peninsula, Minerva,
+Astron and the rest. Those carry `source_basis=added`. The alternative was quoting Qui
+Nhon out of Sunpine AB, which satisfies the count and fails the smell test.
+
+`ports` and `grades` are `;`-separated, the same convention as `Key_Features` and
+`Main_Engine_Fuel_Types`. Together they are the coverage rule: a supplier is eligible
+for a port × grade only if it lists both, **and** the port actually has a series for
+that grade.
+
+### `supplier_offers.csv` — every figure is simulated
+
+Generated by [`scripts/gen-supplier-offers.mjs`](../scripts/gen-supplier-offers.mjs).
+Nothing in it is sourced. The supplier list has no rates; the MSA has a blank
+`Price Basis: ____`. Every differential, lifting range, lead time and payment term is
+invented to give each port a market that behaves plausibly.
+
+Offers store a **differential, not a price**:
+
+```
+offer(port, grade, supplier) = baseline(port, grade) + Offer_Basis_USD_Per_MT
+```
+
+`src/lib/suppliers.ts` resolves the baseline at read time from the latest non-null
+point in `pricing/`. So unlike the modelled price columns, **these do not go stale on
+a price refresh** — there is nothing to re-run when `pricing/` moves. Re-run the
+generator only when `suppliers.csv` changes.
+
+Differential bands, and why they are shaped that way:
+
+| Tier | Band $/mt | Reasoning |
+|---|---|---|
+| 1 — Global major | +3 … +14 | brand, ISO 8217 assurance, 45-day credit |
+| 2 — Trader / independent physical | −8 … +4 | reselling someone else's cargo, competes on price |
+| 3 — Bio / sustainable | +15 … +60, **MEOH only** | certified renewable product, genuinely dearer |
+| 4 — Regional / state-owned | −6 … +5 | refinery on its own doorstep |
+
+Ex-wharf deliveries take a further −1.5 (no barge cost). `Payment_Terms_Days` is
+derived from the differential rather than drawn — 45 above +6, 30 at or above parity,
+15 below — so credit and premium can never contradict each other.
+
+Working rules:
+
+- **Randomness is seeded** on `Port_Code|Grade|Supplier`. The output is reviewable in
+  git and re-running is a no-op. Never hand-edit the file — the next run overwrites it.
+- **Three suppliers per port × grade is a floor, asserted, not a hope.** The generator
+  throws naming the pair if coverage falls short. 61 of the 127 markets sit exactly on
+  it; the rest carry 4 or 5.
+- **Tier 3 is methanol only.** A certified renewable blend is not a like-for-like quote
+  against a fossil grade, so those suppliers never appear in a VLSFO or IFO380 panel.
+  Asserted after generation.
+- **`MEOH_VLSFOe` and `MEOH_MGOe` get no offers.** They are the same physical methanol
+  restated in energy-equivalent terms; quoting them separately triple-counts one market.
+- **Thin markets are derived, not listed.** Below 6 eligible suppliers a port gets
+  longer lead times and `Availability` skewed to `Enquire`. That stays true when
+  coverage changes, which a hardcoded port list would not.
+- Adding a supplier needs a `ports` entry, a `grades` entry and a generator re-run in
+  the same change. A LOCODE with no price series throws rather than being skipped.
+
+**These offers are indistinguishable from real quotes downstream, and at the 23
+modelled ports they spread off a baseline that is not an assessment either** — a hub
+series plus a documented basis, per the `pricing/` section above. The port panel says
+so in copy; anything else that presents them must too.
 
 ---
 
@@ -273,7 +357,7 @@ block. Sheet last modified 2026-08-08; **extracted 2026-08-09**.
 | File | Grain |
 |---|---|
 | `PIL_Fleet_Vessel_Specifications.csv` | one row per vessel (109) |
-| `vessel_assumptions.csv` | one row per derived column (5) |
+| `vessel_assumptions.csv` | one row per derived column (8 — 5 from the source footnote, 3 for the MGO tank) |
 | `PIL_Fleet_Live_Movement.csv` | one row per vessel per 3-hour step (26,040) |
 
 109 vessels: 101 named `KOTA *` plus ASTERIOS, LITTLE MERMAID, PACANDA, SALAM MAJU,
@@ -481,13 +565,16 @@ The regenerated file enforces the rule the source omitted:
 - At the first berthed step of a call carrying a `Bunker_Quantity_MT`, a stem is lifted if
   ROB has fallen to `Bunkering_Trigger_MT` **or** if ROB minus the fuel needed to reach the
   next stem opportunity would fall below `Min_ROB_MT`. The second clause is the
-  safety-critical one: it stops a vessel sailing past a bunker port it cannot skip.
-- The stem is `min(Bunker_Quantity_MT, Max_ROB_MT − ROB)`, so a call's published quantity is
-  never exceeded and the tank never overfills. Where capacity cuts the stem short, the row
-  says so in `Data_Notes`.
-- **Invariant, verified over all 26,040 rows: `Min_ROB_MT ≤ ROB ≤ Max_ROB_MT`.** ROB never
-  reaches 0, and the tightest margin anywhere in the file is 3.445 MT above `Min_ROB_MT`.
-  154 stems occur across the fleet's 93 days — 1.7 a day, against the Drive extract's 0.4.
+  safety-critical one: it stops a vessel sailing past a bunker port it cannot skip. The
+  rule is applied per tank, against the residual pair jointly and MGO separately.
+- The residual stem is `min(Bunker_Quantity_MT, Max_ROB_MT − residual ROB)`, so a call's
+  published quantity is never exceeded and the tank never overfills. Where capacity cuts
+  the stem short, the row says so in `Data_Notes` — 73 of 134 residual stems.
+- **Invariants, verified over all 26,040 rows before the file is written:**
+  `Min_ROB_MT ≤ HSFO + VLSFO ≤ Max_ROB_MT`, and MGO within its own tank. Neither reaches
+  0; the tightest margins are 3.445 MT above `Min_ROB_MT` and 1.557 MT above the MGO
+  floor. **250 stems** occur across the fleet's 93 days — 57 HSFO, 77 VLSFO, 116 MGO —
+  against the Drive extract's 26.
 
 The ROB curves are still a model, not measurements — the consumption rates are a flat
 percentage of DWT, so this remains a worked example. What changed is that it is now a
@@ -495,24 +582,53 @@ percentage of DWT, so this remains a worked example. What changed is that it is 
 cannot cover its longest inter-stem leg is the wrong ship for the service, and the fix is
 the deployment, not a clamp.
 
-### Fuel grade does follow scrubber status
+### Every vessel runs three tanks, and switches fuel for ECA calls
 
-Scrubber-fitted vessels burn HSFO (`VLSFO_ROB_MT` flat at 0); non-scrubber vessels burn
-VLSFO (`HSFO_ROB_MT` flat at 0). Exact across all 35. This is the MARPOL Annex VI rule
-that the specifications sheet does *not* encode — that sheet lists `VLSFO; HSFO; MGO`
-for every vessel regardless of scrubber. Where the two disagree, this file is the more
-careful one.
+This replaces the old one-grade-per-vessel model, in which a vessel burned HSFO or VLSFO
+by scrubber fitting, the other residual column was flat at 0, and MGO was a parked
+number. Three things drive the current model.
 
-`MGO_ROB_MT` is constant per vessel: MGO is never burned and never stemmed. It is a
-static number, not a series.
+**Compliance.** High-sulphur fuel exists only on a scrubber-fitted hull. The 15
+non-scrubber vessels carry `HSFO_ROB_MT` and `HSFO_Bunkered_MT` flat at 0 — a true zero,
+not a missing value. This is the MARPOL Annex VI rule the specifications sheet does *not*
+encode: it lists `VLSFO; HSFO; MGO` for every vessel, which means "engine can burn", not
+"vessel may lawfully burn". Where the two disagree, this file is the more careful one.
 
-**It is blank for the 30 vessels the Drive extract did not cover.** The source's figure has
-no derivable basis — across its 11 vessels it ranges from 0.13 to 0.72 of `Min_ROB_MT`, so
-it is neither a ratio of DWT nor of any other column, unlike the five assumption columns in
-the specifications sheet. There is nothing to extrapolate, so per the null discipline it
-stays empty rather than invented. The five carried-over vessels (ASTERIOS, KOTA ANGGUN,
-KOTA AZAM, KOTA DAHLIA, KOTA DUNIA) keep their real source values. `VesselPanel` hides the
-"MGO remaining" row when it is null.
+**Supply.** The 20 scrubber vessels carry **both** residual grades, sharing `Max_ROB_MT`
+— HSFO as the main fuel and VLSFO as a compliant reserve, opening at 80/20. The reserve
+is not decorative: 12 of the 26 ports have no HSFO market (see "What this costs" above),
+and a scrubber vessel stemming at one lifts VLSFO instead. Burn takes HSFO first, so the
+reserve stands until HSFO runs out. All 20 hold VLSFO at every step; an invariant fails
+the run otherwise.
+
+**The ECA switch.** Ten of the 26 ports sit in China's or Korea's national port ECA:
+`CNNGB CNNSA CNQZH CNSHA CNSHK CNTAO CNTSN CNXMN KRINC KRPUS`. Those cap sulphur at
+**0.10%**, which VLSFO (0.50%) does not clear — so the switch fuel has to be MGO, and
+switching between the two residual grades would look like compliance without being it.
+Per the source rule: on MGO from **8 steps (24 h) before** a berth at an ECA port until
+**1 step (3 h) after** it ends. Consecutive ECA calls merge into one window, which is why
+a KCS vessel running Busan → Incheon → Qingdao → Shanghai barely returns to its main fuel
+between them. `Active_Fuel` records which grade is burning at each step; it is written
+out rather than inferred, because a tank standing still is indistinguishable from a tank
+not being burned.
+
+**MGO is now a series, not a constant** — burned and stemmed, 116 lifts. Its tank sits
+*outside* `Max_ROB_MT` (ASTERIOS opens at 683 MT of residual, exactly its `Max_ROB_MT`,
+and carries MGO on top) and is taken as **0.20 × `Max_ROB_MT`**, floor `÷3`, trigger `÷2`
+— recorded in `vessel_assumptions.csv`, mirrored in `MGO_TANK_RATIO` in
+`src/lib/types.ts` for the fuel bar. That ratio **supersedes the five hand-carried
+figures** from the Drive extract (ASTERIOS, KOTA ANGGUN, KOTA AZAM, KOTA DAHLIA,
+KOTA DUNIA), which had no derivable basis — 0.13 to 0.72 of `Min_ROB_MT` across 11
+vessels, a ratio of nothing. Three of the five land near 0.20 × `Max_ROB_MT`; two do not.
+Holding five hand figures beside thirty derived ones would have made the series
+inconsistent the moment MGO started moving.
+
+**10 of the 35 vessels never enter an ECA** — BD1 ×2, BD2 ×2, CAS ×4, YGS ×2, whose
+rotations run Singapore/Bangladesh/Kolkata/Yangon. Their `MGO_ROB_MT` is flat all window
+and their `Active_Fuel` never reads MGO. That is correct rather than a gap: auxiliary and
+port-generator consumption is **not** modelled here, so MGO moves only where the main
+engine is on it. An invariant checks both directions — a rotation touching an ECA port
+whose MGO never moves fails, and so does the reverse.
 
 ### Conventions
 
@@ -529,6 +645,10 @@ KOTA AZAM, KOTA DAHLIA, KOTA DUNIA) keep their real source values. `VesselPanel`
   misleading.
 - **`Berthed` and `Transit` columns were dropped.** Both were fully derivable from
   `Operational_Phase`, with zero disagreements across all 5,280 rows of the Drive extract.
+- **`Active_Fuel` was added**, after `Operational_Phase`, taking `VLSFO`, `HSFO` or `MGO`.
+  It is the one column here that is derived rather than sourced, and it is written out
+  instead of left to be inferred: a reader cannot tell a fuel switch from an untouched
+  tank by watching ROB, because MGO is flat all window on 10 of the 35 vessels.
 - **`Timestamp` is `YYYY-MM-DD HH:MM:SS` with no timezone.** The source states none;
   it is read as an opaque sortable string, like `Source_Effective_Date` in the service
   master. Don't append `Z` or an offset — that would assert a fact the source lacks.
@@ -557,7 +677,14 @@ writes, throwing rather than emitting a file that violates any of them:
   port off its line.
 - **Every port in every rotation is visited by at least one vessel of that service.** This
   is the check that was silently failing before, and the one worth running first.
-- `Min_ROB_MT ≤ ROB ≤ Max_ROB_MT` on every row; the non-burned grade flat at 0.
+- `Min_ROB_MT ≤ HSFO + VLSFO ≤ Max_ROB_MT` on every row, and MGO inside its own tank.
+- **Compliance:** every non-scrubber vessel holds and stems exactly 0 HSFO, and no
+  `Active_Fuel` reads HSFO on an unfitted hull.
+- **Supply:** no HSFO stem lands at a port in `NO_HSFO_PORTS`.
+- **The reserve:** no scrubber vessel runs its VLSFO to zero.
+- **The ECA switch happened:** MGO moves on every rotation that calls an ECA port, and on
+  no rotation that does not.
+- `Active_Fuel` is one of `VLSFO`/`HSFO`/`MGO`, and the vessel is holding some of it.
 - Every `Vessel_Name` resolves in `PIL_Fleet_Vessel_Specifications.csv`, and every
   `Port_Code` in both `PORT_COORDS` and `PORT_APPROACH`.
 

@@ -14,7 +14,8 @@ import {
 import { GRADE_COLORS, THEME } from "@/lib/colors";
 import { formatMt } from "@/lib/format";
 import { PRICE_SERIES } from "@/lib/bunkerEvents";
-import { stepTimestamp } from "@/lib/vesselPosition";
+import { activeGradeAt, stepTimestamp } from "@/lib/vesselPosition";
+import { MGO_TANK_RATIO } from "@/lib/types";
 import type { VesselSpec, VesselTrack } from "@/lib/types";
 
 interface Props {
@@ -24,7 +25,8 @@ interface Props {
   onSeek: (step: number) => void;
 }
 
-type Row = { step: number; rob: number };
+/** One point per step, carrying all three tanks. */
+type Row = { step: number; HSFO: number; VLSFO: number; MGO: number };
 
 /** "2026-05-05 00:00" -> "05 May". A 93-day window needs the day, not the year. */
 function axisLabel(track: VesselTrack, step: number): string {
@@ -47,11 +49,16 @@ function axisLabel(track: VesselTrack, step: number): string {
  */
 function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
   const rows = useMemo<Row[]>(
-    () => track.robMt.map((rob, step) => ({ step, rob })),
+    () =>
+      track.robMt.VLSFO.map((_, step) => ({
+        step,
+        HSFO: track.robMt.HSFO[step],
+        VLSFO: track.robMt.VLSFO[step],
+        MGO: track.robMt.MGO[step],
+      })),
     [track],
   );
 
-  const color = GRADE_COLORS[PRICE_SERIES[track.grade]];
   const lastStep = rows.length - 1;
 
   // Shares the fuel bar's scale so the two read as one statement about the same
@@ -59,6 +66,14 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
   // the axis past the figure the bar calls 100%.
   const yMax =
     spec.maxRobMt !== null && spec.maxRobMt > 0 ? spec.maxRobMt : "auto";
+
+  // MGO gets its own right-hand axis rather than sharing the residual one. Its
+  // tank is a fifth the size, so on a shared scale it would sit flat along the
+  // bottom and the ECA draw-downs — the thing worth seeing — would vanish.
+  const mgoMax =
+    spec.maxRobMt !== null && spec.maxRobMt > 0
+      ? spec.maxRobMt * MGO_TANK_RATIO
+      : "auto";
 
   return (
     <div className="px-4">
@@ -95,10 +110,23 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               minTickGap={40}
             />
             <YAxis
+              yAxisId="residual"
               width={44}
               domain={[0, yMax]}
               allowDataOverflow
               tickCount={4}
+              tick={{ fill: THEME.faint, fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => Math.round(v).toString()}
+            />
+            <YAxis
+              yAxisId="mgo"
+              orientation="right"
+              width={36}
+              domain={[0, mgoMax]}
+              allowDataOverflow
+              tickCount={3}
               tick={{ fill: THEME.faint, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
@@ -109,9 +137,11 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               cursor={{ stroke: THEME.lineStrong }}
             />
 
-            {/* The thresholds the panel names in words, as positions. */}
+            {/* The thresholds the panel names in words, as positions. Both are
+                residual figures, so they belong on the residual axis. */}
             {spec.minRobMt !== null && (
               <ReferenceLine
+                yAxisId="residual"
                 y={spec.minRobMt}
                 stroke={THEME.warn}
                 strokeDasharray="3 3"
@@ -120,6 +150,7 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
             )}
             {spec.bunkeringTriggerMt !== null && (
               <ReferenceLine
+                yAxisId="residual"
                 y={spec.bunkeringTriggerMt}
                 stroke={THEME.faint}
                 strokeDasharray="3 3"
@@ -127,21 +158,46 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               />
             )}
 
+            {/* "linear", not PriceChart's "monotone": a stem is a genuine
+                vertical step, and smoothing would round it into a ramp the
+                vessel never sails. */}
+            {track.scrubber && (
+              <Line
+                yAxisId="residual"
+                type="linear"
+                dataKey="HSFO"
+                stroke={GRADE_COLORS[PRICE_SERIES.HSFO]}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{ r: 3, strokeWidth: 0 }}
+                isAnimationActive={false}
+              />
+            )}
             <Line
+              yAxisId="residual"
               type="linear"
-              dataKey="rob"
-              stroke={color}
+              dataKey="VLSFO"
+              stroke={GRADE_COLORS[PRICE_SERIES.VLSFO]}
               strokeWidth={1.5}
               dot={false}
               activeDot={{ r: 3, strokeWidth: 0 }}
               isAnimationActive={false}
-              /* "linear", not PriceChart's "monotone": a stem is a genuine
-                 vertical step, and smoothing would round it into a ramp the
-                 vessel never sails. */
+            />
+            <Line
+              yAxisId="mgo"
+              type="linear"
+              dataKey="MGO"
+              stroke={GRADE_COLORS[PRICE_SERIES.MGO]}
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              dot={false}
+              activeDot={{ r: 3, strokeWidth: 0 }}
+              isAnimationActive={false}
             />
 
             {/* Where we are. Declared last so it paints above the series. */}
             <ReferenceLine
+              yAxisId="residual"
               x={stepIndex}
               stroke={THEME.down}
               strokeWidth={1}
@@ -154,7 +210,10 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
       <p className="mt-1 text-[10px] leading-relaxed text-faint">
         <span style={{ color: THEME.down }}>Red</span> marks the scrubbed
         moment; click the chart to seek. Dashed rules are the bunker trigger and
-        safety minimum — both derived from deadweight, not measured.
+        safety minimum — both derived from deadweight, not measured.{" "}
+        <span style={{ color: GRADE_COLORS[PRICE_SERIES.MGO] }}>MGO</span> is on
+        the right-hand scale: its tank is a fifth the size of the residual one,
+        and it draws down only through China and Korea ECA calls.
       </p>
     </div>
   );
@@ -174,21 +233,39 @@ function RobTooltip({
   const step = Number(label);
   if (!active || !payload?.length || !Number.isFinite(step)) return null;
 
-  const lifted = track.bunkered[step] ?? null;
+  const burning = activeGradeAt(track, step);
+  // Only the grades this hull can hold — an unfitted one has no HSFO row.
+  const grades = track.scrubber
+    ? (["HSFO", "VLSFO", "MGO"] as const)
+    : (["VLSFO", "MGO"] as const);
 
   return (
     <div className="rounded border border-line-strong bg-surface px-2.5 py-2 shadow-xl">
       <div className="tnum text-[10px] text-faint">
         {stepTimestamp(track, step)}
       </div>
-      <div className="tnum mt-1 text-[11px] text-fg">
-        {formatMt(payload[0].value)} MT {track.grade}
-      </div>
-      {lifted !== null && (
-        <div className="tnum mt-0.5 text-[10px] text-accent">
-          Lifted {formatMt(lifted)} MT
-        </div>
-      )}
+      {grades.map((grade) => {
+        const lifted = track.bunkered[grade][step] ?? null;
+        return (
+          <div key={grade} className="tnum mt-1 text-[11px]">
+            <span
+              className={grade === burning ? "text-fg" : "text-faint"}
+              style={{ color: GRADE_COLORS[PRICE_SERIES[grade]] }}
+            >
+              {grade}
+            </span>{" "}
+            <span className={grade === burning ? "text-fg" : "text-faint"}>
+              {formatMt(track.robMt[grade][step])} MT
+            </span>
+            {grade === burning && (
+              <span className="text-faint"> · burning</span>
+            )}
+            {lifted !== null && (
+              <span className="text-accent"> · lifted {formatMt(lifted)}</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

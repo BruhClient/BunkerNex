@@ -886,11 +886,13 @@ function updateVesselTip(
   where.textContent = fix.berthed
     ? `${track.serviceCode} · Berthed ${fix.portCode}`
     : `${track.serviceCode} · ${fix.fromPortCode} → ${fix.portCode}`;
-  rob.textContent = `${track.grade} ${Math.round(fix.robMt).toLocaleString()} MT`;
+  // fix.grade is what is burning now, not the vessel's primary grade — a ship
+  // in a China or Korea ECA reads MGO here and switches back on departure.
+  rob.textContent = `${fix.grade} ${Math.round(fix.robMt).toLocaleString()} MT`;
 
   stem.textContent =
     fix.bunkeredMt !== null
-      ? `Bunkering ${Math.round(fix.bunkeredMt).toLocaleString()} MT`
+      ? `Bunkering ${Math.round(fix.bunkeredMt).toLocaleString()} MT ${fix.grade}`
       : "";
   stem.style.display = fix.bunkeredMt !== null ? "" : "none";
 }

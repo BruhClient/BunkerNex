@@ -4,3 +4,6 @@ Min_ROB_MT,DWT,0.01,yes,
 Consumption_Transit_MT_Per_Day,DWT,0.0009,yes,
 Consumption_Berth_MT_Per_Day,DWT,0.00015,yes,Source footnote mislabels this row as 'in transit'; the arithmetic confirms it is the berth rate
 Bunkering_Trigger_MT,DWT,0.015,no,Not stated in the source footnote; derived here from the data. Equals Max_ROB_MT / 2
+MGO_Max_ROB_MT,DWT,0.006,no,"Not in the source at all. The MGO tank sits outside Max_ROB_MT and is taken as 0.20 x Max_ROB_MT by scripts/gen-vessel-movement.mjs. The Drive extract carried an MGO figure for only 5 of 35 vessels and it was a ratio of nothing (0.13-0.72 of Min_ROB_MT); 3 of those 5 land near this ratio. See data/README.md"
+MGO_Min_ROB_MT,DWT,0.002,no,Derived: MGO_Max_ROB_MT / 3, mirroring Min_ROB_MT / Max_ROB_MT
+MGO_Bunkering_Trigger_MT,DWT,0.003,no,Derived: MGO_Max_ROB_MT / 2, mirroring Bunkering_Trigger_MT / Max_ROB_MT

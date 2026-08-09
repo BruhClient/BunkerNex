@@ -4,13 +4,21 @@ import { useEffect, useState } from "react";
 import PriceChart from "./PriceChart";
 import PriceTiles from "./PriceTiles";
 import SchedulePanel from "./SchedulePanel";
+import SupplierOffers from "./SupplierOffers";
 import { serviceColor } from "@/lib/colors";
-import type { Port, PortCall, PortPrices, PricePoint } from "@/lib/types";
+import type {
+  Port,
+  PortCall,
+  PortMarket,
+  PortPrices,
+  PricePoint,
+} from "@/lib/types";
 
 interface PricesResponse {
   portKey: string;
   grades: PortPrices;
   brent: PricePoint[];
+  markets: PortMarket[];
 }
 
 interface Props {
@@ -70,6 +78,7 @@ export default function PortPanel({ port, portCalls, onClose }: Props) {
   if (!port) return null;
 
   const hasPrices = data !== null && Object.keys(data.grades).length > 0;
+  const hasMarkets = (data?.markets.length ?? 0) > 0;
 
   return (
     <aside
@@ -155,6 +164,17 @@ export default function PortPanel({ port, portCalls, onClose }: Props) {
             </>
           )}
         </section>
+
+        {!loading && !error && hasMarkets && data && (
+          <section className="mt-2 border-t border-line">
+            <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
+              <span className="label">Supplier offers</span>
+              <span className="text-[10px] text-faint">cheapest first</span>
+            </div>
+
+            <SupplierOffers markets={data.markets} />
+          </section>
+        )}
 
         <section className="mt-2 border-t border-line">
           <div className="px-4 pb-1 pt-3.5">

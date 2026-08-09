@@ -161,8 +161,10 @@ export function getBrentSeries(): PricePoint[] {
  * wherever those totals are presented.
  *
  * Gaps are still gaps: a port absent here means no figure at all, never zero.
- * Shanghai has no IFO380 column in the source and none is modelled for it, so
- * its HSFO stems still resolve to nothing.
+ * As of the current movement file every stem does resolve, because the
+ * generator now picks its stem grade by what the port can supply — Shanghai
+ * has no IFO380 column and no longer receives HSFO stems. That is a property
+ * of the data, not a guarantee of this function.
  */
 export function bunkerPriceSnapshot(): BunkerPriceSnapshot {
   const snapshot: BunkerPriceSnapshot = {};

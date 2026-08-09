@@ -12,8 +12,15 @@
  * It is a simulation, not telemetry. The rotations come from the published
  * schedules and the fuel curves are the assumptions in vessel_assumptions.csv
  * played forward, so reconciling this against real noon reports would be
- * circular. What it does guarantee is feasibility: every vessel visits every
- * port on its line, and ROB stays inside Min_ROB_MT..Max_ROB_MT throughout.
+ * circular. What it does guarantee is feasibility and compliance: every vessel
+ * visits every port on its line, residual ROB stays inside
+ * Min_ROB_MT..Max_ROB_MT, HSFO appears only on scrubber-fitted hulls and only
+ * where a port can supply it, and every vessel is on 0.10% S fuel through its
+ * China and Korea ECA calls.
+ *
+ * Each vessel therefore runs three tanks, not one: two residual grades sharing
+ * Max_ROB_MT (HSFO plus VLSFO on a scrubber hull, VLSFO alone without one) and
+ * a separate MGO tank that is genuinely burned and stemmed on ECA legs.
  *
  * TO MOVE THE TIMELINE, EDIT WINDOW_START AND STEPS BELOW AND RE-RUN. Those two
  * constants are the whole window. Everything else — rotations, phases, offsets,
@@ -69,6 +76,10 @@ const HEADER = [
   "Synthetic_Latitude",
   "Synthetic_Longitude",
   "Operational_Phase",
+  // Which grade the main engine is on for this step: VLSFO, HSFO or MGO.
+  // Derived from the ECA rule and the vessel's tanks, but written out because
+  // ROB alone cannot distinguish a fuel switch from an untouched tank.
+  "Active_Fuel",
   "VLSFO_ROB_MT",
   "HSFO_ROB_MT",
   "MGO_ROB_MT",
@@ -153,22 +164,125 @@ const DEPLOYMENT_NOTES = {
     "feeder berths.",
 };
 
+// --- Fuel: compliance, supply and the ECA switch --------------------------
+
 /**
- * MGO carried, constant per vessel: it is never burned and never stemmed.
+ * Ports where the fleet must burn 0.10% S fuel, i.e. LSMGO.
  *
- * Only these five appeared in the Drive extract this file replaced. The other
- * thirty are blank because the source figure has no derivable basis — across
- * its eleven vessels it ranged from 0.13 to 0.72 of Min_ROB_MT, so it is
- * neither a ratio of DWT nor of any other column. Per the null discipline it
- * stays empty rather than invented.
+ * China and Korea both run national port ECAs rather than an IMO SECA — Korea's
+ * covers Busan, Incheon, Ulsan and Yeosu/Gwangyang; China's covers its coastal
+ * ports — so this is a port list, not a polygon. Every one of the ten also
+ * publishes a Bunker_Quantity_MT somewhere in this fleet's schedules, which is
+ * what lets a vessel top its MGO up inside a window rather than having to carry
+ * the whole stretch from outside.
+ *
+ * VLSFO does not clear this: it is 0.50% S against a 0.10% limit. Switching
+ * between the two residual grades would look like compliance without being it,
+ * which is why MGO has to be the switch fuel.
  */
-const MGO_ROB = {
-  ASTERIOS: 119.903,
-  "KOTA ANGGUN": 50.71,
-  "KOTA AZAM": 149.795,
-  "KOTA DAHLIA": 16.362,
-  "KOTA DUNIA": 50.612,
-};
+const ECA_PORTS = new Set([
+  "CNNGB", // Ningbo
+  "CNNSA", // Nansha
+  "CNQZH", // Qinzhou
+  "CNSHA", // Shanghai
+  "CNSHK", // Shekou
+  "CNTAO", // Qingdao
+  "CNTSN", // Tianjin
+  "CNXMN", // Xiamen
+  "KRINC", // Incheon
+  "KRPUS", // Busan
+]);
+
+/** Switch to MGO one day before berthing at an ECA port. */
+const ECA_LEAD_STEPS = STEPS_PER_DAY;
+
+/** Switch back a few hours after leaving: one 3-hour step. */
+const ECA_TRAIL_STEPS = 1;
+
+/**
+ * Ports with no high-sulphur bunker market.
+ *
+ * Held as a literal rather than read from data/pricing/, which the generator
+ * deliberately does not parse. The evidence is there though: none of these has
+ * an IFO380 column in "HSGO Prices.csv", and bunker_basis.csv models no IFO380
+ * basis for them either — researched and recorded in data/README.md as an
+ * absence of market, not an absence of data.
+ *
+ * This is the constraint the previous generator lacked. Assigning grade purely
+ * by scrubber fitting put HSFO stems at Chittagong and Yangon, where no such
+ * stem could be lifted. A scrubber vessel calling here lifts VLSFO into its
+ * secondary residual tank instead — which is the whole reason a scrubber vessel
+ * needs a second residual grade at all.
+ *
+ * Laem Chabang is deliberately NOT in this list: LAEMCHABANG IFO380 carries
+ * 1,715 values through 2026-08-05. data/README.md used to name it here.
+ */
+const NO_HSFO_PORTS = new Set([
+  "BDCGP", // Chittagong
+  "BDMGL", // Mongla
+  "CNSHA", // Shanghai
+  "IDJKT", // Jakarta
+  "IDSRG", // Semarang
+  "IDSUB", // Surabaya
+  "INCCU", // Kolkata
+  "INGAV", // Gangavaram
+  "MMRGN", // Yangon
+  "THBKK", // Bangkok
+  "VNHPH", // Haiphong
+  "VNUIH", // Qui Nhon
+]);
+
+/**
+ * Share of a scrubber vessel's residual capacity held as VLSFO.
+ *
+ * A scrubber-fitted ship does not sail on high-sulphur fuel alone. It keeps a
+ * compliant residual reserve against the scrubber failing and against ports
+ * that restrict its use — China limits open-loop discharge across its domestic
+ * ECA, and the Drive source's own Hong Kong row describes VLSFO as "this
+ * fleet's HSFO-vessel berth fuel where scrubber use is restricted".
+ *
+ * So the two residual grades share Max_ROB_MT from step 0 rather than the
+ * second one appearing only if a no-HSFO port happens to fall due. The reserve
+ * is protected in practice by burning HSFO first: VLSFO is drawn on only once
+ * HSFO runs out, and topped up wherever the port cannot sell HSFO.
+ *
+ * Derived. Nothing in the source splits a residual tank; 20% is the same
+ * fraction used for the MGO tank, chosen for one stated ratio rather than two.
+ */
+const VLSFO_RESERVE_RATIO = 0.2;
+
+/**
+ * The MGO tank, as a ratio of Max_ROB_MT. Mirrored in vessel_assumptions.csv.
+ *
+ * MGO sits OUTSIDE Max_ROB_MT: the source has ASTERIOS opening at 683 MT of
+ * HSFO — exactly its Max_ROB_MT — and carrying 119.9 MT of MGO on top, so
+ * Max_ROB_MT is the residual capacity and the distillate tank is separate.
+ *
+ * Derived, not sourced. The Drive extract this file replaced carried a figure
+ * for only five vessels and it had no derivable basis — 0.13 to 0.72 of
+ * Min_ROB_MT across its eleven ships, a ratio of nothing. Three of those five
+ * land near 0.20 of Max_ROB_MT (KOTA AZAM 149.8 vs 143.0, KOTA DUNIA 50.6 vs
+ * 49.2, ASTERIOS 119.9 vs 136.6) and two do not. Now that MGO is burned rather
+ * than parked, holding five hand figures beside thirty derived ones would make
+ * the series inconsistent, so all thirty-five come from this ratio.
+ *
+ * Raise it if the ECA-heavy rotations (KCS, KCI) ever breach the MGO floor —
+ * checkInvariants will say so before anything is written.
+ */
+const MGO_MAX_RATIO = 0.2;
+
+/** Floor and trigger as fractions of the MGO tank, mirroring the residual ones. */
+const MGO_MIN_RATIO = 1 / 3;
+const MGO_TRIGGER_RATIO = 1 / 2;
+
+/**
+ * Share of a call's published Bunker_Quantity_MT liftable as MGO.
+ *
+ * The schedules publish one quantity per call, sized for the residual stem. The
+ * MGO lift is pegged to it at the same ratio the tank is, so the figure stays
+ * anchored to published data rather than invented outright.
+ */
+const MGO_STEM_RATIO = 0.2;
 
 // --- Helpers -------------------------------------------------------------
 
@@ -298,6 +412,8 @@ function buildTimetable(serviceCode, rows) {
   const portCode = new Array(steps).fill(null);
   const portName = new Array(steps).fill(null);
   const phase = new Array(steps).fill(null);
+  /** step -> true where the vessel must be on 0.10% S fuel. Filled below. */
+  const eca = new Array(steps).fill(false);
   /** step -> the quantity published for the call berthing at that step. */
   const bunkerQty = new Map();
 
@@ -347,6 +463,15 @@ function buildTimetable(serviceCode, rows) {
       bunkerQty.set(berthStart, Number(cell(call, "Bunker_Quantity_MT")));
     }
 
+    // The ECA window rides the shifted berth for the same reason. It is marked
+    // modulo the loop because a lead-in can reach back past step 0 into the
+    // previous loop's tail, which a vessel reads cyclically anyway.
+    if (ECA_PORTS.has(code)) {
+      const from = berthStart - ECA_LEAD_STEPS;
+      const to = berthEnd + ECA_TRAIL_STEPS;
+      for (let s = from; s < to; s++) eca[((s % steps) + steps) % steps] = true;
+    }
+
     cursor = berthEnd;
   });
 
@@ -366,16 +491,18 @@ function buildTimetable(serviceCode, rows) {
     throw new Error(`${serviceCode}: no call publishes a Bunker_Quantity_MT`);
   }
 
-  return { steps, portCode, portName, phase, bunkerQty };
+  return { steps, portCode, portName, phase, eca, bunkerQty };
 }
 
 // --- The fleet -----------------------------------------------------------
 
 function buildRows(timetables, specByName) {
   const rows = [];
-  let stems = 0;
+  const stems = { VLSFO: 0, HSFO: 0, MGO: 0 };
   let clipped = 0;
-  let tightestMargin = Infinity;
+  let ecaSwitches = 0;
+  let tightestResidual = Infinity;
+  let tightestMgo = Infinity;
 
   for (const [serviceCode, vessels] of ROSTER) {
     const tt = timetables.get(serviceCode);
@@ -385,10 +512,13 @@ function buildRows(timetables, specByName) {
       const spec = specByName.get(name);
       if (!spec) throw new Error(`${name}: no row in ${path.basename(SPECS)}`);
 
-      // Scrubber-fitted vessels burn HSFO, the rest VLSFO — the MARPOL Annex VI
-      // rule the specifications sheet does not encode, since it lists all three
-      // grades for every ship regardless of fitting.
-      const grade = cell(spec, "Scrubber_Fitted") === "Yes" ? "HSFO" : "VLSFO";
+      // Only a scrubber-fitted hull may burn high-sulphur fuel — the MARPOL
+      // Annex VI rule the specifications sheet does not encode, since it lists
+      // all three grades for every ship regardless of fitting. A scrubber
+      // vessel carries two residual grades (HSFO, plus VLSFO for the ports that
+      // cannot supply HSFO); the rest carry VLSFO alone and their HSFO columns
+      // stay a true zero, not a missing value.
+      const scrubber = cell(spec, "Scrubber_Fitted") === "Yes";
       const max = Number(cell(spec, "Max_ROB_MT"));
       const min = Number(cell(spec, "Min_ROB_MT"));
       const trigger = Number(cell(spec, "Bunkering_Trigger_MT"));
@@ -402,89 +532,157 @@ function buildRows(timetables, specByName) {
         if (!Number.isFinite(v) || v <= 0) throw new Error(`${name}: ${label} is "${v}"`);
       }
 
+      // The distillate tank, outside Max_ROB_MT. See MGO_MAX_RATIO.
+      const mgoMax = round3(max * MGO_MAX_RATIO);
+      const mgoMin = round3(mgoMax * MGO_MIN_RATIO);
+      const mgoTrigger = round3(mgoMax * MGO_TRIGGER_RATIO);
+
       // Sisters are spread around the rotation instead of moving in lockstep.
       const offset = Math.round((k * tt.steps) / vessels.length) % tt.steps;
       const burnAt = (s) => (tt.phase[s] === "Berthed" ? burnBerth : burnTransit);
 
-      const mgo = MGO_ROB[name];
-      const mgoCell = mgo === undefined ? "" : fmt(mgo);
+      /**
+       * Fuel needed to reach the next call that could stem, split by tank.
+       *
+       * Split because the two tanks drain in different places: an ECA stretch
+       * spends MGO and no residual at all. Accumulated unrounded — a decision
+       * input, not an emitted value.
+       */
+      const needFrom = (i) => {
+        let residual = 0;
+        let mgo = 0;
+        for (let j = i + 1; j <= i + tt.steps; j++) {
+          const at = (offset + j - 1) % tt.steps;
+          if (tt.eca[at]) mgo += burnAt(at);
+          else residual += burnAt(at);
+          if (tt.bunkerQty.has((offset + j) % tt.steps)) {
+            return { residual, mgo, reachable: true };
+          }
+        }
+        return { residual, mgo, reachable: false };
+      };
 
-      let rob = max;
+      // Both residual tanks open full and together fill Max_ROB_MT: a scrubber
+      // vessel splits it HSFO/VLSFO, everyone else holds VLSFO alone. Everyone
+      // opens with a full MGO tank.
+      const reserve = scrubber ? round3(max * VLSFO_RESERVE_RATIO) : max;
+      let vlsfo = reserve;
+      let hsfo = round3(max - reserve);
+      let mgo = mgoMax;
+      let previousFuel = null;
 
       for (let i = 0; i < STEPS; i++) {
         const s = (offset + i) % tt.steps;
-        let stem = 0;
+        const port = tt.portCode[s];
+        const inEca = tt.eca[s];
+
+        let stemV = 0;
+        let stemH = 0;
+        let stemM = 0;
         let note = i === 0 ? DEPLOYMENT_NOTES[serviceCode] : "";
         if (i === 0 && !note) throw new Error(`${serviceCode}: no deployment note`);
 
         const qty = tt.bunkerQty.get(s);
         if (qty !== undefined) {
-          // Fuel needed to reach the next call that could stem. Accumulated
-          // unrounded: this is a decision input, not an emitted value.
-          let need = 0;
-          let reachable = false;
-          for (let j = i + 1; j <= i + tt.steps; j++) {
-            need += burnAt((offset + j - 1) % tt.steps);
-            if (tt.bunkerQty.has((offset + j) % tt.steps)) {
-              reachable = true;
-              break;
-            }
-          }
-          if (!reachable) throw new Error(`${name}: no reachable next stem from step ${i}`);
+          const need = needFrom(i);
+          if (!need.reachable) throw new Error(`${name}: no reachable next stem from step ${i}`);
 
-          // Lift on the trigger, or earlier if sailing on would breach Min_ROB
-          // before the next chance. The second clause is the safety-critical
-          // one: it stops a vessel passing a bunker port it cannot skip.
-          if (rob <= trigger || rob - need < min) {
-            stem = round3(Math.min(qty, max - rob));
-            if (stem > 0) {
-              if (stem < qty) {
+          // --- Residual. Lift on the trigger, or earlier if sailing on would
+          // breach Min_ROB before the next chance. The second clause is the
+          // safety-critical one: it stops a vessel passing a bunker port it
+          // cannot skip.
+          const residual = round3(vlsfo + hsfo);
+          if (residual <= trigger || residual - need.residual < min) {
+            const lift = round3(Math.min(qty, max - residual));
+            if (lift > 0) {
+              // Grade follows what the port can actually supply, not just the
+              // fitting. Twelve of the twenty-six have no HSFO market.
+              const asHsfo = scrubber && !NO_HSFO_PORTS.has(port);
+              if (asHsfo) {
+                stemH = lift;
+                hsfo = round3(hsfo + lift);
+              } else {
+                stemV = lift;
+                vlsfo = round3(vlsfo + lift);
+              }
+              stems[asHsfo ? "HSFO" : "VLSFO"]++;
+              if (lift < qty) {
                 note =
-                  `Stem cut from the scheduled ${qty} MT to ${fmt(stem)} MT ` +
+                  `Stem cut from the scheduled ${qty} MT to ${fmt(lift)} MT ` +
                   `by the ${fmt(max)} MT tank capacity.`;
                 clipped++;
               }
-              rob = round3(rob + stem);
-              stems++;
+            }
+          }
+
+          // --- MGO. Same rule against its own tank. Vessels on rotations that
+          // touch no ECA port never burn any, so this never fires for them.
+          if (mgo <= mgoTrigger || mgo - need.mgo < mgoMin) {
+            const lift = round3(Math.min(qty * MGO_STEM_RATIO, mgoMax - mgo));
+            if (lift > 0) {
+              stemM = lift;
+              mgo = round3(mgo + lift);
+              stems.MGO++;
             }
           }
         }
 
-        if (i === 0 && stem > 0) {
+        if (i === 0 && (stemV > 0 || stemH > 0 || stemM > 0)) {
           throw new Error(`${name}: stemmed at step 0, which would overwrite the deployment note`);
         }
 
-        const robCell = fmt(rob);
-        const stemCell = fmt(stem);
-        rows.push([
-          name,
-          serviceCode,
-          tt.portName[s],
-          tt.portCode[s],
-          timestampAt(i),
-          "",
-          "",
-          tt.phase[s],
-          grade === "VLSFO" ? robCell : "0",
-          grade === "HSFO" ? robCell : "0",
-          mgoCell,
-          grade === "VLSFO" ? stemCell : "0",
-          grade === "HSFO" ? stemCell : "0",
-          "0",
-          SOURCE_FILE,
-          note,
-        ]);
+        // What the main engine is on for this step. Recorded rather than left
+        // to be inferred: a reader cannot tell a switch from a quiet tank by
+        // watching ROB alone, since MGO is flat on ECA-free rotations.
+        const activeFuel = inEca ? "MGO" : hsfo > 0 ? "HSFO" : "VLSFO";
+        if (previousFuel !== null && previousFuel !== activeFuel) ecaSwitches++;
+        previousFuel = activeFuel;
 
-        tightestMargin = Math.min(tightestMargin, rob - min);
+        rows.push({
+          Vessel_Name: name,
+          Service_Code: serviceCode,
+          Port_Name: tt.portName[s],
+          Port_Code: port,
+          Timestamp: timestampAt(i),
+          Synthetic_Latitude: "",
+          Synthetic_Longitude: "",
+          Operational_Phase: tt.phase[s],
+          Active_Fuel: activeFuel,
+          VLSFO_ROB_MT: fmt(vlsfo),
+          HSFO_ROB_MT: fmt(hsfo),
+          MGO_ROB_MT: fmt(mgo),
+          VLSFO_Bunkered_MT: fmt(stemV),
+          HSFO_Bunkered_MT: fmt(stemH),
+          MGO_Bunkered_MT: fmt(stemM),
+          Source_File: SOURCE_FILE,
+          Data_Notes: note,
+        });
+
+        tightestResidual = Math.min(tightestResidual, round3(vlsfo + hsfo) - min);
+        tightestMgo = Math.min(tightestMgo, mgo - mgoMin);
 
         // Burn is charged after the row is written, so the emitted ROB is the
         // level at the start of the step (including anything lifted there).
-        rob = round3(rob - burnAt(s));
+        const burn = burnAt(s);
+        if (inEca) {
+          mgo = round3(mgo - burn);
+        } else {
+          // HSFO first — with a scrubber it is the cheaper fuel, so VLSFO is
+          // held as the reserve it was lifted to be. The remainder spills to
+          // VLSFO on the one step where HSFO runs out mid-burn.
+          let left = burn;
+          if (hsfo > 0) {
+            const take = Math.min(hsfo, left);
+            hsfo = round3(hsfo - take);
+            left -= take;
+          }
+          if (left > 0) vlsfo = round3(vlsfo - left);
+        }
       }
     });
   }
 
-  return { rows, stems, clipped, tightestMargin };
+  return { rows, stems, clipped, ecaSwitches, tightestResidual, tightestMgo };
 }
 
 // --- Invariants ----------------------------------------------------------
@@ -517,8 +715,8 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
 
   const byVessel = new Map();
   for (const r of rows) {
-    if (!byVessel.has(r[0])) byVessel.set(r[0], []);
-    byVessel.get(r[0]).push(r);
+    if (!byVessel.has(r.Vessel_Name)) byVessel.set(r.Vessel_Name, []);
+    byVessel.get(r.Vessel_Name).push(r);
   }
 
   const expectedVessels = ROSTER.reduce((n, [, v]) => n + v.length, 0);
@@ -534,7 +732,7 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
   for (const [serviceCode, vessels] of ROSTER) {
     const rotation = new Set(portCallsByService.get(serviceCode).map((r) => cell(r, "Port_Code")));
     const visited = new Set();
-    for (const name of vessels) for (const r of byVessel.get(name)) visited.add(r[3]);
+    for (const name of vessels) for (const r of byVessel.get(name)) visited.add(r.Port_Code);
     for (const code of rotation) {
       if (!visited.has(code)) {
         fail(`${serviceCode}: ${code} is in the rotation but no vessel calls it`);
@@ -553,29 +751,70 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
     if (!spec) fail(`${name} has no specification row`);
     if (vesselRows.length !== STEPS) fail(`${name}: ${vesselRows.length} rows, expected ${STEPS}`);
 
-    const grade = cell(spec, "Scrubber_Fitted") === "Yes" ? "HSFO" : "VLSFO";
-    const robCol = grade === "HSFO" ? 9 : 8;
-    const idleRobCol = grade === "HSFO" ? 8 : 9;
-    const idleStemCol = grade === "HSFO" ? 11 : 12;
+    const scrubber = cell(spec, "Scrubber_Fitted") === "Yes";
     const min = Number(cell(spec, "Min_ROB_MT"));
     const max = Number(cell(spec, "Max_ROB_MT"));
-    const services = new Set(vesselRows.map((r) => r[1]));
+    const mgoMax = round3(max * MGO_MAX_RATIO);
+    const mgoMin = round3(mgoMax * MGO_MIN_RATIO);
+    const services = new Set(vesselRows.map((r) => r.Service_Code));
     if (services.size !== 1) fail(`${name} appears under ${services.size} service codes`);
 
+    // A rotation with no ECA port must leave MGO untouched, and one with an
+    // ECA port must not: the switch either happened or it silently did not.
+    const serviceCode = vesselRows[0].Service_Code;
+    const touchesEca = portCallsByService
+      .get(serviceCode)
+      .some((r) => ECA_PORTS.has(cell(r, "Port_Code")));
+    const mgoMoves = vesselRows.some((r) => r.MGO_ROB_MT !== vesselRows[0].MGO_ROB_MT);
+    if (touchesEca && !mgoMoves) fail(`${name}: ${serviceCode} calls an ECA port but MGO never moves`);
+    if (!touchesEca && mgoMoves) fail(`${name}: ${serviceCode} has no ECA port but MGO moves`);
+
+    // The point of the whole exercise: a scrubber vessel carries two residual
+    // grades throughout, not one plus an occasional accident of supply. HSFO
+    // may legitimately hit zero between stems; the compliant reserve may not.
+    if (scrubber && vesselRows.some((r) => Number(r.VLSFO_ROB_MT) <= 0)) {
+      fail(`${name}: scrubber vessel runs its compliant VLSFO reserve to zero`);
+    }
+
     vesselRows.forEach((r, i) => {
-      if (r[4] !== timestampAt(i)) fail(`${name} step ${i}: timestamp ${r[4]} breaks the grid`);
-      if (!coords.has(r[3])) fail(`${name} step ${i}: ${r[3]} is missing from PORT_COORDS`);
-      if (!approach.has(r[3])) fail(`${name} step ${i}: ${r[3]} is missing from PORT_APPROACH`);
-      const rob = Number(r[robCol]);
-      if (rob < min - 1e-9 || rob > max + 1e-9) {
-        fail(`${name} step ${i}: ROB ${rob} outside ${min}..${max}`);
+      const where = `${name} step ${i}`;
+      if (r.Timestamp !== timestampAt(i)) fail(`${where}: timestamp ${r.Timestamp} breaks the grid`);
+      if (!coords.has(r.Port_Code)) fail(`${where}: ${r.Port_Code} is missing from PORT_COORDS`);
+      if (!approach.has(r.Port_Code)) fail(`${where}: ${r.Port_Code} is missing from PORT_APPROACH`);
+
+      // The two residual grades share one tank capacity, so the bound is on
+      // their sum. Either column alone may legitimately sit at zero.
+      const residual = round3(Number(r.VLSFO_ROB_MT) + Number(r.HSFO_ROB_MT));
+      if (residual < min - 1e-9 || residual > max + 1e-9) {
+        fail(`${where}: residual ROB ${residual} outside ${min}..${max}`);
       }
-      if (r[idleRobCol] !== "0") fail(`${name} step ${i}: non-burned grade ROB is ${r[idleRobCol]}`);
-      if (r[idleStemCol] !== "0") {
-        fail(`${name} step ${i}: non-burned grade stemmed ${r[idleStemCol]}`);
+      const mgo = Number(r.MGO_ROB_MT);
+      if (mgo < mgoMin - 1e-9 || mgo > mgoMax + 1e-9) {
+        fail(`${where}: MGO ROB ${mgo} outside ${mgoMin}..${mgoMax}`);
       }
-      if (r[13] !== "0") fail(`${name} step ${i}: MGO_Bunkered_MT is ${r[13]}`);
-      if (r[10] !== vesselRows[0][10]) fail(`${name} step ${i}: MGO_ROB_MT is not constant`);
+
+      // Compliance: high-sulphur fuel exists only on a scrubber-fitted hull.
+      if (!scrubber) {
+        if (r.HSFO_ROB_MT !== "0") fail(`${where}: no scrubber, but HSFO ROB is ${r.HSFO_ROB_MT}`);
+        if (r.HSFO_Bunkered_MT !== "0") {
+          fail(`${where}: no scrubber, but stemmed ${r.HSFO_Bunkered_MT} MT of HSFO`);
+        }
+      }
+
+      // Supply: the check whose absence let the old file stem HSFO at
+      // Chittagong and Yangon, where there is no high-sulphur market at all.
+      if (Number(r.HSFO_Bunkered_MT) > 0 && NO_HSFO_PORTS.has(r.Port_Code)) {
+        fail(`${where}: stemmed HSFO at ${r.Port_Code}, which has no HSFO market`);
+      }
+
+      // The active fuel must be one the vessel is actually holding.
+      if (!["VLSFO", "HSFO", "MGO"].includes(r.Active_Fuel)) {
+        fail(`${where}: Active_Fuel is "${r.Active_Fuel}"`);
+      }
+      if (r.Active_Fuel === "HSFO" && !scrubber) fail(`${where}: burning HSFO with no scrubber`);
+      if (Number(r[`${r.Active_Fuel}_ROB_MT`]) <= 0) {
+        fail(`${where}: burning ${r.Active_Fuel} with none onboard`);
+      }
     });
   }
 
@@ -609,21 +848,29 @@ for (const [serviceCode] of ROSTER) {
   timetables.set(serviceCode, buildTimetable(serviceCode, rows));
 }
 
-const { rows, stems, clipped, tightestMargin } = buildRows(timetables, specByName);
+const { rows, stems, clipped, ecaSwitches, tightestResidual, tightestMgo } = buildRows(
+  timetables,
+  specByName,
+);
 
 checkInvariants(rows, timetables, specByName, portCallsByService);
 
-const text = [HEADER.join(","), ...rows.map((r) => r.map(csvCell).join(","))].join("\n") + "\n";
+const text =
+  [HEADER.join(","), ...rows.map((r) => HEADER.map((h) => csvCell(r[h])).join(","))].join("\n") +
+  "\n";
 
 const unchanged = fs.existsSync(OUT) && fs.readFileSync(OUT, "utf8") === text;
 if (!unchanged) fs.writeFileSync(OUT, text, "utf8");
 
 const fleetSize = ROSTER.reduce((n, [, v]) => n + v.length, 0);
+const totalStems = stems.VLSFO + stems.HSFO + stems.MGO;
 console.log(
   `${unchanged ? "unchanged" : "wrote"} ${path.relative(ROOT, OUT)}\n` +
     `  ${rows.length.toLocaleString()} rows, ${fleetSize} vessels x ${STEPS} steps\n` +
     `  ${timestampAt(0)} -> ${timestampAt(STEPS - 1)} ` +
     `(${STEPS / STEPS_PER_DAY} days, ${STEP_HOURS}-hour grid)\n` +
-    `  ${stems} stems, ${clipped} cut by tank capacity, ` +
-    `tightest ROB margin ${fmt(tightestMargin)} MT`,
+    `  ${totalStems} stems (${stems.HSFO} HSFO, ${stems.VLSFO} VLSFO, ${stems.MGO} MGO), ` +
+    `${clipped} cut by tank capacity\n` +
+    `  ${ecaSwitches} fuel switches, tightest margins: ` +
+    `residual ${fmt(tightestResidual)} MT, MGO ${fmt(tightestMgo)} MT`,
 );

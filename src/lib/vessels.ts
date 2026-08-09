@@ -1,6 +1,7 @@
 import { num, readCsv, str } from "./csv";
 import { PORT_COORDS } from "./ports";
-import type { VesselSizeClass, VesselSpec, VesselTrack } from "./types";
+import { VESSEL_GRADES } from "./types";
+import type { VesselGrade, VesselSizeClass, VesselSpec, VesselTrack } from "./types";
 
 const VESSEL_SPECS = "vessels/PIL_Fleet_Vessel_Specifications.csv";
 const VESSEL_MOVEMENT = "vessels/PIL_Fleet_Live_Movement.csv";
@@ -45,8 +46,8 @@ export function loadVesselSpecs(): VesselSpec[] {
  * timestamps collapse to a start plus a fixed step, since the grid is exactly
  * 3-hourly with no gaps.
  *
- * A movement row for an unknown vessel, or a port missing from PORT_COORDS,
- * throws rather than quietly disappearing from the map.
+ * A movement row for an unknown vessel, a port missing from PORT_COORDS, or an
+ * unrecognised Active_Fuel throws rather than quietly disappearing from the map.
  */
 export function loadVesselTracks(specs: VesselSpec[]): VesselTrack[] {
   const { rows } = readCsv(VESSEL_MOVEMENT);
@@ -78,18 +79,23 @@ export function loadVesselTracks(specs: VesselSpec[]): VesselTrack[] {
       (str(a, "Timestamp") ?? "").localeCompare(str(b, "Timestamp") ?? ""),
     );
 
-    // Scrubber-fitted vessels burn HSFO, the rest VLSFO — the movement data
-    // applies this MARPOL Annex VI rule even though the specs sheet lists all
-    // three grades for every vessel. Derive from the fitting rather than from
-    // whichever ROB column happens to be non-zero.
-    const grade = spec.scrubber ? "HSFO" : "VLSFO";
-    const robColumn = `${grade}_ROB_MT`;
-    const bunkerColumn = `${grade}_Bunkered_MT`;
-
+    // Every vessel now runs three tanks, so all three columns are read. The
+    // scrubber fitting no longer picks a column — it only says which residual
+    // grade the vessel is built around, and the generator has already applied
+    // the MARPOL Annex VI rule that keeps HSFO off an unfitted hull.
     const portCodes: string[] = [];
-    const robMt: number[] = [];
-    const bunkered: Record<number, number> = {};
+    const robMt: Record<VesselGrade, number[]> = {
+      VLSFO: [],
+      HSFO: [],
+      MGO: [],
+    };
+    const bunkered: Record<VesselGrade, Record<number, number>> = {
+      VLSFO: {},
+      HSFO: {},
+      MGO: {},
+    };
     let phases = "";
+    let activeGrades = "";
 
     ordered.forEach((row, i) => {
       const code = str(row, "Port_Code");
@@ -100,22 +106,34 @@ export function loadVesselTracks(specs: VesselSpec[]): VesselTrack[] {
       }
       portCodes.push(code);
       phases += str(row, "Operational_Phase") === "Berthed" ? "B" : "T";
-      robMt.push(num(row, robColumn) ?? 0);
 
-      const lifted = num(row, bunkerColumn);
-      if (lifted !== null && lifted > 0) bunkered[i] = lifted;
+      // An unreadable active fuel would silently mislabel the whole series, so
+      // it throws rather than defaulting to the primary grade.
+      const active = str(row, "Active_Fuel");
+      if (active === null || !VESSEL_GRADES.includes(active as VesselGrade)) {
+        throw new Error(
+          `${VESSEL_MOVEMENT}: Active_Fuel "${active}" for ${name} at step ${i} is not a vessel grade`,
+        );
+      }
+      activeGrades += active[0];
+
+      for (const grade of VESSEL_GRADES) {
+        robMt[grade].push(num(row, `${grade}_ROB_MT`) ?? 0);
+        const lifted = num(row, `${grade}_Bunkered_MT`);
+        if (lifted !== null && lifted > 0) bunkered[grade][i] = lifted;
+      }
     });
 
     tracks.push({
       name,
       serviceCode: str(ordered[0], "Service_Code") ?? "",
-      grade,
-      // Constant across the series: MGO is never burned or stemmed.
-      mgoRobMt: num(ordered[0], "MGO_ROB_MT"),
+      primaryGrade: spec.scrubber ? "HSFO" : "VLSFO",
+      scrubber: spec.scrubber,
       startTimestamp: str(ordered[0], "Timestamp") ?? "",
       stepHours: STEP_HOURS,
       portCodes,
       phases,
+      activeGrades,
       robMt,
       bunkered,
     });
