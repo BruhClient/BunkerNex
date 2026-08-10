@@ -157,6 +157,19 @@ DEHAM,LSMGO,"Aegean Marine Petroleum Network, Inc.",2,-3.5,Barge,400,4000,6,15,6
 DEHAM,LSMGO,Bomin Bunker Oil Corp.,2,3.5,Barge,400,3000,5,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 DEHAM,LSMGO,BP PLC,1,3.5,Barge,800,5500,3,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 DEHAM,LSMGO,TotalEnergies Marine Fuels,1,6.5,Ex-wharf,900,5000,6,45,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+EGPSD,VLSFO,Bunker Holding A/S,2,-5.5,Barge,450,3500,5,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,VLSFO,TotalEnergies Marine Fuels,1,6,Barge,650,5500,5,45,625,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,VLSFO,ExxonMobil Corporation,1,9.5,Barge,500,4500,6,45,475,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,VLSFO,BP PLC,1,11.5,Barge,500,5500,7,45,450,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,IFO380,Bunker Holding A/S,2,-5,Barge,300,2500,6,15,450,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,IFO380,ExxonMobil Corporation,1,9.5,Barge,800,6000,7,45,625,Enquire,simulated,Differential against the port baseline; see data/README.md
+EGPSD,IFO380,BP PLC,1,10.5,Ex-wharf,550,4500,8,45,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+EGPSD,IFO380,TotalEnergies Marine Fuels,1,11,Pipeline,500,6000,7,45,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+EGPSD,IFO380,Royal Dutch Shell,1,13.5,Barge,1000,4500,9,45,525,Enquire,simulated,Differential against the port baseline; see data/README.md
+EGPSD,MGO,Bunker Holding A/S,2,-5,Barge,450,2000,7,15,475,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,MGO,ExxonMobil Corporation,1,5,Barge,700,4500,7,30,450,Enquire,simulated,Differential against the port baseline; see data/README.md
+EGPSD,MGO,Royal Dutch Shell,1,6,Barge,1000,6000,9,45,425,5 days,simulated,Differential against the port baseline; see data/README.md
+EGPSD,MGO,BP PLC,1,9,Ex-wharf,600,4000,8,45,700,Enquire,simulated,Differential against the port baseline; see data/README.md
 ESALG,VLSFO,Bomin Bunker Oil Corp.,2,-2,Ex-wharf,350,4000,6,15,700,Prompt,simulated,Differential against the port baseline; see data/README.md
 ESALG,VLSFO,KPI Bridge Oil A/S,2,0,Barge,400,2000,4,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 ESALG,VLSFO,Royal Dutch Shell,1,10.5,Barge,950,4500,3,45,500,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -164,6 +177,50 @@ ESALG,VLSFO,ExxonMobil Corporation,1,12.5,Ex-wharf,950,4500,3,45,650,Prompt,simu
 ESALG,MGO,Dan-Bunkering,2,-7,Barge,400,4000,5,15,475,Prompt,simulated,Differential against the port baseline; see data/README.md
 ESALG,MGO,Bomin Bunker Oil Corp.,2,-1,Barge,500,2500,6,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 ESALG,MGO,ExxonMobil Corporation,1,3.5,Ex-wharf,750,4000,6,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+ESVLC,VLSFO,ExxonMobil Corporation,1,5.5,Barge,800,5000,8,30,675,5 days,simulated,Differential against the port baseline; see data/README.md
+ESVLC,VLSFO,Royal Dutch Shell,1,5.5,Barge,900,4000,6,30,650,5 days,simulated,Differential against the port baseline; see data/README.md
+ESVLC,VLSFO,TotalEnergies Marine Fuels,1,11.5,Barge,800,5000,5,45,425,5 days,simulated,Differential against the port baseline; see data/README.md
+ESVLC,IFO380,TotalEnergies Marine Fuels,1,4,Barge,750,4500,9,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+ESVLC,IFO380,BP PLC,1,5,Pipeline,750,5000,7,30,700,Prompt,simulated,Differential against the port baseline; see data/README.md
+ESVLC,IFO380,Royal Dutch Shell,1,6,Pipeline,850,4500,8,45,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+ESVLC,MGO,Bunker Holding A/S,2,-0.5,Barge,300,2500,9,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
+ESVLC,MGO,BP PLC,1,8,Barge,800,4500,9,45,525,Enquire,simulated,Differential against the port baseline; see data/README.md
+ESVLC,MGO,ExxonMobil Corporation,1,10,Pipeline,700,5500,9,45,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+FRLEH,VLSFO,Bunker Holding A/S,2,0,Ex-wharf,350,3500,6,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+FRLEH,VLSFO,Royal Dutch Shell,1,9,Ex-wharf,900,4500,9,45,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+FRLEH,VLSFO,TotalEnergies Marine Fuels,1,10.5,Barge,850,5000,9,45,425,Enquire,simulated,Differential against the port baseline; see data/README.md
+FRLEH,VLSFO,BP PLC,1,12.5,Barge,550,5000,5,45,675,5 days,simulated,Differential against the port baseline; see data/README.md
+FRLEH,IFO380,Bunker Holding A/S,2,2,Barge,250,2000,9,30,600,5 days,simulated,Differential against the port baseline; see data/README.md
+FRLEH,IFO380,BP PLC,1,4,Barge,550,5000,8,30,475,Prompt,simulated,Differential against the port baseline; see data/README.md
+FRLEH,IFO380,ExxonMobil Corporation,1,8.5,Barge,600,4000,9,45,425,5 days,simulated,Differential against the port baseline; see data/README.md
+FRLEH,IFO380,TotalEnergies Marine Fuels,1,10,Barge,600,5000,9,45,675,5 days,simulated,Differential against the port baseline; see data/README.md
+FRLEH,LSMGO,Bunker Holding A/S,2,-3.5,Barge,350,2500,9,15,625,Enquire,simulated,Differential against the port baseline; see data/README.md
+FRLEH,LSMGO,ExxonMobil Corporation,1,9,Barge,550,5500,7,45,450,Enquire,simulated,Differential against the port baseline; see data/README.md
+FRLEH,LSMGO,Royal Dutch Shell,1,9,Barge,650,5000,5,45,425,5 days,simulated,Differential against the port baseline; see data/README.md
+FRLEH,LSMGO,BP PLC,1,9.5,Pipeline,850,5000,7,45,750,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBFXT,VLSFO,Bunker Holding A/S,2,-4.5,Barge,250,3000,8,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
+GBFXT,VLSFO,ExxonMobil Corporation,1,3,Ex-wharf,950,6000,6,30,750,5 days,simulated,Differential against the port baseline; see data/README.md
+GBFXT,VLSFO,TotalEnergies Marine Fuels,1,8.5,Ex-wharf,850,5500,5,45,725,5 days,simulated,Differential against the port baseline; see data/README.md
+GBFXT,VLSFO,BP PLC,1,11,Ex-wharf,700,6000,6,45,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBFXT,VLSFO,Royal Dutch Shell,1,12,Pipeline,700,4500,8,45,700,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBFXT,IFO380,ExxonMobil Corporation,1,5,Barge,900,4000,9,30,500,5 days,simulated,Differential against the port baseline; see data/README.md
+GBFXT,IFO380,Royal Dutch Shell,1,6,Barge,550,6000,5,45,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+GBFXT,IFO380,TotalEnergies Marine Fuels,1,6.5,Barge,800,4500,9,45,450,5 days,simulated,Differential against the port baseline; see data/README.md
+GBFXT,LSMGO,Bunker Holding A/S,2,-4.5,Barge,250,3500,6,15,550,5 days,simulated,Differential against the port baseline; see data/README.md
+GBFXT,LSMGO,TotalEnergies Marine Fuels,1,4.5,Ex-wharf,950,6000,7,30,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBFXT,LSMGO,ExxonMobil Corporation,1,6.5,Barge,950,4500,6,45,700,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBFXT,LSMGO,Royal Dutch Shell,1,6.5,Barge,750,4500,6,45,675,5 days,simulated,Differential against the port baseline; see data/README.md
+GBSOU,VLSFO,Bunker Holding A/S,2,-4.5,Barge,300,3000,9,15,700,5 days,simulated,Differential against the port baseline; see data/README.md
+GBSOU,VLSFO,TotalEnergies Marine Fuels,1,4.5,Barge,700,6000,9,30,525,5 days,simulated,Differential against the port baseline; see data/README.md
+GBSOU,VLSFO,Royal Dutch Shell,1,6,Ex-wharf,700,4500,6,45,650,5 days,simulated,Differential against the port baseline; see data/README.md
+GBSOU,VLSFO,ExxonMobil Corporation,1,8.5,Barge,1000,5000,9,45,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+GBSOU,VLSFO,BP PLC,1,10.5,Barge,950,6000,5,45,600,5 days,simulated,Differential against the port baseline; see data/README.md
+GBSOU,IFO380,Bunker Holding A/S,2,2.5,Barge,250,4000,7,30,550,Prompt,simulated,Differential against the port baseline; see data/README.md
+GBSOU,IFO380,BP PLC,1,9.5,Barge,700,4000,6,45,600,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBSOU,IFO380,Royal Dutch Shell,1,12.5,Barge,1000,5000,5,45,575,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBSOU,LSMGO,Bunker Holding A/S,2,-6,Ex-wharf,250,2500,7,15,700,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBSOU,LSMGO,TotalEnergies Marine Fuels,1,5.5,Barge,650,5000,8,30,550,Enquire,simulated,Differential against the port baseline; see data/README.md
+GBSOU,LSMGO,Royal Dutch Shell,1,9.5,Barge,800,5000,5,45,650,Enquire,simulated,Differential against the port baseline; see data/README.md
 GRPIR,VLSFO,Peninsula Petroleum,2,-3,Barge,500,3500,4,15,600,5 days,simulated,Differential against the port baseline; see data/README.md
 GRPIR,VLSFO,Monjasa,2,-2.5,Barge,450,3000,3,15,400,Prompt,simulated,Differential against the port baseline; see data/README.md
 GRPIR,VLSFO,BP PLC,1,6,Ex-wharf,900,6000,3,45,625,Prompt,simulated,Differential against the port baseline; see data/README.md

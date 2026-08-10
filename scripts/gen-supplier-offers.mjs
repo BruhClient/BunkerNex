@@ -152,6 +152,14 @@ const PORT_ALIASES = {
   JAKARTA: "IDJKT",
   SURABAYA: "IDSUB",
   SEMARANG: "IDSRG",
+
+  // Five more modelled ports added with the Asia-Europe services. Mirrors
+  // PRICE_PORT_ALIASES in src/lib/ports.ts.
+  LEHAVRE: "FRLEH",
+  SOUTHAMPTON: "GBSOU",
+  FELIXSTOWE: "GBFXT",
+  PORTSAID: "EGPSD",
+  VALENCIA: "ESVLC",
 };
 
 /**

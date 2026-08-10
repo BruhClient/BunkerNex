@@ -32,12 +32,26 @@ const LSMGO_PORTS: ReadonlySet<string> = new Set([
   "CNTAO", // Qingdao
   "CNTSN", // Tianjin
   "CNXMN", // Xiamen
+  "CNYTN", // Yantian
   "IDSUB", // Surabaya
   "KRINC", // Incheon
   "KRPUS", // Busan
   "MYPKG", // Port Klang
   "SGSIN", // Singapore
   "VNUIH", // Qui Nhon
+
+  // Added with the Asia-Europe services. Rotterdam/Antwerp/Hamburg are
+  // assessed with an LSMGO column (not MGO) in the source data; Le Havre/
+  // Southampton/Felixstowe are modelled to match, per the North Sea/Channel
+  // cluster convention. Port Said and Valencia are modelled as plain MGO
+  // instead, matching Algeciras/Piraeus/Malta's Mediterranean convention —
+  // deliberately not listed here.
+  "NLRTM", // Rotterdam
+  "BEANR", // Antwerp
+  "DEHAM", // Hamburg
+  "FRLEH", // Le Havre
+  "GBSOU", // Southampton
+  "GBFXT", // Felixstowe
 ]);
 
 /**
@@ -191,4 +205,63 @@ export function allBunkerEvents(
       a.vesselName.localeCompare(b.vesselName) ||
       a.grade.localeCompare(b.grade),
   );
+}
+
+/** One vessel's bunkering activity at one port, summed across the window. */
+export interface PortVesselBunkerSummary {
+  vesselName: string;
+  serviceCode: string;
+  totalMt: number;
+  /** Distinct calls the vessel bunkered on — not grade-events, so a call
+   *  that lifts both VLSFO and MGO still counts once. */
+  visitCount: number;
+  grades: VesselGrade[];
+}
+
+/**
+ * Every vessel that has bunkered at a port, with its total lift.
+ *
+ * A vessel can call at the same port more than once in the window and can
+ * lift more than one grade per call, so this is a group-by-vessel sum over
+ * `allBunkerEvents`'s output, not a 1:1 mapping. Sorted by total MT
+ * descending — the busiest bunkering customers first.
+ *
+ * Callers wanting the history as of a scrubbed moment rather than the whole
+ * window should pre-filter `events` to `step <= stepIndex` before calling
+ * this — it has no notion of "now" itself, matching how BunkerLog/VesselStems
+ * do their own step filtering over the same shared event list.
+ */
+export function summarizePortBunkering(
+  events: BunkerEvent[],
+  portCode: string,
+): PortVesselBunkerSummary[] {
+  const byVessel = new Map<string, PortVesselBunkerSummary>();
+  const stepsByVessel = new Map<string, Set<number>>();
+
+  for (const event of events) {
+    if (event.portCode !== portCode) continue;
+
+    let summary = byVessel.get(event.vesselName);
+    if (!summary) {
+      summary = {
+        vesselName: event.vesselName,
+        serviceCode: event.serviceCode,
+        totalMt: 0,
+        visitCount: 0,
+        grades: [],
+      };
+      byVessel.set(event.vesselName, summary);
+      stepsByVessel.set(event.vesselName, new Set());
+    }
+
+    summary.totalMt += event.quantityMt;
+    stepsByVessel.get(event.vesselName)!.add(event.step);
+    if (!summary.grades.includes(event.grade)) summary.grades.push(event.grade);
+  }
+
+  for (const summary of byVessel.values()) {
+    summary.visitCount = stepsByVessel.get(summary.vesselName)!.size;
+  }
+
+  return [...byVessel.values()].sort((a, b) => b.totalMt - a.totalMt);
 }

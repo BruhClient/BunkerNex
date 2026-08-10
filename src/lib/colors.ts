@@ -46,6 +46,19 @@ export const SERVICE_COLORS: Record<string, string> = {
   NCI: "#2DD4BF",
   SCT: "#D946EF",
   VCS: "#A3E635",
+
+  // Asia-Europe · Mainline (AE1-AE7)
+  AE1: "#38BDF8",
+  AE2: "#6366F1",
+  AE3: "#C084FC",
+  AE4: "#0EA5E9",
+  AE5: "#5EEAD4",
+  AE6: "#60A5FA",
+  AE7: "#8B5CF6",
+
+  // Asia-Europe · Mediterranean
+  MEDI: "#FCD34D",
+  EUROMED: "#FB7185",
 };
 
 export const SERVICE_COLOR_FALLBACK = "#64748B";

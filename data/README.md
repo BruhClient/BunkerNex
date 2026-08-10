@@ -31,15 +31,15 @@ have the account activated with the service provider.
 | File | Columns | Rows | Coverage |
 |---|---|---|---|
 | `Brent Prices.csv` | `Brent`, `BrentPMT` | 1966 | 2019-01-02 → 2026-08-05 |
-| `VLSFO Prices.csv` | 43 columns: 25 assessed ports + **18 modelled** | 1973 | 2019-01-02 → 2026-08-05 |
-| `HSGO Prices.csv` | 28 columns: 12 assessed + **16 modelled**, `IFO380` | 1973 | 2019-01-02 → 2026-08-05 |
-| `LSMGO_MGO Prices.csv` | 49 columns: 28 assessed + **12 modelled `LSMGO`** + **9 modelled `MGO`** | 1973 | 2019-01-02 → 2026-08-05 |
+| `VLSFO Prices.csv` | 48 columns: 25 assessed ports + **23 modelled** | 1973 | 2019-01-02 → 2026-08-05 |
+| `HSGO Prices.csv` | 33 columns: 12 assessed + **21 modelled**, `IFO380` | 1973 | 2019-01-02 → 2026-08-05 |
+| `LSMGO_MGO Prices.csv` | 54 columns: 28 assessed + **15 modelled `LSMGO`** + **11 modelled `MGO`** | 1973 | 2019-01-02 → 2026-08-05 |
 | `MDO Prices.csv` | 2 columns, both modelled — Chittagong and Mongla | 1973 | 2019-01-02 → 2026-08-05 |
 | `LNG Prices.csv` | 5 columns: 1 **reconstructed** hub + 4 modelled — see below | 1973 | 2021-10-01 → 2026-08-05 |
 | `lng_anchors.csv` | published JKM and premium anchors behind the LNG hub — **not a price sheet** | 10 | anchors from 2021-09-30 |
 | `Biofuel Prices.csv` | 7 columns, all modelled — 5 × `B24`, 2 × `B40` | 1973 | 2019-01-02 → 2026-08-05 |
 | `Methanol Prices.csv` | 13 columns, `MEOH` + `VLSFOe`/`MGOe` equivalents + **1 modelled** (Ningbo) | 188 | 2022-12-16 → 2026-08-03 |
-| `bunker_basis.csv` | provenance for the modelled columns — **not a price sheet**, and not read by the app | 264 | segments from 2019-01-02 |
+| `bunker_basis.csv` | provenance for the modelled columns — **not a price sheet**, and not read by the app | 284 | segments from 2019-01-02 |
 
 `MDO Prices.csv` and `Biofuel Prices.csv` carry no assessed columns at all: every value
 in them is modelled. They share the date spine of the three fossil sheets.
@@ -168,12 +168,16 @@ covering the window: drop one in as the hub and this script becomes unnecessary.
 is which.** Read this section before quoting any figure from a port outside the
 assessed set.
 
-Only 3 of the 26 ports this fleet stems at are quoted anywhere — Singapore, Busan and
-Shanghai. The other 23 have no assessment and no obtainable history: Ship & Bunker
+Only 3 of the original 26 ports this fleet stems at are quoted anywhere — Singapore, Busan
+and Shanghai. The other 23 have no assessment and no obtainable history: Ship & Bunker
 403s automated fetch and gates history behind Bunker Prices Pro, Bunker Index answers
 "Subscribe to view this information" on every port page, OilMonster and LiveBunkers are
 login-walled. Each is therefore **modelled**, the way an unassessed port is genuinely
-quoted in the market:
+quoted in the market. (5 more ports were modelled with the Asia-Europe extension — Le
+Havre, Southampton, Felixstowe, Port Said, Valencia — for a different reason than any of
+these 23: no obtainable-but-paywalled market to model at all, just no Chief Engineer sheet
+coverage. See "AE1-AE7, MEDI, EUROMED" above; they're the softest priced columns in the
+app and are kept out of the Ship & Bunker narrative below on purpose.)
 
 ```
 modelled(port, grade, date) = assessed_hub(hub, grade, date) + basis(port, grade, date)
@@ -195,6 +199,7 @@ Modelled ports, by hub:
 | `HONGKONG` | Shekou, Nansha, Xiamen, Qinzhou (+ all Chinese IFO380 — Shanghai has no IFO380 column) |
 | `SHANGHAI` | Ningbo, Qingdao, Tianjin (VLSFO only) |
 | `BUSAN` | Incheon |
+| `ROTERDAM` | Le Havre, Southampton, Felixstowe, Port Said, Valencia — all judgment, no CE sheet coverage; by decision rather than proximity (see "AE1-AE7, MEDI, EUROMED" above) |
 
 `MGO` rides the same hub assignment as VLSFO, added for all 23 ports for chart
 completeness — see "MGO and Methanol" below.
@@ -381,6 +386,113 @@ The Old sheet is a strict subset except for `SANTOS IFO380`, and it names one co
 Ports join to pricing on UN/LOCODE. Some cells are quoted and contain commas, which
 is why `readCsv` uses PapaParse rather than a plain split.
 
+### AE1-AE7, MEDI, EUROMED — the Asia-Europe extension
+
+**Source:** "Main - PIL Intra Asia + Europe Services" (Google Drive), a separate workbook
+from the two sources the `PIL_Intra_Asia_*` filenames reference. The filenames were left
+as-is — renaming touches `src/lib/schedules.ts`, this file and `CLAUDE.md` for no
+functional gain, and the mismatch is recorded here rather than fixed.
+
+Nine services, 20 total: `Trade_Region` is `"Asia-Europe"` for these nine (`"Europe
+Mainline"` sub-region for AE1-AE7, `"Mediterranean"` for MEDI/EUROMED) rather than
+`"Intra Asia"` — the first time this dataset has carried two trade regions, which is why
+the page header in `src/app/page.tsx` now counts distinct `Trade_Region` values instead of
+reading `services[0]`.
+
+AE1-AE7 are deep-sea strings (64-96 day loops, mostly Singapore-hub-to-North-Europe).
+MEDI and EUROMED are Mediterranean/Suez loops with much shorter individual legs (every leg
+≤7 days) because they route through Colombo, Port Said, Piraeus, Malta and Algeciras
+rather than jumping straight from Asia to North Europe in one hop.
+
+**Twelve new ports** needed `PORT_COORDS` entries: Cai Mep (`VNCMP`), Kaohsiung
+(`TWKHH`), Yantian (`CNYTN`), Karachi (`PKKHI`), Hazira (`INHZA`), Mundra (`INMUN`), Nhava
+Sheva (`INNSA`), Le Havre (`FRLEH`), Southampton (`GBSOU`), Felixstowe (`GBFXT`), Port
+Said (`EGPSD`) and Valencia (`ESVLC`). Seven more ports gained `PORT_APPROACH` entries for
+the first time despite already having coordinates — Rotterdam, Antwerp, Hamburg, Piraeus,
+Malta, Algeciras and Colombo were pricing hubs only until these services made them route
+ports too, and before this change they rendered as direct great-circle arcs regardless of
+what lay between them and their leg partner.
+
+**`src/lib/searoutes.ts` gained a westward corridor** — roughly 33 new nodes chaining off
+the existing `BENGAL_S` node through the Arabian Sea, Gulf of Aden, Red Sea, Suez Canal,
+Mediterranean, Strait of Gibraltar, Atlantic and the English Channel into the North Sea.
+Same coarse-corridor, land-avoidance-by-inspection style as the rest of the file — not
+surveyed tracks.
+
+**Every vessel in the 109-ship fleet has an identical ~22.2-day unrefuelled residual-tank
+range**, because `Max_ROB_MT`, `Min_ROB_MT` and `Consumption_Transit_MT_Per_Day` are all
+fixed percentages of `DWT_MT` in `vessel_assumptions.csv` (3%, 1%, 0.09%/day — the DWT
+terms cancel). Four of the nine new services — AE1, AE2, AE3, AE5 — have a single leg
+(23-26 days, no intermediate call) longer than that, so the twelve vessels deployed on
+them (three per service, see `PIL_Fleet_Vessel_Specifications.csv` below) carry
+`Max_ROB_MT`/`Min_ROB_MT`/`Bunkering_Trigger_MT` raised above the standard ratio —
+documented as reflecting a deep-sea mainline ship's larger bunker autonomy versus the
+regional-feeder ratio the standard figure was sourced from, not a change to the ratio
+itself. The other 15 Asia-Europe vessels (AE4, AE6, AE7, MEDI, EUROMED) sail the standard
+ratio; their longest legs (19-22 days) clear it, several with only a day or two of margin.
+**This is a checkable constraint, not a modelling choice** — if you resize or reassign a
+vessel on any of the nine, re-derive its usable range against the service's longest
+`Transit_To_Next_Days` gap before running the generator, or it will throw a ROB-bounds
+invariant failure, possibly only after several simulated loops rather than on the first
+one (the fuel state carries over between loops; a schedule that barely clears one loop can
+still drift below the floor on the second).
+
+**Seven of the twelve new ports carry no pricing at all** — Cai Mep, Kaohsiung, Yantian,
+Karachi, Hazira, Mundra, Nhava Sheva. Every route port before this change had some pricing
+coverage; these are the first that don't, because they were never in scope for the
+modelled-pricing pass (only the five fully-unpriced Europe ports were). A vessel still
+stems its published `Bunker_Quantity_MT` there — that logic doesn't consult pricing — but
+the stem renders with a null price in the bunker log.
+
+**Five ports were newly modelled** — Le Havre, Southampton, Felixstowe, Port Said and
+Valencia — all off Rotterdam as the hub, by decision rather than proximity (Rotterdam,
+Antwerp and Hamburg are the only assessed European hubs `gen-modelled-prices.mjs` can use;
+Algeciras/Piraeus/Malta are geographically closer to Port Said and Valencia but carry no
+assessed IFO380 column, so they can't serve as a hub for that grade regardless of
+proximity). None of these five have Chief Engineer sheet coverage, so every basis figure
+in `bunker_basis.csv` for them is `Confidence=judgment` with no source — the softest
+priced columns in the app, softer even than B24-off-a-modelled-hub. Le Havre, Southampton
+and Felixstowe are modelled as LSMGO (matching the Rotterdam/Antwerp/Hamburg North
+Sea-Channel cluster, which is assessed with an LSMGO column, not MGO); Port Said and
+Valencia are modelled as plain MGO (matching the Algeciras/Piraeus/Malta Mediterranean
+cluster). `LSMGO_PORTS` in `src/lib/bunkerEvents.ts` — the client-safe duplicate that
+resolves which price column a distillate stem reads — was updated to match; get the two
+out of step and a stem at one of these ports prices off the wrong grade.
+
+**Algeciras, Piraeus and Malta joined `NO_HSFO_PORTS`** in both
+`scripts/gen-vessel-movement.mjs` and its client-safe duplicate `src/lib/eca.ts` — not a
+Chief Engineer finding like the rest of that set, but because none of the three carry an
+assessed IFO380 column (and this change doesn't add one). Without it a scrubber vessel
+routed through MEDI/EUROMED could stem HSFO at any of the three and the bunker log would
+render that stem with a null price, the exact silent gap this set exists to prevent.
+
+**Yantian joined `ECA_PORTS`** (same set, same two files) as an eleventh China national-ECA
+port. Kaohsiung deliberately did not — Taiwan isn't covered by the China/Korea rule this
+set encodes, and there's no evidence otherwise.
+
+**Deliberately out of scope: the real North Sea/Channel and Mediterranean SECAs.** In
+reality, Le Havre/Southampton/Felixstowe/Antwerp/Rotterdam/Hamburg sit in the North
+Sea/Channel SECA (0.10% S, since 2007) and Port Said/Valencia/Piraeus/Malta/Algeciras now
+sit in the Mediterranean SECA (since 2025-05-01). None of that is reflected in
+`ECA_PORTS` for this change. The fleet-wide MGO tank's autonomy is only ~4.4 days
+full-to-min (`MGO_MAX_RATIO=0.2`, `MGO_MIN_RATIO=1/3` of that, against the same
+DWT-proportional consumption rate), and ECA windows merge across consecutive calls — a
+Le Havre→Southampton→Felixstowe→Antwerp→Rotterdam→Hamburg run flagged as one continuous
+window would need its own sizing pass against the actual leg days, the same exercise the
+four widened-tank services above already needed for their residual tanks. Left for a
+follow-on change if taken on, not folded in silently here.
+
+**`Transit_Times.csv` was not extended** for these nine services — the source workbook has
+no independent pairwise transit matrix for them, only the adjacent-leg figures already
+captured in `Port_Calls.Transit_To_Next_Days`. This matches the sparse/absent coverage
+precedent YGS already set, not an oversight.
+
+**The fleet crossed the ~55-vessel point** past which shipping `PIL_Fleet_Live_Movement.csv`
+as page props (see "Regenerated from the rotations" below) stops being an obviously
+reasonable trade-off — 62 vessels now, roughly 690 KB of payload, about where the pricing
+API split happened. Accepted for this change; moving vessel tracks behind
+`GET /api/vessels` on the same pattern is a reasonable next step, not done here.
+
 ---
 
 ## `contracts/` — term-contract and supplier reference data
@@ -459,7 +571,7 @@ Working rules:
 - **Randomness is seeded** on `Port_Code|Grade|Supplier`. The output is reviewable in
   git and re-running is a no-op. Never hand-edit the file — the next run overwrites it.
 - **Three suppliers per port × grade is a floor, asserted, not a hope.** The generator
-  throws naming the pair if coverage falls short. 64 of the 134 markets sit exactly on
+  throws naming the pair if coverage falls short. 75 of the 154 markets sit exactly on
   it; the rest carry 4 or 5.
 - **Tier 3 is alternative fuels only** — methanol, B24 and B40. A certified renewable
   blend is not a like-for-like quote against a fossil grade, so those suppliers never
@@ -474,7 +586,7 @@ Working rules:
 - Adding a supplier needs a `ports` entry, a `grades` entry and a generator re-run in
   the same change. A LOCODE with no price series throws rather than being skipped.
 
-**These offers are indistinguishable from real quotes downstream, and at the 23
+**These offers are indistinguishable from real quotes downstream, and at the 28
 modelled ports they spread off a baseline that is not an assessment either** — a hub
 series plus a documented basis, per the `pricing/` section above. The port panel says
 so in copy; anything else that presents them must too.
@@ -558,12 +670,13 @@ Two defects in the source's footnote block, both settled by arithmetic:
   may lawfully burn". Anything that switches fuel by port needs a compliance rule of
   its own; this column will not supply one. (64 vessels are scrubber-fitted.)
 
-### The vessel ↔ service link lives only in the movement file, and covers 35 of 109
+### The vessel ↔ service link lives only in the movement file, and covers 62 of 109
 
 The specifications sheet carries no `Service_Code`, and no vessel name appears anywhere
 in `schedules/`. `PIL_Fleet_Live_Movement.csv` is the only place the link exists. It now
-covers **35 vessels across all 11 services**, 2–5 per service, replacing an earlier
-11-vessel slice that left BD1, BD2, CAS and YGS with no vessels at all.
+covers **62 vessels across all 20 services**, 2–5 per Intra Asia service and exactly 3 per
+Asia-Europe service, replacing an earlier 11-vessel slice that left BD1, BD2, CAS and YGS
+with no vessels at all.
 
 Three services carry PIL's **published** deployment; the rest are **derived**, and every
 vessel's first movement row states which in `Data_Notes`:
@@ -581,6 +694,21 @@ vessel's first movement row states which in `Data_Notes`:
 | YGS | KOTA HAKIM, HALUS | derived — sisters of KOTA HAPAS, the ship PIL actually runs |
 | SCT | KOTA RAJIN, RANCAK | derived — 943 TEU for Bangkok Klong Toey |
 | VCS | KOTA HANDAL, HARUM | derived — 1,080 TEU feeder berths |
+| AE1 | KOTA EAGLE, EBONY, EMERALD | derived — 14,450 TEU; widened Max_ROB_MT (see below) to clear the 24-26 day Singapore-Europe crossings |
+| AE2 | KOTA ELAN, ELOK, EMBUN | derived — 13,064-14,410 TEU; widened Max_ROB_MT to clear the 24-25 day Singapore-Europe crossings |
+| AE3 | KOTA PEONY, PLUMBAGO, PRIMROSE | derived — 13,082 TEU; widened Max_ROB_MT to clear the 23-25 day Singapore/Hamburg-Qingdao crossings |
+| AE4 | KOTA SYDNEY, TEMA, VALPARAISO | derived — 7,092 TEU at the fleet-standard ratio, which clears this service's 22-day longest leg |
+| AE5 | KOTA PAHLAWAN, PELANGI, PURI | derived — 11,923 TEU; widened Max_ROB_MT to clear the 24-26 day Singapore/Le Havre crossings |
+| AE6 | KOTA OASIS, OCEAN, ODYSSEY | derived — 8,350 TEU at the fleet-standard ratio, which clears this service's 21-22 day longest legs |
+| AE7 | KOTA MANZANILLO, SANTOS, ORKID | derived — 8,350-8,533 TEU at the fleet-standard ratio, which clears this service's 22-day longest leg |
+| MEDI | KOTA PUSAKA, LIMA, LEGIT | derived — fleet-standard ratio; every leg on this rotation is ≤7 days |
+| EUROMED | KOTA LEKAS, LEMBAH, LAMBAI | derived — fleet-standard ratio; every leg on this rotation is ≤6 days |
+
+None of the nine Asia-Europe deployments are PIL-published — no schedule for these
+services carries vessel names or tonnage anywhere in the source workbook, so all nine rows
+above are derived the same way the Intra Asia derived rows are: sized to the tightest real
+constraint the rotation presents. For AE1/AE2/AE3/AE5 that constraint is fuel autonomy, not
+draft — see "Twelve vessels needed widened tanks" below.
 
 **The derived rows are sized by port constraint, not by trade lane or by what looks
 plausible.** Draft and LOA are the binding facts: Kolkata sits up the Hooghly at roughly
@@ -591,7 +719,36 @@ KOTA CABAR calling Bangkok — neither ship can physically reach either berth. *
 belongs on PIL's long-haul trades, not on an Intra-Asia feeder loop. If you extend the
 deployment, size the ship to the tightest port in its rotation first.
 
-Still open: 74 of 109 vessels have no service, and `suppliers.ports` in `contracts/`
+### Twelve vessels needed widened tanks, and it is a fleet-wide constraint, not a per-vessel one
+
+`Max_ROB_MT`, `Min_ROB_MT` and `Consumption_Transit_MT_Per_Day` are all fixed percentages
+of `DWT_MT` (`vessel_assumptions.csv`: 3%, 1%, 0.09%/day). The DWT terms cancel, so
+`(Max_ROB_MT − Min_ROB_MT) ÷ Consumption_Transit_MT_Per_Day` is **~22.2 days for every
+vessel in this file, regardless of size** — the 628 TEU KOTA DAHLIA and the 14,450 TEU
+KOTA EAGLE have the identical unrefuelled residual-tank range under this ratio. That never
+mattered before AE1-AE7: no Intra Asia rotation has a leg anywhere close to 22 days.
+AE1, AE2, AE3 and AE5 each have one (23-26 days, Singapore or a European port to the next
+call with nothing in between), which no vessel at the standard ratio can sail without
+bunkering mid-ocean.
+
+The twelve vessels on those four services carry `Max_ROB_MT`, `Min_ROB_MT` and
+`Bunkering_Trigger_MT` raised above the standard ratio — `Min_ROB_MT` and the consumption
+rates are untouched, only the ceiling and (derived from it) the trigger moved. Each row's
+`Data_Notes` states the deviation and which service it is sized for. This is documented as
+reflecting a deep-sea mainline ship's larger bunker autonomy against the regional-feeder
+ratio the standard figure was sourced from — not a change to the ratio's meaning for the
+other 97 vessels.
+
+**If you resize or redeploy a vessel on any of these nine services, re-derive its usable
+range against the service's longest `Transit_To_Next_Days` gap before running the
+generator.** A schedule that only barely clears its longest leg on the first simulated
+loop can still drift below `Min_ROB_MT` on a later one — the fuel state carries over
+between loops, so a tight margin that survives loop 1 is not proof it survives loop 2. This
+is exactly how the widened-tank figures here were arrived at: several rounds of "the
+generator threw, the shortfall was under 10 MT, raise the pre-crossing `Bunker_Quantity_MT`
+or the tank a little more" before the run went clean.
+
+Still open: 47 of 109 vessels have no service, and `suppliers.ports` in `contracts/`
 remains empty.
 
 ---
@@ -734,8 +891,13 @@ and a scrubber vessel stemming at one lifts VLSFO instead. Burn takes HSFO first
 reserve stands until HSFO runs out. All 20 hold VLSFO at every step; an invariant fails
 the run otherwise.
 
-**The ECA switch.** Ten of the 26 ports sit in China's or Korea's national port ECA:
-`CNNGB CNNSA CNQZH CNSHA CNSHK CNTAO CNTSN CNXMN KRINC KRPUS`. Those cap sulphur at
+**The ECA switch.** Eleven of the (now 45) route ports sit in China's or Korea's national
+port ECA:
+`CNNGB CNNSA CNQZH CNSHA CNSHK CNTAO CNTSN CNXMN CNYTN KRINC KRPUS` — Yantian (`CNYTN`)
+joined with the Asia-Europe services, as an eleventh China national-ECA port; the rest of
+this subsection describes the original 26-port, 35-vessel design and was not fully
+re-derived for the extension (see "Twelve vessels needed widened tanks" above and "AE1-AE7,
+MEDI, EUROMED" earlier in this file for what changed). Those cap sulphur at
 **0.10%**, which VLSFO (0.50%) does not clear — so the switch fuel has to be MGO, and
 switching between the two residual grades would look like compliance without being it.
 Per the source rule: on MGO from **8 steps (24 h) before** a berth at an ECA port until
@@ -830,12 +992,14 @@ the generator, assert them yourself.
 
 The generator reads `PORT_COORDS` and `PORT_APPROACH` by scraping `src/lib/ports.ts` and
 `src/lib/searoutes.ts`, since no CSV carries port geometry. That scrape throws if it finds
-fewer than 26 codes, so reformatting either object literal fails loudly instead of turning
-the check into a vacuous pass.
+fewer than 26 codes — a floor, not the current count (both tables carry far more since the
+Asia-Europe extension) — so reformatting either object literal fails loudly instead of
+turning the check into a vacuous pass.
 
-Watch the payload: these tracks ship as props from `app/page.tsx`, roughly **390 KB of RSC
-payload at 35 vessels × 744 steps** (up from ~250 KB at 480 steps). Pricing moved behind
-`GET /api/prices/[portKey]` at ~700 KB; that is the threshold to compare against. There is
-room for the fleet to grow to roughly 55 vessels *or* for a longer window, not both — the
-next expansion of either dimension should move tracks behind an API route on the same
-pattern.
+Watch the payload: these tracks ship as props from `app/page.tsx`, roughly **690 KB of RSC
+payload at 62 vessels × 744 steps**, up from ~390 KB at 35 vessels. Pricing moved behind
+`GET /api/prices/[portKey]` at ~700 KB; that is the threshold to compare against, and this
+change lands right at it. The 55-vessel-or-longer-window ceiling this note used to warn
+about has now been crossed (by vessel count, not window length) — accepted for this
+change, but **moving `PIL_Fleet_Live_Movement.csv` behind an API route, on the pricing
+route's own pattern, is the next thing to do here**, not a future hypothetical.

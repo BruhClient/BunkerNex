@@ -461,6 +461,8 @@ export default function Explorer({
           <PortPanel
             port={selectedPort}
             portCalls={portCalls}
+            bunkerEvents={bunkerEvents}
+            stepIndex={stepIndex}
             onClose={() => setSelectedKey(null)}
           />
         ) : (

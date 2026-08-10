@@ -47,6 +47,20 @@ export const PORT_COORDS: Record<string, PortMeta> = {
   // third port (with Singapore and Shanghai) where the two datasets meet.
   KRPUS: { name: "Busan", country: "South Korea", lon: 129.075, lat: 35.101 },
 
+  // --- Asia-Europe service ports (AE1-AE7, MEDI, EUROMED) ---
+  VNCMP: { name: "Cai Mep", country: "Vietnam", lon: 107.02, lat: 10.58 },
+  TWKHH: { name: "Kaohsiung", country: "Taiwan", lon: 120.28, lat: 22.61 },
+  CNYTN: { name: "Yantian", country: "China", lon: 114.27, lat: 22.58 },
+  PKKHI: { name: "Karachi", country: "Pakistan", lon: 66.98, lat: 24.85 },
+  INHZA: { name: "Hazira", country: "India", lon: 72.85, lat: 21.1 },
+  INMUN: { name: "Mundra", country: "India", lon: 69.72, lat: 22.84 },
+  INNSA: { name: "Nhava Sheva", country: "India", lon: 72.95, lat: 18.95 },
+  FRLEH: { name: "Le Havre", country: "France", lon: 0.1, lat: 49.49 },
+  GBSOU: { name: "Southampton", country: "United Kingdom", lon: -1.4, lat: 50.9 },
+  GBFXT: { name: "Felixstowe", country: "United Kingdom", lon: 1.32, lat: 51.96 },
+  EGPSD: { name: "Port Said", country: "Egypt", lon: 32.3, lat: 31.26 },
+  ESVLC: { name: "Valencia", country: "Spain", lon: -0.32, lat: 39.44 },
+
   // --- Bunker pricing hubs (from the pricing CSV column headers) ---
   HKHKG: { name: "Hong Kong", country: "Hong Kong", lon: 114.152, lat: 22.32 },
   JPTYO: { name: "Tokyo", country: "Japan", lon: 139.79, lat: 35.617 },
@@ -158,6 +172,15 @@ export const PRICE_PORT_ALIASES: Record<string, string> = {
   JAKARTA: "IDJKT",
   SURABAYA: "IDSUB",
   SEMARANG: "IDSRG",
+
+  // Five more modelled ports added with the Asia-Europe services: no Chief
+  // Engineer sheet coverage exists for these, so the basis in bunker_basis.csv
+  // is editorial judgment off the nearest assessed European hub, not sourced.
+  LEHAVRE: "FRLEH",
+  SOUTHAMPTON: "GBSOU",
+  FELIXSTOWE: "GBFXT",
+  PORTSAID: "EGPSD",
+  VALENCIA: "ESVLC",
 };
 
 /** Resolve a raw CSV column port prefix to a canonical key, or null. */

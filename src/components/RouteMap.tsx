@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { serviceColor, THEME } from "@/lib/colors";
+import { ecaZonesGeoJson } from "@/lib/ecaZones";
 import { greatCircleArc, multiPointArc, type LonLat } from "@/lib/geo";
 import { seaRoute } from "@/lib/searoutes";
 import { createTrackResolver, type VesselFix } from "@/lib/vesselPosition";
@@ -344,6 +345,33 @@ export default function RouteMap({
       const firstSymbolId = map
         .getStyle()
         .layers.find((l) => l.type === "symbol")?.id;
+
+      // Shaded ECA/DECA reference zones — schematic sea-area outlines, not
+      // surveyed boundaries (see ecaZones.ts). Added first among our own
+      // layers so it renders beneath every route line and port label.
+      map.addSource("eca-zones", { type: "geojson", data: ecaZonesGeoJson() });
+      map.addLayer(
+        {
+          id: "eca-zones-fill",
+          type: "fill",
+          source: "eca-zones",
+          paint: { "fill-color": THEME.warn, "fill-opacity": 0.08 },
+        },
+        firstSymbolId,
+      );
+      map.addLayer(
+        {
+          id: "eca-zones-outline",
+          type: "line",
+          source: "eca-zones",
+          paint: {
+            "line-color": THEME.warn,
+            "line-opacity": 0.25,
+            "line-width": 1,
+          },
+        },
+        firstSymbolId,
+      );
 
       // Offsets and focus styling are both applied by their own effects,
       // which run straight after load — these layers start at neutral, on the

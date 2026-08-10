@@ -93,6 +93,55 @@ const SEA_NODES: Record<string, LonLat> = {
   JAVA_NW: [106.9, -5.6], // offshore Jakarta
   JAVA_NC: [110.4, -6.4], // offshore Semarang
   JAVA_NE: [112.7, -6.5], // west mouth of the Madura Strait, for Surabaya
+
+  // --- Arabian Sea, continuing west from BENGAL_S ---
+  // South of Sri Lanka's southern tip (Dondra Head, ~5.9N) so the leg in from
+  // BENGAL_S doesn't clip the island.
+  CEYLON_S: [80.7, 5.2],
+  ARABIAN_MID: [72.0, 12.0], // open Arabian Sea, west of the Karnataka/Goa coast
+  INDIA_W_S: [70.0, 19.5], // off Mumbai/Diu, for Nhava Sheva and Hazira
+  // West of Dwarka (~69E), the Kathiawar peninsula's tip, so the leg north to
+  // the Gulf of Kutch doesn't cut the corner.
+  SAURASHTRA_OFFSHORE: [67.0, 20.5],
+  INDIA_W_N: [67.5, 23.0], // Gulf of Kutch approach, for Mundra
+  PAKISTAN_S: [65.5, 24.5], // for Karachi
+  ARABIAN_W: [58.0, 13.5], // mid Arabian Sea, well south of the Omani coast
+
+  // --- Gulf of Aden and the Red Sea ---
+  GULF_ADEN: [50.0, 12.5],
+  BAB_EL_MANDEB: [43.4, 12.6], // the strait itself: Yemen and the Horn close in on both sides
+  RED_SEA_S: [40.5, 15.5],
+  // Two more nodes rather than one straight shot to Suez: the Farasan and
+  // Dahlak island chains sit either side of the direct line.
+  RED_SEA_MID: [37.5, 20.0],
+  RED_SEA_N: [36.2, 24.0],
+  GUBAL: [34.0, 27.7], // Strait of Gubal, where the sea funnels into the Gulf of Suez
+  SUEZ_S: [32.55, 29.93], // Suez city, south end of the canal
+  SUEZ_N: [32.35, 31.5], // Port Said, north end of the canal / Mediterranean mouth
+
+  // --- Mediterranean ---
+  MED_E: [28.0, 33.0],
+  CRETE_S: [25.0, 34.0], // south of Crete, clear of the island for the run into the Aegean
+  AEGEAN: [23.4, 37.6], // Saronic Gulf approach, for Piraeus
+  CAPE_MATAPAN: [22.0, 36.2], // south of the Peloponnese's southern tip
+  IONIAN: [19.0, 37.0],
+  MED_C: [15.5, 36.0], // central Med, for Malta
+  MED_W: [3.0, 38.5], // western Med, for Valencia
+
+  // --- Gibraltar and the Atlantic approach to the Channel ---
+  GIB_E: [-4.5, 36.0], // Med-side approach to the strait, for Algeciras
+  GIB_W: [-6.0, 35.9], // Atlantic-side approach, same port
+  ATLANTIC_IBERIA: [-10.0, 38.0], // off Cape St Vincent
+  FINISTERRE_W: [-10.5, 43.0], // well west of Cape Finisterre, Iberia's NW corner
+  BISCAY: [-7.5, 46.5],
+
+  // --- English Channel and North Sea ---
+  CHANNEL_W: [-5.5, 48.7], // western entrance, off Ushant
+  SOLENT: [-1.6, 50.5], // for Southampton
+  SEINE_BAY: [0.0, 49.6], // for Le Havre
+  DOVER_STRAIT: [1.8, 51.0], // for Felixstowe, and the gateway to the North Sea
+  NORTH_SEA_S: [3.0, 51.9], // southern North Sea, for Antwerp and Rotterdam
+  GERMAN_BIGHT: [7.0, 54.3], // Elbe approach, for Hamburg
 };
 
 /**
@@ -175,6 +224,49 @@ const SEA_EDGES: [string, string][] = [
   ["KARIMATA", "JAVA_NC"],
   ["JAVA_NW", "JAVA_NC"],
   ["JAVA_NC", "JAVA_NE"],
+
+  // Arabian Sea, continuing the chain west from the Bay of Bengal
+  ["BENGAL_S", "CEYLON_S"],
+  ["CEYLON_S", "ARABIAN_MID"],
+  ["ARABIAN_MID", "INDIA_W_S"],
+  ["INDIA_W_S", "SAURASHTRA_OFFSHORE"],
+  ["SAURASHTRA_OFFSHORE", "INDIA_W_N"],
+  ["INDIA_W_N", "PAKISTAN_S"],
+  ["ARABIAN_MID", "ARABIAN_W"],
+
+  // Gulf of Aden and the Red Sea
+  ["ARABIAN_W", "GULF_ADEN"],
+  ["GULF_ADEN", "BAB_EL_MANDEB"],
+  ["BAB_EL_MANDEB", "RED_SEA_S"],
+  ["RED_SEA_S", "RED_SEA_MID"],
+  ["RED_SEA_MID", "RED_SEA_N"],
+  ["RED_SEA_N", "GUBAL"],
+  ["GUBAL", "SUEZ_S"],
+  ["SUEZ_S", "SUEZ_N"],
+
+  // Mediterranean
+  ["SUEZ_N", "MED_E"],
+  ["MED_E", "CRETE_S"],
+  ["CRETE_S", "AEGEAN"],
+  ["AEGEAN", "CAPE_MATAPAN"],
+  ["CAPE_MATAPAN", "IONIAN"],
+  ["IONIAN", "MED_C"],
+  ["MED_C", "MED_W"],
+
+  // Gibraltar and the Atlantic approach to the Channel
+  ["MED_W", "GIB_E"],
+  ["GIB_E", "GIB_W"],
+  ["GIB_W", "ATLANTIC_IBERIA"],
+  ["ATLANTIC_IBERIA", "FINISTERRE_W"],
+  ["FINISTERRE_W", "BISCAY"],
+  ["BISCAY", "CHANNEL_W"],
+
+  // English Channel and North Sea
+  ["CHANNEL_W", "SOLENT"],
+  ["SOLENT", "SEINE_BAY"],
+  ["SEINE_BAY", "DOVER_STRAIT"],
+  ["DOVER_STRAIT", "NORTH_SEA_S"],
+  ["NORTH_SEA_S", "GERMAN_BIGHT"],
 ];
 
 /**
@@ -226,6 +318,35 @@ const PORT_APPROACH: Record<string, string[]> = {
   IDJKT: ["JAVA_NW"],
   IDSRG: ["JAVA_NC"],
   IDSUB: ["JAVA_NE"],
+
+  // Asia-side ports added with the Europe services, close enough to an
+  // existing cluster that no new node is needed
+  VNCMP: ["VUNG_TAU"], // Cai Mep sits right by Ho Chi Minh's approach
+  TWKHH: ["TAIWAN_SW"], // Kaohsiung, Taiwan's SW coast
+  CNYTN: ["PEARL_MOUTH"], // Yantian, the same Pearl River estuary as Shekou/Nansha
+
+  // Indian subcontinent and Sri Lanka
+  PKKHI: ["PAKISTAN_S"],
+  INMUN: ["INDIA_W_N"],
+  INHZA: ["INDIA_W_S"],
+  INNSA: ["INDIA_W_S"],
+  LKCMB: ["CEYLON_S"],
+
+  // Mediterranean
+  EGPSD: ["SUEZ_N"],
+  GRPIR: ["AEGEAN"],
+  MTMLA: ["MED_C"],
+  ESVLC: ["MED_W"],
+  // Algeciras sits at the strait itself and is reached from either side.
+  ESALG: ["GIB_E", "GIB_W"],
+
+  // Channel and North Sea
+  FRLEH: ["SEINE_BAY"],
+  GBSOU: ["SOLENT"],
+  GBFXT: ["DOVER_STRAIT"],
+  BEANR: ["NORTH_SEA_S"],
+  NLRTM: ["NORTH_SEA_S"],
+  DEHAM: ["GERMAN_BIGHT"],
 };
 
 const EARTH_KM = 6371;

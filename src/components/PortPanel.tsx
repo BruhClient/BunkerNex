@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PriceChart from "./PriceChart";
 import PriceTiles from "./PriceTiles";
 import SchedulePanel from "./SchedulePanel";
 import SupplierOffers from "./SupplierOffers";
-import { serviceColor } from "@/lib/colors";
+import { GRADE_COLORS, GRADE_LABELS, serviceColor } from "@/lib/colors";
+import { summarizePortBunkering, TANK_SERIES } from "@/lib/bunkerEvents";
+import { formatMt } from "@/lib/format";
+import type { BunkerEvent } from "@/lib/bunkerEvents";
 import type {
   Port,
   PortCall,
@@ -24,10 +27,18 @@ interface PricesResponse {
 interface Props {
   port: Port | null;
   portCalls: PortCall[];
+  bunkerEvents: BunkerEvent[];
+  stepIndex: number;
   onClose: () => void;
 }
 
-export default function PortPanel({ port, portCalls, onClose }: Props) {
+export default function PortPanel({
+  port,
+  portCalls,
+  bunkerEvents,
+  stepIndex,
+  onClose,
+}: Props) {
   const [data, setData] = useState<PricesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +85,14 @@ export default function PortPanel({ port, portCalls, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [portKey, onClose]);
+
+  const bunkerHistory = useMemo(() => {
+    if (!portKey) return [];
+    // As of the scrubbed moment, not the whole window — matches how
+    // BunkerLog/VesselStems treat stepIndex as "now" everywhere else.
+    const soFar = bunkerEvents.filter((e) => e.step <= stepIndex);
+    return summarizePortBunkering(soFar, portKey);
+  }, [bunkerEvents, portKey, stepIndex]);
 
   if (!port) return null;
 
@@ -175,6 +194,76 @@ export default function PortPanel({ port, portCalls, onClose }: Props) {
             <SupplierOffers markets={data.markets} />
           </section>
         )}
+
+        <section className="mt-2 border-t border-line">
+          <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
+            <span className="label">Bunkering history</span>
+          </div>
+
+          {bunkerHistory.length === 0 ? (
+            <p className="px-4 pb-4 text-[11px] leading-relaxed text-faint">
+              No vessel has bunkered here yet, as of the current time.
+            </p>
+          ) : (
+            <table className="w-full table-fixed border-collapse text-[11px]">
+              <thead>
+                <tr className="label border-b border-line">
+                  <th className="px-4 pb-1.5 text-left font-medium">
+                    Vessel
+                  </th>
+                  <th className="pb-1.5 text-left font-medium">Grade</th>
+                  <th className="px-2 pb-1.5 text-right font-medium">
+                    Visits
+                  </th>
+                  <th className="px-4 pb-1.5 text-right font-medium">
+                    Total MT
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {bunkerHistory.map((v) => (
+                  <tr
+                    key={v.vesselName}
+                    className="border-b border-line/60 last:border-b-0"
+                  >
+                    <td className="truncate px-4 py-1.5 text-fg">
+                      {v.vesselName}
+                      <span className="ml-1 text-faint">
+                        · {v.serviceCode}
+                      </span>
+                    </td>
+                    <td className="py-1.5">
+                      <span className="flex flex-wrap gap-1">
+                        {v.grades.map((g) => (
+                          <span
+                            key={g}
+                            className="inline-flex items-center gap-1"
+                          >
+                            <span
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{
+                                background: GRADE_COLORS[TANK_SERIES[g]],
+                              }}
+                            />
+                            <span className="text-faint">
+                              {GRADE_LABELS[TANK_SERIES[g]]}
+                            </span>
+                          </span>
+                        ))}
+                      </span>
+                    </td>
+                    <td className="tnum px-2 py-1.5 text-right text-faint">
+                      {v.visitCount}
+                    </td>
+                    <td className="tnum px-4 py-1.5 text-right text-fg">
+                      {formatMt(v.totalMt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
 
         <section className="mt-2 border-t border-line">
           <div className="px-4 pb-1 pt-3.5">

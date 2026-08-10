@@ -117,6 +117,23 @@ const ROSTER = [
   ["YGS", ["KOTA HAKIM", "KOTA HALUS"]],
   ["SCT", ["KOTA RAJIN", "KOTA RANCAK"]],
   ["VCS", ["KOTA HANDAL", "KOTA HARUM"]],
+
+  // Asia-Europe services, added with the Main - PIL Intra Asia + Europe
+  // Services (Google Drive) workbook. All nine deployments are derived, not
+  // published, drawn from vessels otherwise unused in the specifications
+  // file. AE1/AE2/AE3/AE5 carry vessels widened above the fleet-standard
+  // Max_ROB_MT ratio — see PIL_Fleet_Vessel_Specifications.csv Data_Notes —
+  // because their longest leg (23-26 days) exceeds every vessel's standard
+  // 22.2-day bunker autonomy.
+  ["AE1", ["KOTA EAGLE", "KOTA EBONY", "KOTA EMERALD"]],
+  ["AE2", ["KOTA ELAN", "KOTA ELOK", "KOTA EMBUN"]],
+  ["AE3", ["KOTA PEONY", "KOTA PLUMBAGO", "KOTA PRIMROSE"]],
+  ["AE4", ["KOTA SYDNEY", "KOTA TEMA", "KOTA VALPARAISO"]],
+  ["AE5", ["KOTA PAHLAWAN", "KOTA PELANGI", "KOTA PURI"]],
+  ["AE6", ["KOTA OASIS", "KOTA OCEAN", "KOTA ODYSSEY"]],
+  ["AE7", ["KOTA MANZANILLO", "KOTA SANTOS", "KOTA ORKID"]],
+  ["MEDI", ["KOTA PUSAKA", "KOTA LIMA", "KOTA LEGIT"]],
+  ["EUROMED", ["KOTA LEKAS", "KOTA LEMBAH", "KOTA LAMBAI"]],
 ];
 
 /**
@@ -162,6 +179,53 @@ const DEPLOYMENT_NOTES = {
   VCS:
     "Deployment derived: PIL does not publish VCS tonnage. 1080 TEU suits the Qui Nhon and Haiphong " +
     "feeder berths.",
+  AE1:
+    "Deployment derived: PIL does not publish AE1 vessel names or tonnage. KOTA EAGLE, " +
+    "KOTA EBONY and KOTA EMERALD (14,450 TEU) carry Max_ROB_MT and Bunkering_Trigger_MT " +
+    "raised above the fleet-standard ratio because this service's 24-26 day Singapore-" +
+    "Europe crossings exceed the fleet's standard 22.2-day bunker autonomy; see " +
+    "PIL_Fleet_Vessel_Specifications.csv Data_Notes.",
+  AE2:
+    "Deployment derived: PIL does not publish AE2 vessel names or tonnage. KOTA ELAN, " +
+    "KOTA ELOK and KOTA EMBUN (13,064-14,410 TEU) carry Max_ROB_MT and " +
+    "Bunkering_Trigger_MT raised above the fleet-standard ratio because this service's " +
+    "24-25 day Singapore-Europe crossings exceed the fleet's standard 22.2-day bunker " +
+    "autonomy; see PIL_Fleet_Vessel_Specifications.csv Data_Notes.",
+  AE3:
+    "Deployment derived: PIL does not publish AE3 vessel names or tonnage. KOTA PEONY, " +
+    "KOTA PLUMBAGO and KOTA PRIMROSE (13,082 TEU) carry Max_ROB_MT and " +
+    "Bunkering_Trigger_MT raised above the fleet-standard ratio because this service's " +
+    "23-25 day Singapore/Hamburg-Qingdao crossings exceed the fleet's standard 22.2-day " +
+    "bunker autonomy; see PIL_Fleet_Vessel_Specifications.csv Data_Notes.",
+  AE4:
+    "Deployment derived: PIL does not publish AE4 vessel names or tonnage. KOTA SYDNEY, " +
+    "KOTA TEMA and KOTA VALPARAISO (7,092 TEU) sail this service's shortest AE loop at " +
+    "the fleet-standard Max_ROB_MT ratio, which comfortably clears its 22-day longest leg.",
+  AE5:
+    "Deployment derived: PIL does not publish AE5 vessel names or tonnage. KOTA " +
+    "PAHLAWAN, KOTA PELANGI and KOTA PURI (11,923 TEU) carry Max_ROB_MT and " +
+    "Bunkering_Trigger_MT raised above the fleet-standard ratio because this service's " +
+    "24-26 day Singapore/Le Havre crossings exceed the fleet's standard 22.2-day bunker " +
+    "autonomy; see PIL_Fleet_Vessel_Specifications.csv Data_Notes.",
+  AE6:
+    "Deployment derived: PIL does not publish AE6 vessel names or tonnage. KOTA OASIS, " +
+    "KOTA OCEAN and KOTA ODYSSEY (8,350 TEU) sail the fleet-standard Max_ROB_MT ratio, " +
+    "which clears this service's 21-22 day longest legs.",
+  AE7:
+    "Deployment derived: PIL does not publish AE7 vessel names or tonnage. KOTA " +
+    "MANZANILLO, KOTA SANTOS and KOTA ORKID (8,350-8,533 TEU) sail the fleet-standard " +
+    "Max_ROB_MT ratio, which clears this service's 22-day longest leg. The only AE " +
+    "service originating on the Indian subcontinent rather than East or Southeast Asia.",
+  MEDI:
+    "Deployment derived: PIL does not publish MEDI vessel names or tonnage. KOTA " +
+    "PUSAKA, KOTA LIMA and KOTA LEGIT sail the fleet-standard Max_ROB_MT ratio; every " +
+    "leg on this rotation is 7 days or shorter, so no widened tank is needed even " +
+    "though the loop runs Singapore to North Europe and back via Suez.",
+  EUROMED:
+    "Deployment derived: PIL does not publish EUROMED vessel names or tonnage. KOTA " +
+    "LEKAS, KOTA LEMBAH and KOTA LAMBAI sail the fleet-standard Max_ROB_MT ratio; every " +
+    "leg on this rotation is 6 days or shorter, the same as MEDI, whose Mediterranean " +
+    "and North Europe rotation this service shares.",
 };
 
 // --- Fuel: compliance, supply and the ECA switch --------------------------
@@ -189,8 +253,19 @@ const ECA_PORTS = new Set([
   "CNTAO", // Qingdao
   "CNTSN", // Tianjin
   "CNXMN", // Xiamen
+  "CNYTN", // Yantian - same China national port ECA as the rest of the coast
   "KRINC", // Incheon
   "KRPUS", // Busan
+
+  // Deliberately NOT here: the North Sea/Channel and Mediterranean SECAs that
+  // cover most of the Asia-Europe services' European ports in reality. Adding
+  // them is out of scope for this change — the MGO tank's fleet-wide autonomy
+  // is only ~4.4 days full-to-min, and ECA windows merge across consecutive
+  // calls, so a Le Havre-Southampton-Felixstowe-Antwerp-Rotterdam-Hamburg run
+  // flagged as one continuous window needs its own sizing pass against the
+  // actual leg days, not a silent addition here. Also NOT here: TWKHH
+  // (Kaohsiung) — Taiwan isn't covered by the China/Korea national-ECA rule
+  // this set otherwise encodes, and there's no evidence otherwise.
 ]);
 
 /** Switch to MGO one day before berthing at an ECA port. */
@@ -226,6 +301,17 @@ const NO_HSFO_PORTS = new Set([
   "MMRGN", // Yangon
   "VNHPH", // Haiphong
   "VNUIH", // Qui Nhon
+
+  // Added with the Asia-Europe services. Unlike the entries above, these
+  // three aren't CE-sheet findings — Algeciras, Piraeus and Malta have no
+  // assessed IFO380 column in HSGO Prices.csv and none is added for them in
+  // this change either (out of scope). Without this, a scrubber vessel
+  // routed through MEDI/EUROMED could stem HSFO here and the bunker log
+  // would render that stem with a null price — the silent valuation gap this
+  // set exists to prevent.
+  "ESALG", // Algeciras - no priced IFO380 market
+  "GRPIR", // Piraeus - no priced IFO380 market
+  "MTMLA", // Malta - no priced IFO380 market
 ]);
 
 /**

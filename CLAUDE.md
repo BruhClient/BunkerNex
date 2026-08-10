@@ -31,7 +31,9 @@ Three datasets live there:
 
 ### `PIL_Fleet_Live_Movement.csv` is the timeline, and it is generated
 
-Nothing in `src/` hardcodes a start or end date. The scrubbed window is **entirely** derived from `data/vessels/PIL_Fleet_Live_Movement.csv`: `loadVesselTracks` ([src/lib/vessels.ts](src/lib/vessels.ts)) keeps only the first `Timestamp` and the row count, and every date the UI shows is index arithmetic from there against a hardcoded `STEP_HOURS = 3`. It currently runs **2026-05-05 00:00:00 → 2026-08-05 21:00:00** — 26,040 rows, 35 vessels × 744 three-hour steps.
+Nothing in `src/` hardcodes a start or end date. The scrubbed window is **entirely** derived from `data/vessels/PIL_Fleet_Live_Movement.csv`: `loadVesselTracks` ([src/lib/vessels.ts](src/lib/vessels.ts)) keeps only the first `Timestamp` and the row count, and every date the UI shows is index arithmetic from there against a hardcoded `STEP_HOURS = 3`. It currently runs **2026-05-05 00:00:00 → 2026-08-05 21:00:00** — 46,128 rows, 62 vessels × 744 three-hour steps.
+
+This fleet size crosses the ~55-vessel point where shipping tracks as page props stops being a clearly reasonable trade-off (data/README.md flags this; the payload is now ~690 KB). Moving `PIL_Fleet_Live_Movement.csv` behind an API route, on the same pattern already used for pricing, is a reasonable next architectural step — treated as a conscious, deferred decision for this change rather than a silent one.
 
 **To move the timeline, edit `WINDOW_START` and `STEPS` at the top of `scripts/gen-vessel-movement.mjs` and re-run it.** Those two constants are the whole window; rotations, phases, loop offsets and the ROB model are all derived, so the same fleet replays over the new dates. The script asserts every invariant in `data/README.md`'s "Refreshing" list before writing — including the one nothing at runtime checks, that every port in every rotation is actually visited — and is idempotent. Editing that CSV by hand instead will silently break those invariants.
 
@@ -39,11 +41,13 @@ Nothing in `src/` hardcodes a start or end date. The scrubbed window is **entire
 
 The generator, not the app, applies the fuel rules. Three constants in `scripts/gen-vessel-movement.mjs` carry them, and each has an invariant that fails the run if the output violates it:
 
-- `ECA_PORTS` — the 10 China/Korea ports capping sulphur at **0.10%**. A vessel is on MGO from `ECA_LEAD_STEPS` (8 = 24 h) before a berth there until `ECA_TRAIL_STEPS` (1 = 3 h) after. VLSFO is 0.50% and does **not** clear this, so switching between the two residual grades would be non-compliance dressed as compliance. Consecutive ECA calls merge into one window.
-- `NO_HSFO_PORTS` / `NO_VLSFO_PORTS` / `NO_MGO_PORTS` — 8, 5 and 5 of the 26 ports, straight off the Chief Engineer's availability sheet (see below). A scrubber vessel lifts VLSFO where there is no high-sulphur market; where there is no residual market **at all** — Chittagong, Mongla and Kolkata sell HSFO and distillate but no VLSFO — a non-scrubber hull stems nothing and must reach its next opportunity on what it carries. Qinzhou and Yangon are in all three: no confirmed bunker market of any kind. Assigning grade by scrubber fitting alone is the bug the first of these replaced; `data/README.md` records it. **`needFrom()` scans to the next call that can supply each tank separately** — a call selling HSFO but no distillate is not a distillate opportunity, and treating it as one is how a hull sails past the port it could not skip.
+- `ECA_PORTS` — the 11 China/Korea ports capping sulphur at **0.10%**. A vessel is on MGO from `ECA_LEAD_STEPS` (8 = 24 h) before a berth there until `ECA_TRAIL_STEPS` (1 = 3 h) after. VLSFO is 0.50% and does **not** clear this, so switching between the two residual grades would be non-compliance dressed as compliance. Consecutive ECA calls merge into one window. Deliberately does **not** cover the North Sea/Channel or Mediterranean SECAs the Asia-Europe services' European ports sit in in reality — an explicit, documented deferral (see `data/README.md`), not an oversight; the fleet-wide MGO tank's ~4.4-day autonomy makes folding those in a sizing exercise of its own.
+- `NO_HSFO_PORTS` / `NO_VLSFO_PORTS` / `NO_MGO_PORTS` — 11, 5 and 5 of the 38 route ports. The first eight of `NO_HSFO_PORTS` come straight off the Chief Engineer's availability sheet (see below); Algeciras, Piraeus and Malta were added for a different reason — no assessed IFO380 column exists for any of the three, so a scrubber vessel calling there would otherwise stem HSFO with nothing to price it against. A scrubber vessel lifts VLSFO where there is no high-sulphur market; where there is no residual market **at all** — Chittagong, Mongla and Kolkata sell HSFO and distillate but no VLSFO — a non-scrubber hull stems nothing and must reach its next opportunity on what it carries. Qinzhou and Yangon are in all three: no confirmed bunker market of any kind. Assigning grade by scrubber fitting alone is the bug the first of these replaced; `data/README.md` records it. **`needFrom()` scans to the next call that can supply each tank separately** — a call selling HSFO but no distillate is not a distillate opportunity, and treating it as one is how a hull sails past the port it could not skip.
 - `VLSFO_RESERVE_RATIO` / `MGO_MAX_RATIO` — scrubber vessels open 80/20 HSFO/VLSFO within `Max_ROB_MT`; the MGO tank is 0.20 × `Max_ROB_MT` and sits **outside** it. `MGO_MAX_RATIO` is duplicated as `MGO_TANK_RATIO` in `src/lib/types.ts` because the generator cannot import from `src/` — change one, change the other.
 
-`Active_Fuel` (column 9) names the burning grade per row. **Read it; do not infer it** — a tank standing still is indistinguishable from a tank not being burned, and MGO is flat all window for the 10 vessels on ECA-free rotations (BD1, BD2, CAS, YGS). `activeGradeAt` in `src/lib/vesselPosition.ts` is the only decoder.
+`Active_Fuel` (column 9) names the burning grade per row. **Read it; do not infer it** — a tank standing still is indistinguishable from a tank not being burned, and MGO is flat all window for the 19 vessels on ECA-free rotations (BD1, BD2, CAS, YGS, AE1, AE7, MEDI). `activeGradeAt` in `src/lib/vesselPosition.ts` is the only decoder.
+
+Twelve of the 27 Asia-Europe vessels (deployed on AE1, AE2, AE3 and AE5) carry `Max_ROB_MT`/`Min_ROB_MT`/`Bunkering_Trigger_MT` raised above the fleet-standard 3%/1%-of-DWT ratio, documented per-vessel in `PIL_Fleet_Vessel_Specifications.csv` `Data_Notes`. Every vessel in this fleet has an *identical* unrefuelled residual-tank range regardless of size — `Max_ROB_MT`, `Min_ROB_MT` and `Consumption_Transit_MT_Per_Day` are all fixed percentages of `DWT_MT`, so the ratios cancel to a flat ~22.2 days for any ship — and those four services each have a single leg (23-26 days, no intermediate call) that no vessel at the standard ratio can sail without bunkering mid-ocean. This is a real, checkable constraint, not a modelling gap: if you resize a vessel on one of these four services, re-derive against its longest `Transit_To_Next_Days` gap.
 
 Auxiliary and port-generator consumption is **not** modelled. MGO moves only where the main engine is on it.
 
@@ -65,7 +69,9 @@ Adding a pricing port needs both an alias entry and a `PORT_COORDS` entry, or th
 
 ### Most price columns are modelled, and nothing marks them
 
-Only 3 of the 26 ports this fleet stems at are assessed — Singapore, Busan and Shanghai. The other 23 carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `LSMGO_MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
+Only 10 of the 45 ports this fleet stems at are assessed — Singapore, Busan, Shanghai, Rotterdam, Antwerp, Hamburg, Algeciras, Piraeus, Malta and Colombo. 28 more carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `LSMGO_MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
+
+**7 route ports carry no pricing at all** — Cai Mep, Kaohsiung, Yantian, Karachi, Hazira, Mundra, Nhava Sheva, added with the Asia-Europe services. Every prior route port had some pricing coverage (assessed or modelled); these are the first that don't. A vessel still stems its published `Bunker_Quantity_MT` there in the fleet movement simulation — that logic doesn't consult pricing at all — but `bunkerPriceSnapshot()` has nothing to resolve the stem's value against, so it renders with a null price rather than a number. This is a deliberate scope boundary, not a bug: these 7 were never in scope for the modelled-pricing pass (only the 5 Europe ports with zero coverage were), and adding real pricing for them would mean inventing a basis with no CE-sheet or assessed-market anchor at all, unlike even the softest existing modelled columns.
 
 ### The Chief Engineer's sheet is the availability authority
 
@@ -100,7 +106,7 @@ Working rules:
 ### Every priced port is a marketplace, and the offers are invented
 
 `data/contracts/` is read at runtime now. [src/lib/suppliers.ts](src/lib/suppliers.ts)
-turns each of the 48 priced ports into a market per fuel type: the baseline, plus 3–5
+turns each of the 53 priced ports into a market per fuel type: the baseline, plus 3–5
 suppliers quoting against it. It reaches the UI through `markets` on
 `GET /api/prices/[portKey]`, rendered by
 [src/components/SupplierOffers.tsx](src/components/SupplierOffers.tsx) inside the port
@@ -169,3 +175,14 @@ MapLibre with CARTO Dark Matter (no API key needed). Route lines are **schematic
 - `ETA_Day_Number` / `ETD_Day_Number` are integers relative to Day 0 of the loop — **not dates**. The only real date field is `Source_Effective_Date` (`YYYY-MM-DD`) in the service master, read as an opaque string and never parsed.
 - `Key_Features` packs several bullets into one cell separated by `;`.
 - `Schedule_Data_Status = "Unavailable in source"` marks rows whose weekdays the source PDF didn't publish; the panels branch on this string to show an explanatory note instead of empty columns. Don't fill such rows in with derived values — provenance is tracked per row via `Source_File` and `Data_Notes`.
+
+### Asia-Europe services (AE1-AE7, MEDI, EUROMED)
+
+20 services now, not 11 — `Trade_Region` is `"Asia-Europe"` for these 9, not `"Intra Asia"`, and the page header logic ([src/app/page.tsx](src/app/page.tsx)) counts distinct `Trade_Region` values rather than assuming one. Sourced from the "Main - PIL Intra Asia + Europe Services" Google Drive workbook, a separate document from the two Intra Asia sources the filenames still reference (`data/schedules/PIL_Intra_Asia_*.csv` — left as-is; renaming touches enough files that it was scoped out, see `data/README.md`).
+
+What's specific to these nine, beyond the counts already folded into the sections above:
+
+- AE1-AE7 are deep-sea Europe mainline strings (64-96 day loops); MEDI and EUROMED are Mediterranean/Suez loops with much shorter individual legs (≤7 days) because they route through Colombo, Port Said and the Med bunkering hubs rather than jumping straight from Singapore to North Europe.
+- `src/lib/searoutes.ts` gained an entire westward corridor — Arabian Sea, Gulf of Aden, Red Sea, Suez, Mediterranean, Gibraltar, Atlantic, Channel, North Sea — roughly 33 new nodes chaining off the existing `BENGAL_S` node. Ports that already had `PORT_COORDS` but no `PORT_APPROACH` (Rotterdam, Antwerp, Hamburg, Piraeus, Malta, Algeciras, Colombo) picked up an approach node here for the first time too; before this they rendered as direct arcs despite having coordinates.
+- `Transit_Times.csv` was **not** extended for these 9 — the source has no independent pairwise transit matrix for them, only the adjacent-leg figures already in `Port_Calls.Transit_To_Next_Days`, matching the sparse-coverage precedent already set by YGS.
+- None of the 12 new ports get `NO_HSFO_PORTS`/`NO_VLSFO_PORTS`/`NO_MGO_PORTS` entries beyond the 3 IFO380-pricing exceptions noted above — there's no Chief Engineer sheet coverage for any of them, so the generator's default (full 3-grade availability) applies. Flagged as an explicit assumption, not a finding.

@@ -35,6 +35,14 @@ const HUB_HEADER = {
   CNSHA: "SHANGHAI",
   HKHKG: "HONGKONG",
   KRPUS: "BUSAN",
+  // Added with the Asia-Europe services: Rotterdam is the sole hub the five
+  // new modelled European ports use (by decision, not proximity — see
+  // bunker_basis.csv Rationale). Antwerp and Hamburg are not used as hubs
+  // here but are listed for completeness; Hamburg carries no assessed IFO380
+  // column, so it can never be an IFO380 hub regardless.
+  NLRTM: "ROTERDAM",
+  BEANR: "ANTWERP",
+  DEHAM: "HAMBURG",
 };
 
 /**
@@ -75,6 +83,16 @@ const PORT_HEADER = {
   IDJKT: "JAKARTA",
   IDSUB: "SURABAYA",
   IDSRG: "SEMARANG",
+
+  // Five more modelled ports added with the Asia-Europe services. All five
+  // hub off Rotterdam by decision (see bunker_basis.csv), with no Chief
+  // Engineer sheet coverage backing the basis — the softest priced columns
+  // in the app.
+  FRLEH: "LEHAVRE",
+  GBSOU: "SOUTHAMPTON",
+  GBFXT: "FELIXSTOWE",
+  EGPSD: "PORTSAID",
+  ESVLC: "VALENCIA",
 };
 
 /**

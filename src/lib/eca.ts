@@ -14,12 +14,14 @@
  */
 
 /**
- * The 10 China/Korea ports capping sulphur at 0.10%.
+ * The 11 China/Korea ports capping sulphur at 0.10%.
  *
  * A vessel runs MGO from a day before berthing here until shortly after
  * departure. VLSFO is a 0.50% grade and does not clear this cap — switching
  * between the two residual grades would be non-compliance dressed as
- * compliance.
+ * compliance. Deliberately does NOT include the North Sea/Channel or
+ * Mediterranean SECAs the Asia-Europe services' European ports sit in in
+ * reality — out of scope, see data/README.md.
  */
 export const ECA_PORTS: ReadonlySet<string> = new Set([
   "CNNGB", // Ningbo
@@ -30,15 +32,19 @@ export const ECA_PORTS: ReadonlySet<string> = new Set([
   "CNTAO", // Qingdao
   "CNTSN", // Tianjin
   "CNXMN", // Xiamen
+  "CNYTN", // Yantian
   "KRINC", // Incheon
   "KRPUS", // Busan
 ]);
 
 /**
- * The 8 ports with no high-sulphur market.
+ * The 11 ports with no high-sulphur market.
  *
  * A scrubber-fitted hull calling here lifts VLSFO instead. Assigning grade by
  * scrubber fitting alone is the bug this set replaced — see data/README.md.
+ * Algeciras/Piraeus/Malta are here for a different reason than the first
+ * eight: not a CE-sheet finding, but the absence of an assessed IFO380
+ * column for any of the three.
  */
 export const NO_HSFO_PORTS: ReadonlySet<string> = new Set([
   "CNNSA", // Nansha
@@ -49,6 +55,9 @@ export const NO_HSFO_PORTS: ReadonlySet<string> = new Set([
   "MMRGN", // Yangon
   "VNHPH", // Haiphong
   "VNUIH", // Qui Nhon
+  "ESALG", // Algeciras - no priced IFO380 market
+  "GRPIR", // Piraeus - no priced IFO380 market
+  "MTMLA", // Malta - no priced IFO380 market
 ]);
 
 /**

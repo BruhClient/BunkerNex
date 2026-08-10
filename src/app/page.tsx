@@ -31,11 +31,17 @@ export default function Page() {
 
   // One sub-region reads better named ("Intra Asia · East Coast India"); with
   // several loaded at once, naming only the first service's would be wrong.
+  // Same reasoning applies one level up now that a second Trade_Region
+  // ("Asia-Europe") exists alongside "Intra Asia" — services[0] is no longer
+  // representative of the whole dataset.
+  const tradeRegions = [...new Set(services.map((s) => s.tradeRegion))];
   const subRegions = [...new Set(services.map((s) => s.subRegion))];
   const region = services[0]
-    ? subRegions.length === 1
-      ? `${services[0].tradeRegion} · ${subRegions[0]}`
-      : `${services[0].tradeRegion} · ${subRegions.length} sub-regions`
+    ? tradeRegions.length === 1
+      ? subRegions.length === 1
+        ? `${tradeRegions[0]} · ${subRegions[0]}`
+        : `${tradeRegions[0]} · ${subRegions.length} sub-regions`
+      : `${tradeRegions.length} trade regions · ${subRegions.length} sub-regions`
     : "";
 
   return (
