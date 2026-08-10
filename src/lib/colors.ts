@@ -54,11 +54,22 @@ export function serviceColor(code: string): string {
   return SERVICE_COLORS[code] ?? SERVICE_COLOR_FALLBACK;
 }
 
+/**
+ * Residuals warm, distillates green, alternative fuels cyan-to-violet.
+ *
+ * The alternatives sit off the fossil ramp deliberately: a B24 quote is not a
+ * like-for-like buy against the VLSFO tile beside it, and a single continuous
+ * scale invites exactly that comparison.
+ */
 export const GRADE_COLORS: Record<Grade, string> = {
   VLSFO: "#38BDF8",
   IFO380: "#F59E0B",
   LSMGO: "#34D399",
   MGO: "#A3E635",
+  MDO: "#84CC16",
+  LNG: "#22D3EE",
+  B24: "#4ADE80",
+  B40: "#16A34A",
   MEOH: "#C084FC",
   MEOH_VLSFOe: "#E879F9",
   MEOH_MGOe: "#F0ABFC",
@@ -71,6 +82,12 @@ export const GRADE_LABELS: Record<Grade, string> = {
   IFO380: "IFO380",
   LSMGO: "LSMGO",
   MGO: "MGO",
+  MDO: "MDO",
+  LNG: "LNG",
+  // Labelled by blend rather than as "biofuel": B24 and B40 are different
+  // products at different ports, and the source sheet distinguishes them.
+  B24: "B24 biofuel",
+  B40: "B40 biofuel",
   MEOH: "Methanol",
   MEOH_VLSFOe: "MEOH (VLSFOe)",
   MEOH_MGOe: "MEOH (MGOe)",
@@ -83,6 +100,10 @@ export const GRADE_ORDER: Grade[] = [
   "IFO380",
   "LSMGO",
   "MGO",
+  "MDO",
+  "LNG",
+  "B24",
+  "B40",
   "MEOH",
   "MEOH_VLSFOe",
   "MEOH_MGOe",

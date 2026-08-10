@@ -8,20 +8,28 @@ AEFJR,MGO,Monjasa,2,2,Barge,400,3500,7,30,425,Prompt,simulated,Differential agai
 AEFJR,MEOH,Emirates National Oil Company,4,0,Barge,250,2000,7,30,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 AEFJR,MEOH,TotalEnergies Marine Fuels,1,6,Barge,850,5000,8,45,475,Enquire,simulated,Differential against the port baseline; see data/README.md
 AEFJR,MEOH,Royal Dutch Shell,1,9,Barge,950,4500,7,45,625,Prompt,simulated,Differential against the port baseline; see data/README.md
-BDCGP,VLSFO,Monjasa,2,-6,Barge,350,3500,6,15,700,5 days,simulated,Differential against the port baseline; see data/README.md
-BDCGP,VLSFO,Meghna Petroleum,4,-5,Barge,150,2000,6,15,600,5 days,simulated,Differential against the port baseline; see data/README.md
-BDCGP,VLSFO,Padma Oil Company,4,-4,Ex-wharf,150,2500,5,15,750,Prompt,simulated,Differential against the port baseline; see data/README.md
-BDCGP,VLSFO,GAC Bunker Fuels Ltd.,2,-1,Barge,500,2500,6,15,525,Prompt,simulated,Differential against the port baseline; see data/README.md
+BDCGP,IFO380,Monjasa,2,-8.5,Ex-wharf,300,2000,5,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
+BDCGP,IFO380,Padma Oil Company,4,2.5,Barge,200,1500,8,30,650,5 days,simulated,Differential against the port baseline; see data/README.md
+BDCGP,IFO380,Meghna Petroleum,4,5,Barge,250,2000,7,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 BDCGP,MGO,Monjasa,2,-8,Ex-wharf,500,3500,8,15,750,Prompt,simulated,Differential against the port baseline; see data/README.md
 BDCGP,MGO,Padma Oil Company,4,-5.5,Barge,200,2500,9,15,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 BDCGP,MGO,GAC Bunker Fuels Ltd.,2,1,Barge,350,2000,7,30,550,5 days,simulated,Differential against the port baseline; see data/README.md
-BDMGL,VLSFO,Meghna Petroleum,4,-6,Barge,300,2500,9,15,700,Enquire,simulated,Differential against the port baseline; see data/README.md
-BDMGL,VLSFO,Padma Oil Company,4,-1,Barge,100,3000,8,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
-BDMGL,VLSFO,Monjasa,2,0.5,Barge,250,3000,6,30,625,5 days,simulated,Differential against the port baseline; see data/README.md
+BDCGP,MDO,Monjasa,2,-5.5,Barge,250,3500,6,15,425,Enquire,simulated,Differential against the port baseline; see data/README.md
+BDCGP,MDO,GAC Bunker Fuels Ltd.,2,-2.5,Barge,450,2500,9,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+BDCGP,MDO,Meghna Petroleum,4,-2,Ex-wharf,250,2000,8,15,775,Enquire,simulated,Differential against the port baseline; see data/README.md
+BDCGP,MDO,Padma Oil Company,4,-2,Barge,300,2500,8,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
+BDMGL,IFO380,GAC Bunker Fuels Ltd.,2,-5.5,Ex-wharf,250,3500,7,15,775,Prompt,simulated,Differential against the port baseline; see data/README.md
+BDMGL,IFO380,Monjasa,2,-5.5,Ex-wharf,450,3500,7,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
+BDMGL,IFO380,Meghna Petroleum,4,1.5,Ex-wharf,250,2000,6,30,750,Enquire,simulated,Differential against the port baseline; see data/README.md
+BDMGL,IFO380,Padma Oil Company,4,2,Ex-wharf,250,1500,9,30,800,Prompt,simulated,Differential against the port baseline; see data/README.md
 BDMGL,MGO,Padma Oil Company,4,-3.5,Barge,250,2000,7,15,475,Enquire,simulated,Differential against the port baseline; see data/README.md
 BDMGL,MGO,GAC Bunker Fuels Ltd.,2,0.5,Ex-wharf,450,4000,8,30,675,Enquire,simulated,Differential against the port baseline; see data/README.md
 BDMGL,MGO,Monjasa,2,1,Barge,350,3500,8,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 BDMGL,MGO,Meghna Petroleum,4,2.5,Barge,250,1500,9,30,575,5 days,simulated,Differential against the port baseline; see data/README.md
+BDMGL,MDO,Monjasa,2,-5,Barge,350,2000,7,15,575,Enquire,simulated,Differential against the port baseline; see data/README.md
+BDMGL,MDO,Meghna Petroleum,4,1,Barge,200,2500,6,30,550,5 days,simulated,Differential against the port baseline; see data/README.md
+BDMGL,MDO,GAC Bunker Fuels Ltd.,2,2.5,Barge,400,4000,8,30,600,Prompt,simulated,Differential against the port baseline; see data/README.md
+BDMGL,MDO,Padma Oil Company,4,3,Barge,100,2500,7,30,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 BEANR,VLSFO,ExxonMobil Corporation,1,7,Barge,850,5500,7,45,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 BEANR,VLSFO,BP PLC,1,9.5,Barge,650,5000,7,45,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 BEANR,VLSFO,TotalEnergies Marine Fuels,1,12,Barge,950,4500,6,45,525,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -62,48 +70,52 @@ CNNGB,IFO380,China Marine Bunker (Chimbusco),4,2,Ex-wharf,250,3000,4,30,700,5 da
 CNNGB,IFO380,PetroChina Fuel Oil,4,2.5,Barge,200,2500,7,30,525,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNNGB,IFO380,Bunker Holding A/S,2,3,Barge,450,2000,3,30,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNNGB,IFO380,Sinopec Zhoushan Petroleum,4,3,Barge,300,3000,5,30,475,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNNGB,MGO,Sinopec Zhoushan Petroleum,4,-5.5,Barge,200,2000,6,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNNGB,MGO,China Marine Bunker (Chimbusco),4,-3.5,Ex-wharf,150,2500,6,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNNGB,MGO,PetroChina Fuel Oil,4,2.5,Barge,200,2500,3,30,700,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNGB,LSMGO,PetroChina Fuel Oil,4,-4.5,Barge,150,1500,6,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNGB,LSMGO,Sinopec Zhoushan Petroleum,4,-0.5,Barge,150,1500,4,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNGB,LSMGO,China Marine Bunker (Chimbusco),4,0,Barge,250,2000,7,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNGB,LNG,PetroChina Fuel Oil,4,-1.5,Ex-wharf,250,2000,8,15,725,5 days,simulated,Differential against the port baseline; see data/README.md
+CNNGB,LNG,Sinopec Zhoushan Petroleum,4,-1.5,Barge,300,1500,5,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNGB,LNG,China Marine Bunker (Chimbusco),4,2.5,Barge,300,2500,5,30,675,5 days,simulated,Differential against the port baseline; see data/README.md
+CNNGB,B24,Sinopec Zhoushan Petroleum,4,-2.5,Pipeline,250,3000,5,15,800,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNNGB,B24,China Marine Bunker (Chimbusco),4,-1,Ex-wharf,100,2000,8,15,775,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNNGB,B24,PetroChina Fuel Oil,4,-0.5,Barge,250,2000,5,15,525,5 days,simulated,Differential against the port baseline; see data/README.md
+CNNGB,MEOH,PetroChina Fuel Oil,4,-1,Barge,250,3000,7,15,475,5 days,simulated,Differential against the port baseline; see data/README.md
+CNNGB,MEOH,China Marine Bunker (Chimbusco),4,2,Ex-wharf,150,2500,9,30,625,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNNGB,MEOH,Shenergy Group,3,50.5,Barge,150,1000,7,45,575,5 days,simulated,Differential against the port baseline; see data/README.md
 CNNSA,VLSFO,China Marine Bunker (Chimbusco),4,-5.5,Ex-wharf,100,3000,6,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNNSA,VLSFO,Brightoil Petroleum,2,-4.5,Barge,450,4000,6,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNNSA,VLSFO,Sinopec Zhoushan Petroleum,4,0,Ex-wharf,150,1500,6,30,650,5 days,simulated,Differential against the port baseline; see data/README.md
 CNNSA,VLSFO,PetroChina Fuel Oil,4,1.5,Barge,150,3000,5,30,675,5 days,simulated,Differential against the port baseline; see data/README.md
-CNNSA,IFO380,PetroChina Fuel Oil,4,-4.5,Barge,100,2000,5,15,425,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNNSA,IFO380,Brightoil Petroleum,2,-3.5,Ex-wharf,400,3500,5,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
-CNNSA,IFO380,China Marine Bunker (Chimbusco),4,-2,Barge,200,1500,8,15,600,5 days,simulated,Differential against the port baseline; see data/README.md
-CNNSA,IFO380,Sinopec Zhoushan Petroleum,4,2.5,Ex-wharf,150,2000,9,30,625,5 days,simulated,Differential against the port baseline; see data/README.md
-CNNSA,MGO,Brightoil Petroleum,2,-7.5,Barge,250,3500,5,15,450,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNNSA,MGO,PetroChina Fuel Oil,4,-2,Barge,200,2000,7,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNNSA,MGO,Sinopec Zhoushan Petroleum,4,5,Barge,150,1500,5,30,450,5 days,simulated,Differential against the port baseline; see data/README.md
-CNQZH,VLSFO,Sinopec Zhoushan Petroleum,4,-6,Barge,200,3000,9,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNQZH,VLSFO,China Marine Bunker (Chimbusco),4,-4,Ex-wharf,150,1500,6,15,700,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNQZH,VLSFO,Brightoil Petroleum,2,3.5,Barge,300,2500,5,30,675,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNQZH,VLSFO,PetroChina Fuel Oil,4,4,Barge,200,2500,8,30,575,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNQZH,IFO380,China Marine Bunker (Chimbusco),4,-2.5,Ex-wharf,150,3000,9,15,700,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNQZH,IFO380,Sinopec Zhoushan Petroleum,4,0,Ex-wharf,250,2000,6,30,600,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNQZH,IFO380,Brightoil Petroleum,2,2,Barge,350,4000,7,30,400,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNQZH,MGO,China Marine Bunker (Chimbusco),4,-2.5,Barge,200,3000,5,15,575,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNQZH,MGO,Brightoil Petroleum,2,-2,Barge,350,2500,5,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNQZH,MGO,PetroChina Fuel Oil,4,-2,Ex-wharf,100,2500,8,15,700,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNQZH,MGO,Sinopec Zhoushan Petroleum,4,4.5,Barge,200,1500,6,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNSA,LSMGO,China Marine Bunker (Chimbusco),4,-6.5,Ex-wharf,150,1500,9,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNNSA,LSMGO,Brightoil Petroleum,2,-4,Barge,350,3000,7,15,425,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNNSA,LSMGO,PetroChina Fuel Oil,4,-4,Barge,250,2500,9,15,400,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNNSA,LSMGO,Sinopec Zhoushan Petroleum,4,-2.5,Pipeline,100,1500,9,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
 CNSHA,VLSFO,China Marine Bunker (Chimbusco),4,-5.5,Barge,300,2000,3,15,475,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHA,VLSFO,Dan-Bunkering,2,-1,Barge,400,3000,6,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHA,VLSFO,Sinopec Zhoushan Petroleum,4,2.5,Pipeline,200,2000,7,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,IFO380,KPI Bridge Oil A/S,2,-3.5,Barge,350,2500,3,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,IFO380,Brightoil Petroleum,2,-1.5,Barge,450,3500,4,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,IFO380,PetroChina Fuel Oil,4,-1.5,Ex-wharf,300,2500,4,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,IFO380,Sinopec Zhoushan Petroleum,4,3.5,Barge,200,2000,7,30,450,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,IFO380,Vitol Bunkers,2,4,Barge,350,3000,5,30,700,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,LSMGO,China Marine Bunker (Chimbusco),4,-5,Ex-wharf,200,2000,6,15,750,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,LSMGO,Sinopec Zhoushan Petroleum,4,0.5,Barge,250,3000,4,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,LSMGO,Dan-Bunkering,2,1,Barge,500,2000,6,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHA,MGO,Brightoil Petroleum,2,0,Barge,250,4000,7,30,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHA,MGO,China Marine Bunker (Chimbusco),4,1,Ex-wharf,150,3000,6,30,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHA,MGO,KPI Bridge Oil A/S,2,1.5,Ex-wharf,400,2500,6,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHA,MGO,Sinopec Zhoushan Petroleum,4,1.5,Barge,150,2500,6,30,400,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNSHA,MGO,Royal Dutch Shell,1,6.5,Barge,700,4500,7,45,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNSHA,LNG,Vitol Bunkers,2,-7,Barge,350,3000,6,15,475,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNSHA,LNG,China Marine Bunker (Chimbusco),4,-2.5,Barge,200,2000,8,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNSHA,LNG,Royal Dutch Shell,1,7.5,Barge,800,4500,9,45,550,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHK,VLSFO,China Marine Bunker (Chimbusco),4,-5,Barge,150,2500,8,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
 CNSHK,VLSFO,PetroChina Fuel Oil,4,-2,Barge,200,1500,6,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNSHK,VLSFO,Brightoil Petroleum,2,0,Barge,300,2000,7,30,600,5 days,simulated,Differential against the port baseline; see data/README.md
-CNSHK,IFO380,China Marine Bunker (Chimbusco),4,-7,Ex-wharf,200,2000,5,15,675,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNSHK,IFO380,Sinopec Zhoushan Petroleum,4,-6,Ex-wharf,150,2000,6,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
-CNSHK,IFO380,PetroChina Fuel Oil,4,4,Pipeline,150,2500,5,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNSHK,MGO,China Marine Bunker (Chimbusco),4,-3.5,Ex-wharf,300,2500,5,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
-CNSHK,MGO,Sinopec Zhoushan Petroleum,4,1.5,Barge,200,2500,7,30,450,5 days,simulated,Differential against the port baseline; see data/README.md
-CNSHK,MGO,PetroChina Fuel Oil,4,3,Barge,250,3000,9,30,500,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNSHK,LSMGO,Brightoil Petroleum,2,-4.5,Barge,250,2500,6,15,525,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNSHK,LSMGO,China Marine Bunker (Chimbusco),4,-4,Barge,200,2500,9,15,500,5 days,simulated,Differential against the port baseline; see data/README.md
+CNSHK,LSMGO,Sinopec Zhoushan Petroleum,4,-2,Barge,200,2500,5,15,400,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNSHK,LSMGO,PetroChina Fuel Oil,4,2.5,Ex-wharf,250,2000,7,30,750,5 days,simulated,Differential against the port baseline; see data/README.md
 CNTAO,VLSFO,Sinopec Zhoushan Petroleum,4,-2,Pipeline,200,2500,5,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNTAO,VLSFO,Brightoil Petroleum,2,0.5,Ex-wharf,500,2500,8,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNTAO,VLSFO,PetroChina Fuel Oil,4,3,Barge,100,2000,6,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -111,10 +123,10 @@ CNTAO,IFO380,Brightoil Petroleum,2,-8,Barge,450,3000,5,15,600,5 days,simulated,D
 CNTAO,IFO380,PetroChina Fuel Oil,4,-3,Ex-wharf,200,1500,7,15,750,5 days,simulated,Differential against the port baseline; see data/README.md
 CNTAO,IFO380,Sinopec Zhoushan Petroleum,4,2,Ex-wharf,150,1500,7,30,750,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNTAO,IFO380,China Marine Bunker (Chimbusco),4,4.5,Barge,200,2500,6,30,450,5 days,simulated,Differential against the port baseline; see data/README.md
-CNTAO,MGO,Brightoil Petroleum,2,-2.5,Ex-wharf,250,4000,5,15,775,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNTAO,MGO,PetroChina Fuel Oil,4,-1,Barge,250,1500,8,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNTAO,MGO,Sinopec Zhoushan Petroleum,4,0,Barge,150,2000,6,30,450,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNTAO,MGO,China Marine Bunker (Chimbusco),4,0.5,Ex-wharf,200,2000,7,30,650,5 days,simulated,Differential against the port baseline; see data/README.md
+CNTAO,LSMGO,Brightoil Petroleum,2,-2.5,Barge,500,3500,6,15,475,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNTAO,LSMGO,Sinopec Zhoushan Petroleum,4,-2.5,Ex-wharf,300,1500,6,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNTAO,LSMGO,China Marine Bunker (Chimbusco),4,1,Pipeline,250,2000,6,30,775,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNTAO,LSMGO,PetroChina Fuel Oil,4,1.5,Ex-wharf,150,3000,7,30,700,Prompt,simulated,Differential against the port baseline; see data/README.md
 CNTSN,VLSFO,China Marine Bunker (Chimbusco),4,-3,Barge,100,2500,8,15,675,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNTSN,VLSFO,Brightoil Petroleum,2,0,Barge,450,3000,9,30,625,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNTSN,VLSFO,PetroChina Fuel Oil,4,0,Barge,150,2500,9,30,550,Enquire,simulated,Differential against the port baseline; see data/README.md
@@ -122,10 +134,9 @@ CNTSN,VLSFO,Sinopec Zhoushan Petroleum,4,2.5,Pipeline,100,3000,7,30,750,Enquire,
 CNTSN,IFO380,Brightoil Petroleum,2,-2.5,Barge,400,3000,9,15,500,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNTSN,IFO380,PetroChina Fuel Oil,4,-0.5,Ex-wharf,150,2000,8,15,725,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNTSN,IFO380,Sinopec Zhoushan Petroleum,4,1,Ex-wharf,250,1500,7,30,775,5 days,simulated,Differential against the port baseline; see data/README.md
-CNTSN,MGO,Brightoil Petroleum,2,-5,Barge,200,3500,6,15,525,Prompt,simulated,Differential against the port baseline; see data/README.md
-CNTSN,MGO,PetroChina Fuel Oil,4,-5,Barge,200,2000,9,15,500,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNTSN,MGO,China Marine Bunker (Chimbusco),4,0.5,Barge,300,2000,6,30,600,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNTSN,MGO,Sinopec Zhoushan Petroleum,4,3.5,Ex-wharf,300,2000,5,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNTSN,LSMGO,PetroChina Fuel Oil,4,-2.5,Barge,150,1500,9,15,550,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNTSN,LSMGO,China Marine Bunker (Chimbusco),4,-1.5,Pipeline,250,2000,6,15,625,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNTSN,LSMGO,Sinopec Zhoushan Petroleum,4,3,Barge,100,2500,6,30,650,5 days,simulated,Differential against the port baseline; see data/README.md
 CNXMN,VLSFO,China Marine Bunker (Chimbusco),4,-4.5,Barge,250,3000,6,15,450,5 days,simulated,Differential against the port baseline; see data/README.md
 CNXMN,VLSFO,Brightoil Petroleum,2,-1.5,Barge,450,3000,9,15,450,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNXMN,VLSFO,PetroChina Fuel Oil,4,0,Ex-wharf,150,2000,5,30,800,Enquire,simulated,Differential against the port baseline; see data/README.md
@@ -133,10 +144,10 @@ CNXMN,IFO380,PetroChina Fuel Oil,4,-1.5,Barge,250,2000,6,15,600,Enquire,simulate
 CNXMN,IFO380,China Marine Bunker (Chimbusco),4,-1,Barge,100,3000,8,15,550,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNXMN,IFO380,Brightoil Petroleum,2,0,Ex-wharf,350,3500,7,30,625,Enquire,simulated,Differential against the port baseline; see data/README.md
 CNXMN,IFO380,Sinopec Zhoushan Petroleum,4,3.5,Ex-wharf,150,2000,8,30,725,5 days,simulated,Differential against the port baseline; see data/README.md
-CNXMN,MGO,Brightoil Petroleum,2,-7.5,Barge,200,2500,6,15,675,5 days,simulated,Differential against the port baseline; see data/README.md
-CNXMN,MGO,China Marine Bunker (Chimbusco),4,-4,Ex-wharf,150,3000,8,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
-CNXMN,MGO,PetroChina Fuel Oil,4,-2,Barge,200,2500,5,15,450,Enquire,simulated,Differential against the port baseline; see data/README.md
-CNXMN,MGO,Sinopec Zhoushan Petroleum,4,3.5,Barge,100,1500,7,30,525,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNXMN,LSMGO,Brightoil Petroleum,2,-7.5,Barge,200,2500,6,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNXMN,LSMGO,China Marine Bunker (Chimbusco),4,-6.5,Ex-wharf,200,2000,5,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+CNXMN,LSMGO,Sinopec Zhoushan Petroleum,4,1.5,Barge,200,1500,9,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+CNXMN,LSMGO,PetroChina Fuel Oil,4,2.5,Barge,150,3000,8,30,550,Enquire,simulated,Differential against the port baseline; see data/README.md
 DEHAM,VLSFO,KPI Bridge Oil A/S,2,-6,Barge,250,3500,5,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 DEHAM,VLSFO,Vitol Bunkers,2,-3.5,Barge,300,2500,7,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
 DEHAM,VLSFO,Bomin Bunker Oil Corp.,2,-1.5,Barge,350,2500,6,15,575,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -176,46 +187,53 @@ HKHKG,MGO,Royal Dutch Shell,1,8.5,Ex-wharf,900,6000,4,45,625,5 days,simulated,Di
 IDJKT,VLSFO,AKR Corporindo,4,-5,Ex-wharf,200,2000,4,15,725,5 days,simulated,Differential against the port baseline; see data/README.md
 IDJKT,VLSFO,Petro Andalan Nusantara,4,-4,Barge,150,3000,6,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 IDJKT,VLSFO,Pertamina Patra Niaga,4,-3,Pipeline,100,1500,4,15,775,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDJKT,IFO380,Bunker Holding A/S,2,-1,Barge,250,2000,8,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDJKT,IFO380,Pertamina Patra Niaga,4,-1,Barge,250,1500,8,15,425,5 days,simulated,Differential against the port baseline; see data/README.md
+IDJKT,IFO380,GAC Bunker Fuels Ltd.,2,0,Barge,350,2000,5,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDJKT,IFO380,Monjasa,2,0,Barge,350,3500,9,30,500,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDJKT,MGO,AKR Corporindo,4,-1,Barge,200,2500,3,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 IDJKT,MGO,Pertamina Patra Niaga,4,-0.5,Barge,150,3000,3,15,475,Prompt,simulated,Differential against the port baseline; see data/README.md
 IDJKT,MGO,Monjasa,2,1.5,Barge,450,3000,5,30,500,5 days,simulated,Differential against the port baseline; see data/README.md
 IDJKT,MGO,Petro Andalan Nusantara,4,2.5,Pipeline,150,2000,6,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDJKT,B40,Pertamina Patra Niaga,4,-7,Ex-wharf,250,2500,8,15,600,Enquire,simulated,Differential against the port baseline; see data/README.md
+IDJKT,B40,Petro Andalan Nusantara,4,-2.5,Barge,250,2000,7,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDJKT,B40,AKR Corporindo,4,-0.5,Barge,100,2500,8,15,675,5 days,simulated,Differential against the port baseline; see data/README.md
 IDSRG,VLSFO,Monjasa,2,-8,Barge,200,2500,6,15,600,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDSRG,VLSFO,Pertamina Patra Niaga,4,-6,Ex-wharf,250,2000,5,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDSRG,VLSFO,GAC Bunker Fuels Ltd.,2,-4,Ex-wharf,250,3000,9,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDSRG,VLSFO,AKR Corporindo,4,0,Ex-wharf,250,2500,6,30,800,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDSRG,VLSFO,Petro Andalan Nusantara,4,0,Pipeline,100,2500,8,30,700,5 days,simulated,Differential against the port baseline; see data/README.md
+IDSRG,IFO380,Monjasa,2,-7.5,Barge,200,3500,9,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSRG,IFO380,Pertamina Patra Niaga,4,-1,Barge,200,3000,7,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSRG,IFO380,GAC Bunker Fuels Ltd.,2,1,Barge,500,3500,9,30,525,Prompt,simulated,Differential against the port baseline; see data/README.md
 IDSRG,MGO,GAC Bunker Fuels Ltd.,2,-6,Barge,250,3000,6,15,675,5 days,simulated,Differential against the port baseline; see data/README.md
 IDSRG,MGO,Pertamina Patra Niaga,4,-4,Barge,200,1500,5,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 IDSRG,MGO,AKR Corporindo,4,-3.5,Barge,100,2000,7,15,525,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDSUB,VLSFO,Pertamina Patra Niaga,4,-4,Ex-wharf,250,2500,6,15,625,Enquire,simulated,Differential against the port baseline; see data/README.md
 IDSUB,VLSFO,Monjasa,2,3,Barge,200,3500,5,30,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 IDSUB,VLSFO,AKR Corporindo,4,4,Barge,200,2000,6,30,550,5 days,simulated,Differential against the port baseline; see data/README.md
-IDSUB,MGO,GAC Bunker Fuels Ltd.,2,-1,Barge,250,4000,5,15,500,Enquire,simulated,Differential against the port baseline; see data/README.md
-IDSUB,MGO,Monjasa,2,-1,Barge,400,4000,8,15,450,Enquire,simulated,Differential against the port baseline; see data/README.md
-IDSUB,MGO,Pertamina Patra Niaga,4,2.5,Barge,150,2000,6,30,675,5 days,simulated,Differential against the port baseline; see data/README.md
-IDSUB,MGO,AKR Corporindo,4,3,Barge,150,2500,7,30,400,Prompt,simulated,Differential against the port baseline; see data/README.md
-IDSUB,MGO,Petro Andalan Nusantara,4,4,Barge,250,2500,7,30,500,Enquire,simulated,Differential against the port baseline; see data/README.md
-INCCU,VLSFO,Indian Oil Corporation,4,-2.5,Barge,200,2500,4,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
-INCCU,VLSFO,GAC Bunker Fuels Ltd.,2,0,Barge,450,3500,4,30,500,Prompt,simulated,Differential against the port baseline; see data/README.md
-INCCU,VLSFO,Hindustan Petroleum,4,0,Barge,250,1500,5,30,600,5 days,simulated,Differential against the port baseline; see data/README.md
-INCCU,MGO,Bharat Petroleum,4,-5.5,Ex-wharf,150,2000,3,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
-INCCU,MGO,Bunker Holding A/S,2,-4.5,Ex-wharf,350,2000,3,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
-INCCU,MGO,Indian Oil Corporation,4,1,Ex-wharf,150,1500,6,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
-INCCU,MGO,Hindustan Petroleum,4,1.5,Ex-wharf,100,3000,4,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSUB,LSMGO,GAC Bunker Fuels Ltd.,2,-7.5,Barge,450,3000,8,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSUB,LSMGO,Petro Andalan Nusantara,4,-2,Ex-wharf,200,2000,7,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSUB,LSMGO,AKR Corporindo,4,3,Barge,100,2000,8,30,525,Enquire,simulated,Differential against the port baseline; see data/README.md
+IDSUB,LSMGO,Pertamina Patra Niaga,4,4,Barge,150,2000,7,30,650,Enquire,simulated,Differential against the port baseline; see data/README.md
+IDSUB,B40,Petro Andalan Nusantara,4,-3.5,Ex-wharf,150,2500,9,15,800,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSUB,B40,AKR Corporindo,4,-3,Barge,100,2500,5,15,525,Prompt,simulated,Differential against the port baseline; see data/README.md
+IDSUB,B40,Pertamina Patra Niaga,4,1.5,Barge,250,2500,5,30,525,5 days,simulated,Differential against the port baseline; see data/README.md
+INCCU,IFO380,Indian Oil Corporation,4,-3.5,Barge,250,2000,3,15,425,5 days,simulated,Differential against the port baseline; see data/README.md
+INCCU,IFO380,Bharat Petroleum,4,-1,Ex-wharf,100,2500,4,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+INCCU,IFO380,GAC Bunker Fuels Ltd.,2,-0.5,Barge,300,3000,3,15,400,Prompt,simulated,Differential against the port baseline; see data/README.md
+INCCU,IFO380,Hindustan Petroleum,4,0,Ex-wharf,150,2000,3,30,800,Prompt,simulated,Differential against the port baseline; see data/README.md
+INCCU,IFO380,Monjasa,2,4,Barge,300,3500,3,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 INGAV,VLSFO,Hindustan Petroleum,4,-1.5,Ex-wharf,250,3000,6,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
 INGAV,VLSFO,Indian Oil Corporation,4,1,Ex-wharf,100,2500,7,30,725,Enquire,simulated,Differential against the port baseline; see data/README.md
 INGAV,VLSFO,Bharat Petroleum,4,2.5,Barge,200,3000,5,30,675,Enquire,simulated,Differential against the port baseline; see data/README.md
 INGAV,VLSFO,Monjasa,2,3.5,Barge,350,3000,6,30,525,Prompt,simulated,Differential against the port baseline; see data/README.md
-INGAV,MGO,Indian Oil Corporation,4,-5.5,Barge,250,1500,6,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
-INGAV,MGO,Monjasa,2,-5.5,Barge,450,2000,9,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
-INGAV,MGO,Bharat Petroleum,4,0,Pipeline,200,2000,8,30,700,5 days,simulated,Differential against the port baseline; see data/README.md
 INMAA,VLSFO,Bunker Holding A/S,2,-3,Barge,400,2500,7,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 INMAA,VLSFO,BGN International,2,-1.5,Barge,300,3000,3,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 INMAA,VLSFO,Hindustan Petroleum,4,-1.5,Ex-wharf,100,3000,5,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 INMAA,VLSFO,GAC Bunker Fuels Ltd.,2,-0.5,Barge,500,2000,6,15,525,Enquire,simulated,Differential against the port baseline; see data/README.md
 INMAA,IFO380,BGN International,2,-6,Barge,350,2000,5,15,400,Prompt,simulated,Differential against the port baseline; see data/README.md
-INMAA,IFO380,Bunker Holding A/S,2,-3,Ex-wharf,500,3000,6,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+INMAA,IFO380,Hindustan Petroleum,4,-6,Barge,150,2500,4,15,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 INMAA,IFO380,Bharat Petroleum,4,-1,Barge,250,2500,6,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
 INMAA,IFO380,Indian Oil Corporation,4,4.5,Barge,300,2000,6,30,600,5 days,simulated,Differential against the port baseline; see data/README.md
 INMAA,MGO,BGN International,2,-2.5,Barge,300,2500,4,15,525,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -246,17 +264,21 @@ KRINC,VLSFO,HD Hyundai Oilbank,4,4,Pipeline,150,2000,7,30,625,Prompt,simulated,D
 KRINC,IFO380,S-Oil Corporation,4,-1.5,Barge,300,3000,7,15,400,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRINC,IFO380,HD Hyundai Oilbank,4,4,Pipeline,250,1500,6,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRINC,IFO380,GS Caltex,4,5,Pipeline,150,2000,5,30,650,Prompt,simulated,Differential against the port baseline; see data/README.md
-KRINC,MGO,KPI Bridge Oil A/S,2,-7.5,Barge,200,2500,4,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
-KRINC,MGO,SK Energy,4,-2.5,Barge,150,2500,6,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
-KRINC,MGO,S-Oil Corporation,4,-2,Ex-wharf,300,2000,6,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
-KRINC,MGO,GS Caltex,4,-0.5,Ex-wharf,200,2000,4,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
-KRINC,MGO,HD Hyundai Oilbank,4,2.5,Barge,200,2000,6,30,650,5 days,simulated,Differential against the port baseline; see data/README.md
+KRINC,LSMGO,GS Caltex,4,-6.5,Ex-wharf,150,3000,4,15,700,Prompt,simulated,Differential against the port baseline; see data/README.md
+KRINC,LSMGO,Bunker Holding A/S,2,-2.5,Barge,300,2000,7,15,525,5 days,simulated,Differential against the port baseline; see data/README.md
+KRINC,LSMGO,KPI Bridge Oil A/S,2,-2,Barge,450,3500,3,15,525,Prompt,simulated,Differential against the port baseline; see data/README.md
+KRINC,LSMGO,S-Oil Corporation,4,2,Barge,250,2500,5,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+KRINC,LSMGO,SK Energy,4,3,Ex-wharf,150,2000,3,30,725,5 days,simulated,Differential against the port baseline; see data/README.md
 KRPUS,VLSFO,HD Hyundai Oilbank,4,-3.5,Pipeline,200,2500,3,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,VLSFO,Vitol Bunkers,2,0.5,Barge,400,3500,7,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,VLSFO,Royal Dutch Shell,1,4,Barge,900,5500,7,30,500,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,IFO380,S-Oil Corporation,4,0,Barge,100,2500,3,30,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,IFO380,HD Hyundai Oilbank,4,3,Barge,200,3000,3,30,500,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,IFO380,Minerva Bunkering,2,3.5,Barge,250,3000,4,30,425,Prompt,simulated,Differential against the port baseline; see data/README.md
+KRPUS,LSMGO,S-Oil Corporation,4,-7,Ex-wharf,250,2000,7,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
+KRPUS,LSMGO,HD Hyundai Oilbank,4,-1.5,Barge,100,3000,5,15,425,5 days,simulated,Differential against the port baseline; see data/README.md
+KRPUS,LSMGO,Dan-Bunkering,2,-1,Ex-wharf,300,3500,5,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+KRPUS,LSMGO,SK Energy,4,0,Barge,200,1500,4,30,625,5 days,simulated,Differential against the port baseline; see data/README.md
 KRPUS,MGO,Minerva Bunkering,2,-7,Barge,500,2000,6,15,600,Enquire,simulated,Differential against the port baseline; see data/README.md
 KRPUS,MGO,Dan-Bunkering,2,-5,Ex-wharf,350,3500,7,15,775,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,MGO,HD Hyundai Oilbank,4,-5,Barge,300,2000,3,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -269,12 +291,6 @@ LKCMB,MGO,Monjasa,2,-5.5,Barge,350,3500,4,15,625,Prompt,simulated,Differential a
 LKCMB,MGO,Lanka Marine Services,4,-2,Barge,250,1500,5,15,575,5 days,simulated,Differential against the port baseline; see data/README.md
 LKCMB,MGO,Vitol Bunkers,2,-1,Barge,300,3000,4,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 LKCMB,MGO,GAC Bunker Fuels Ltd.,2,3.5,Barge,300,3000,6,30,400,Prompt,simulated,Differential against the port baseline; see data/README.md
-MMRGN,VLSFO,GAC Bunker Fuels Ltd.,2,-8,Barge,400,3000,5,15,575,5 days,simulated,Differential against the port baseline; see data/README.md
-MMRGN,VLSFO,Myanma Petroleum Products Enterprise,4,-6.5,Ex-wharf,100,2000,6,15,750,5 days,simulated,Differential against the port baseline; see data/README.md
-MMRGN,VLSFO,Monjasa,2,2,Barge,300,4000,9,30,425,5 days,simulated,Differential against the port baseline; see data/README.md
-MMRGN,MGO,GAC Bunker Fuels Ltd.,2,-7,Barge,250,2500,6,15,600,Enquire,simulated,Differential against the port baseline; see data/README.md
-MMRGN,MGO,Myanma Petroleum Products Enterprise,4,-3,Ex-wharf,300,2000,9,15,750,5 days,simulated,Differential against the port baseline; see data/README.md
-MMRGN,MGO,Monjasa,2,1.5,Barge,400,2500,8,30,625,5 days,simulated,Differential against the port baseline; see data/README.md
 MTMLA,VLSFO,Royal Dutch Shell,1,5.5,Barge,650,5500,4,30,550,Prompt,simulated,Differential against the port baseline; see data/README.md
 MTMLA,VLSFO,BP PLC,1,10,Barge,1000,5500,6,45,425,5 days,simulated,Differential against the port baseline; see data/README.md
 MTMLA,VLSFO,Repsol,1,13,Barge,950,4000,4,45,475,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -287,9 +303,18 @@ MYPKG,VLSFO,ExxonMobil Corporation,1,11.5,Barge,800,4000,5,45,475,Prompt,simulat
 MYPKG,IFO380,GAC Bunker Fuels Ltd.,2,-7,Barge,400,4000,7,15,425,Enquire,simulated,Differential against the port baseline; see data/README.md
 MYPKG,IFO380,Petco Trading Labuan,4,4.5,Barge,250,2000,7,30,500,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,IFO380,ExxonMobil Corporation,1,12,Ex-wharf,750,5000,6,45,725,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,LSMGO,Petco Trading Labuan,4,-3.5,Barge,300,3000,5,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,LSMGO,Petronas Dagangan,4,2,Ex-wharf,150,2000,5,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,LSMGO,ExxonMobil Corporation,1,8.5,Barge,850,6000,6,45,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,MGO,Petronas Dagangan,4,-5,Barge,300,3000,6,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,MGO,Petco Trading Labuan,4,2,Barge,150,2000,5,30,475,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,MGO,ExxonMobil Corporation,1,10,Ex-wharf,900,5000,6,45,775,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,LNG,Petco Trading Labuan,4,-5,Barge,200,1500,9,15,525,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,LNG,Petronas Dagangan,4,-1.5,Pipeline,250,2000,7,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
+MYPKG,LNG,Vitol Bunkers,2,-1,Barge,400,2500,9,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,B24,Monjasa,2,-3,Barge,300,2000,5,15,575,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,B24,Petco Trading Labuan,4,-1,Barge,250,2000,5,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
+MYPKG,B24,Petronas Dagangan,4,2,Barge,150,2500,9,30,500,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,VLSFO,Peninsula Petroleum,2,-5.5,Ex-wharf,250,2500,7,15,775,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,VLSFO,"Aegean Marine Petroleum Network, Inc.",2,-4.5,Barge,300,2500,3,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,VLSFO,Monjasa,2,-2.5,Barge,300,3500,3,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -297,7 +322,7 @@ NLRTM,VLSFO,Royal Dutch Shell,1,11,Ex-wharf,800,5500,4,45,650,Prompt,simulated,D
 NLRTM,IFO380,Vitol Bunkers,2,-9.5,Ex-wharf,450,4000,3,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,IFO380,Repsol,1,6,Barge,650,5000,6,45,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,IFO380,TotalEnergies Marine Fuels,1,10,Pipeline,750,4500,3,45,675,5 days,simulated,Differential against the port baseline; see data/README.md
-NLRTM,LSMGO,World Fuel Services Corp.,2,-6,Barge,250,3000,4,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
+NLRTM,LSMGO,Chemoil Energy Limited,2,-7.5,Barge,350,3000,5,15,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,LSMGO,Bomin Bunker Oil Corp.,2,0.5,Barge,400,2000,4,30,600,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,LSMGO,TotalEnergies Marine Fuels,1,5.5,Barge,500,6000,5,30,475,5 days,simulated,Differential against the port baseline; see data/README.md
 NLRTM,MGO,"Aegean Marine Petroleum Network, Inc.",2,-8,Barge,200,3000,3,15,500,5 days,simulated,Differential against the port baseline; see data/README.md
@@ -346,11 +371,18 @@ SGSIN,IFO380,Monjasa,2,-1.5,Barge,350,4000,6,15,575,Prompt,simulated,Differentia
 SGSIN,IFO380,Chevron Corporation,1,4,Barge,550,4000,6,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 SGSIN,IFO380,Royal Dutch Shell,1,12,Barge,850,4000,7,45,525,Prompt,simulated,Differential against the port baseline; see data/README.md
 SGSIN,LSMGO,KPI Bridge Oil A/S,2,-6,Barge,300,3500,7,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
-SGSIN,LSMGO,Vitol Bunkers,2,-3.5,Barge,400,3000,6,15,600,Enquire,simulated,Differential against the port baseline; see data/README.md
-SGSIN,LSMGO,TotalEnergies Marine Fuels,1,10.5,Barge,650,4500,4,45,425,Prompt,simulated,Differential against the port baseline; see data/README.md
+SGSIN,LSMGO,Chemoil Energy Limited,2,-3,Barge,200,2500,7,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+SGSIN,LSMGO,Petronas Dagangan,4,2.5,Ex-wharf,200,2500,6,30,625,5 days,simulated,Differential against the port baseline; see data/README.md
 SGSIN,MGO,PetroChina Fuel Oil,4,1.5,Barge,200,2500,4,30,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 SGSIN,MGO,Chemoil Energy Limited,2,2.5,Barge,350,3000,3,30,675,5 days,simulated,Differential against the port baseline; see data/README.md
 SGSIN,MGO,BP PLC,1,6.5,Barge,800,4500,5,45,600,Prompt,simulated,Differential against the port baseline; see data/README.md
+SGSIN,LNG,Petronas Dagangan,4,-4,Barge,150,2500,5,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
+SGSIN,LNG,PetroChina Fuel Oil,4,4.5,Barge,150,2500,6,30,500,Enquire,simulated,Differential against the port baseline; see data/README.md
+SGSIN,LNG,Royal Dutch Shell,1,10.5,Barge,600,5000,7,45,450,5 days,simulated,Differential against the port baseline; see data/README.md
+SGSIN,B24,Petronas Dagangan,4,-3.5,Barge,300,2000,4,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+SGSIN,B24,PetroChina Fuel Oil,4,1.5,Barge,200,2000,3,30,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+SGSIN,B24,Monjasa,2,2,Barge,250,3500,6,30,550,Prompt,simulated,Differential against the port baseline; see data/README.md
+SGSIN,MEOH,PetroChina Fuel Oil,4,-0.5,Barge,300,2500,8,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
 SGSIN,MEOH,TotalEnergies Marine Fuels,1,8,Barge,900,5500,9,45,650,5 days,simulated,Differential against the port baseline; see data/README.md
 SGSIN,MEOH,Royal Dutch Shell,1,12.5,Barge,500,4500,6,45,500,Prompt,simulated,Differential against the port baseline; see data/README.md
 SGSIN,MEOH,Methanex Corporation,3,31,Barge,100,1400,5,45,575,Enquire,simulated,Differential against the port baseline; see data/README.md
@@ -359,6 +391,9 @@ THBKK,VLSFO,GAC Bunker Fuels Ltd.,2,-7.5,Barge,300,2500,6,15,550,Enquire,simulat
 THBKK,VLSFO,Bangchak Corporation,4,-4,Ex-wharf,200,2000,7,15,625,5 days,simulated,Differential against the port baseline; see data/README.md
 THBKK,VLSFO,PTT Oil and Retail Business,4,-1.5,Ex-wharf,250,3000,6,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 THBKK,VLSFO,Thai Oil Public Company,4,-1.5,Ex-wharf,200,2000,7,15,675,5 days,simulated,Differential against the port baseline; see data/README.md
+THBKK,IFO380,Monjasa,2,-5.5,Barge,400,3000,7,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
+THBKK,IFO380,PTT Oil and Retail Business,4,-3,Barge,150,2500,7,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+THBKK,IFO380,Thai Oil Public Company,4,-0.5,Barge,200,1500,8,15,675,Enquire,simulated,Differential against the port baseline; see data/README.md
 THBKK,MGO,Thai Oil Public Company,4,-6,Ex-wharf,100,3000,8,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 THBKK,MGO,Bangchak Corporation,4,0.5,Barge,150,2500,8,30,475,5 days,simulated,Differential against the port baseline; see data/README.md
 THBKK,MGO,PTT Oil and Retail Business,4,4.5,Barge,150,3000,9,30,600,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -375,6 +410,9 @@ THLCH,IFO380,Dan-Bunkering,2,2.5,Barge,350,3500,6,30,700,Prompt,simulated,Differ
 THLCH,MGO,Bangchak Corporation,4,-4,Ex-wharf,100,2500,3,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 THLCH,MGO,GAC Bunker Fuels Ltd.,2,-3,Barge,400,2500,6,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 THLCH,MGO,Thai Oil Public Company,4,-3,Ex-wharf,300,2000,6,15,750,Prompt,simulated,Differential against the port baseline; see data/README.md
+THLCH,B24,Thai Oil Public Company,4,-6,Barge,200,2000,7,15,425,Enquire,simulated,Differential against the port baseline; see data/README.md
+THLCH,B24,Bangchak Corporation,4,-3,Barge,150,3000,9,15,500,Prompt,simulated,Differential against the port baseline; see data/README.md
+THLCH,B24,PTT Oil and Retail Business,4,3,Barge,250,1500,9,30,575,Prompt,simulated,Differential against the port baseline; see data/README.md
 TRIST,VLSFO,Bunker Holding A/S,2,-4,Barge,250,3500,4,15,475,Prompt,simulated,Differential against the port baseline; see data/README.md
 TRIST,VLSFO,Petrol Ofisi,4,0,Pipeline,300,3000,6,30,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 TRIST,VLSFO,SOCAR Turkey,4,0.5,Ex-wharf,300,2000,4,30,725,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -435,9 +473,6 @@ USSEA,MGO,ExxonMobil Corporation,1,7,Barge,650,5000,4,45,425,Enquire,simulated,D
 VNHPH,VLSFO,Monjasa,2,-6,Ex-wharf,350,2000,9,15,725,Enquire,simulated,Differential against the port baseline; see data/README.md
 VNHPH,VLSFO,Petrolimex,4,-3.5,Ex-wharf,250,2000,8,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
 VNHPH,VLSFO,PV Oil,4,2,Ex-wharf,100,1500,6,30,775,Enquire,simulated,Differential against the port baseline; see data/README.md
-VNHPH,MGO,Petrolimex,4,-5,Ex-wharf,250,1500,6,15,650,5 days,simulated,Differential against the port baseline; see data/README.md
-VNHPH,MGO,Monjasa,2,-2.5,Barge,250,3000,9,15,425,5 days,simulated,Differential against the port baseline; see data/README.md
-VNHPH,MGO,PV Oil,4,4.5,Barge,200,2500,7,30,500,5 days,simulated,Differential against the port baseline; see data/README.md
 VNSGN,VLSFO,Monjasa,2,-8,Ex-wharf,300,2500,6,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
 VNSGN,VLSFO,KPI Bridge Oil A/S,2,-4,Barge,450,3000,7,15,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 VNSGN,VLSFO,Bunker Holding A/S,2,-1,Barge,250,2500,3,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -449,13 +484,20 @@ VNSGN,IFO380,PV Oil,4,5,Barge,200,2500,5,30,500,Prompt,simulated,Differential ag
 VNSGN,MGO,KPI Bridge Oil A/S,2,-0.5,Barge,250,4000,4,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 VNSGN,MGO,Monjasa,2,1.5,Barge,200,4000,7,30,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 VNSGN,MGO,Saigon Petro,4,1.5,Ex-wharf,150,3000,3,30,600,Prompt,simulated,Differential against the port baseline; see data/README.md
+VNSGN,LNG,Petrolimex,4,-5.5,Barge,150,2500,7,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
+VNSGN,LNG,Saigon Petro,4,2,Ex-wharf,200,3000,6,30,600,Enquire,simulated,Differential against the port baseline; see data/README.md
+VNSGN,LNG,PV Oil,4,2.5,Ex-wharf,250,3000,5,30,625,Enquire,simulated,Differential against the port baseline; see data/README.md
+VNSGN,B24,Monjasa,2,-6.5,Ex-wharf,250,3500,8,15,775,5 days,simulated,Differential against the port baseline; see data/README.md
+VNSGN,B24,PV Oil,4,0.5,Pipeline,150,3000,7,30,675,Enquire,simulated,Differential against the port baseline; see data/README.md
+VNSGN,B24,Saigon Petro,4,0.5,Barge,100,2000,9,30,400,Enquire,simulated,Differential against the port baseline; see data/README.md
 VNUIH,VLSFO,Saigon Petro,4,-1.5,Barge,150,2500,8,15,450,Prompt,simulated,Differential against the port baseline; see data/README.md
 VNUIH,VLSFO,GAC Bunker Fuels Ltd.,2,-0.5,Ex-wharf,450,2500,9,15,650,Enquire,simulated,Differential against the port baseline; see data/README.md
 VNUIH,VLSFO,Monjasa,2,1.5,Ex-wharf,200,3500,6,30,675,5 days,simulated,Differential against the port baseline; see data/README.md
 VNUIH,VLSFO,PV Oil,4,4,Barge,100,3000,8,30,700,5 days,simulated,Differential against the port baseline; see data/README.md
-VNUIH,MGO,Petrolimex,4,-2,Barge,200,2500,5,15,525,5 days,simulated,Differential against the port baseline; see data/README.md
-VNUIH,MGO,GAC Bunker Fuels Ltd.,2,4,Barge,400,3000,6,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
-VNUIH,MGO,Monjasa,2,4,Barge,300,3000,5,30,475,5 days,simulated,Differential against the port baseline; see data/README.md
+VNUIH,LSMGO,GAC Bunker Fuels Ltd.,2,-4,Barge,450,3500,6,15,575,5 days,simulated,Differential against the port baseline; see data/README.md
+VNUIH,LSMGO,Petrolimex,4,-0.5,Barge,150,1500,6,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
+VNUIH,LSMGO,PV Oil,4,0.5,Ex-wharf,250,2000,8,30,725,Prompt,simulated,Differential against the port baseline; see data/README.md
+VNUIH,LSMGO,Saigon Petro,4,3,Ex-wharf,100,1500,7,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 ZADUR,VLSFO,Monjasa,2,-4.5,Barge,250,2500,6,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
 ZADUR,VLSFO,Engen Petroleum,4,-3.5,Barge,150,1500,7,15,550,Prompt,simulated,Differential against the port baseline; see data/README.md
 ZADUR,VLSFO,Peninsula Petroleum,2,3,Barge,250,2000,3,30,425,5 days,simulated,Differential against the port baseline; see data/README.md

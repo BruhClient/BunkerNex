@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { GRADE_COLORS, THEME } from "@/lib/colors";
 import { formatMt } from "@/lib/format";
-import { PRICE_SERIES } from "@/lib/bunkerEvents";
+import { TANK_SERIES } from "@/lib/bunkerEvents";
 import { activeGradeAt, stepTimestamp } from "@/lib/vesselPosition";
 import { MGO_TANK_RATIO } from "@/lib/types";
 import type { VesselSpec, VesselTrack } from "@/lib/types";
@@ -166,7 +166,7 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
                 yAxisId="residual"
                 type="linear"
                 dataKey="HSFO"
-                stroke={GRADE_COLORS[PRICE_SERIES.HSFO]}
+                stroke={GRADE_COLORS[TANK_SERIES.HSFO]}
                 strokeWidth={1.5}
                 dot={false}
                 activeDot={{ r: 3, strokeWidth: 0 }}
@@ -177,7 +177,7 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               yAxisId="residual"
               type="linear"
               dataKey="VLSFO"
-              stroke={GRADE_COLORS[PRICE_SERIES.VLSFO]}
+              stroke={GRADE_COLORS[TANK_SERIES.VLSFO]}
               strokeWidth={1.5}
               dot={false}
               activeDot={{ r: 3, strokeWidth: 0 }}
@@ -187,7 +187,7 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               yAxisId="mgo"
               type="linear"
               dataKey="MGO"
-              stroke={GRADE_COLORS[PRICE_SERIES.MGO]}
+              stroke={GRADE_COLORS[TANK_SERIES.MGO]}
               strokeWidth={1}
               strokeDasharray="4 3"
               dot={false}
@@ -211,7 +211,7 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
         <span style={{ color: THEME.down }}>Red</span> marks the scrubbed
         moment; click the chart to seek. Dashed rules are the bunker trigger and
         safety minimum — both derived from deadweight, not measured.{" "}
-        <span style={{ color: GRADE_COLORS[PRICE_SERIES.MGO] }}>MGO</span> is on
+        <span style={{ color: GRADE_COLORS[TANK_SERIES.MGO] }}>MGO</span> is on
         the right-hand scale: its tank is a fifth the size of the residual one,
         and it draws down only through China and Korea ECA calls.
       </p>
@@ -250,7 +250,7 @@ function RobTooltip({
           <div key={grade} className="tnum mt-1 text-[11px]">
             <span
               className={grade === burning ? "text-fg" : "text-faint"}
-              style={{ color: GRADE_COLORS[PRICE_SERIES[grade]] }}
+              style={{ color: GRADE_COLORS[TANK_SERIES[grade]] }}
             >
               {grade}
             </span>{" "}

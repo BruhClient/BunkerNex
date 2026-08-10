@@ -2,7 +2,7 @@
 
 import { GRADE_COLORS, GRADE_LABELS } from "@/lib/colors";
 import { formatMt } from "@/lib/format";
-import { PRICE_SERIES } from "@/lib/bunkerEvents";
+import { TANK_SERIES } from "@/lib/bunkerEvents";
 import { robState, type RobState } from "@/lib/vesselPosition";
 import type { VesselGrade } from "@/lib/types";
 
@@ -35,8 +35,8 @@ const STATE_LABEL: Record<RobState, string> = {
 };
 
 /** Colour and label resolve through the price grade, as a stem's valuation does. */
-const colorFor = (grade: VesselGrade) => GRADE_COLORS[PRICE_SERIES[grade]];
-const labelFor = (grade: VesselGrade) => GRADE_LABELS[PRICE_SERIES[grade]];
+const colorFor = (grade: VesselGrade) => GRADE_COLORS[TANK_SERIES[grade]];
+const labelFor = (grade: VesselGrade) => GRADE_LABELS[TANK_SERIES[grade]];
 
 /**
  * Fuel onboard, one bar per tank.

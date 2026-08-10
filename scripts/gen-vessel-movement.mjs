@@ -218,19 +218,56 @@ const ECA_TRAIL_STEPS = 1;
  * 1,715 values through 2026-08-05. data/README.md used to name it here.
  */
 const NO_HSFO_PORTS = new Set([
-  "BDCGP", // Chittagong
-  "BDMGL", // Mongla
-  "CNSHA", // Shanghai
-  "IDJKT", // Jakarta
-  "IDSRG", // Semarang
+  "CNNSA", // Nansha
+  "CNQZH", // Qinzhou
+  "CNSHK", // Shekou
   "IDSUB", // Surabaya
-  "INCCU", // Kolkata
   "INGAV", // Gangavaram
   "MMRGN", // Yangon
-  "THBKK", // Bangkok
   "VNHPH", // Haiphong
   "VNUIH", // Qui Nhon
 ]);
+
+/**
+ * Ports with no 0.50% residual market.
+ *
+ * New with the CE sheet, and the reason the residual branch below has three
+ * outcomes rather than two. Until now every port could sell VLSFO, so a hull
+ * that could not lift HSFO always had a fallback. Chittagong and Mongla sell
+ * IFO 180/380 and distillate but no VLSFO; Kolkata sells HSFO alone. A
+ * non-scrubber hull calling at any of the three cannot stem residual at all and
+ * has to reach its next opportunity on what it is already carrying.
+ *
+ * Qinzhou and Yangon appear in all three sets: the sheet records no confirmed
+ * bunker market at either, so neither is a stemming opportunity for anyone.
+ */
+const NO_VLSFO_PORTS = new Set([
+  "BDCGP", // Chittagong
+  "BDMGL", // Mongla
+  "CNQZH", // Qinzhou
+  "INCCU", // Kolkata
+  "MMRGN", // Yangon
+]);
+
+/**
+ * Ports with no distillate market of either kind.
+ *
+ * The LSMGO/MGO split the sheet draws does not matter here — a port feeds the
+ * distillate tank if it sells either grade, and only which price column values
+ * the lift changes between them. That is priceSeriesFor() in
+ * src/lib/bunkerEvents.ts, not this file.
+ */
+const NO_MGO_PORTS = new Set([
+  "CNQZH", // Qinzhou
+  "INCCU", // Kolkata
+  "INGAV", // Gangavaram
+  "MMRGN", // Yangon
+  "VNHPH", // Haiphong
+]);
+
+/** Whether this berth can put any residual grade into this hull. */
+const canStemResidual = (port, scrubber) =>
+  (scrubber && !NO_HSFO_PORTS.has(port)) || !NO_VLSFO_PORTS.has(port);
 
 /**
  * Share of a scrubber vessel's residual capacity held as VLSFO.
@@ -551,15 +588,32 @@ function buildRows(timetables, specByName) {
       const needFrom = (i) => {
         let residual = 0;
         let mgo = 0;
+        // Separate, because a call can supply one tank and not the other:
+        // Kolkata sells HSFO but no distillate, Haiphong the reverse. Stopping
+        // at the first call publishing a quantity would have this hull believe
+        // it can top up somewhere it cannot, which is the one thing the
+        // second trigger clause below exists to prevent.
+        let residualAt = null;
+        let mgoAt = null;
         for (let j = i + 1; j <= i + tt.steps; j++) {
           const at = (offset + j - 1) % tt.steps;
           if (tt.eca[at]) mgo += burnAt(at);
           else residual += burnAt(at);
-          if (tt.bunkerQty.has((offset + j) % tt.steps)) {
-            return { residual, mgo, reachable: true };
-          }
+
+          const s = (offset + j) % tt.steps;
+          if (!tt.bunkerQty.has(s)) continue;
+          const p = tt.portCode[s];
+          if (residualAt === null && canStemResidual(p, scrubber)) residualAt = residual;
+          if (mgoAt === null && !NO_MGO_PORTS.has(p)) mgoAt = mgo;
+          if (residualAt !== null && mgoAt !== null) break;
         }
-        return { residual, mgo, reachable: false };
+        return {
+          residual: residualAt,
+          // A rotation with no distillate stop anywhere falls back to the whole
+          // loop's burn: conservative, and the MGO floor check is the arbiter.
+          mgo: mgoAt ?? mgo,
+          reachable: residualAt !== null,
+        };
       };
 
       // Both residual tanks open full and together fill Max_ROB_MT: a scrubber
@@ -591,13 +645,20 @@ function buildRows(timetables, specByName) {
           // breach Min_ROB before the next chance. The second clause is the
           // safety-critical one: it stops a vessel passing a bunker port it
           // cannot skip.
+          //
+          // Grade follows what the berth can actually supply, not the fitting.
+          // Three outcomes, not two: high-sulphur where the hull is scrubbed and
+          // the port sells it, VLSFO where the port sells that, and no lift at
+          // all where it sells neither — a non-scrubber hull at Chittagong,
+          // Mongla or Kolkata.
+          const asHsfo = scrubber && !NO_HSFO_PORTS.has(port);
           const residual = round3(vlsfo + hsfo);
-          if (residual <= trigger || residual - need.residual < min) {
+          if (
+            (asHsfo || !NO_VLSFO_PORTS.has(port)) &&
+            (residual <= trigger || residual - need.residual < min)
+          ) {
             const lift = round3(Math.min(qty, max - residual));
             if (lift > 0) {
-              // Grade follows what the port can actually supply, not just the
-              // fitting. Twelve of the twenty-six have no HSFO market.
-              const asHsfo = scrubber && !NO_HSFO_PORTS.has(port);
               if (asHsfo) {
                 stemH = lift;
                 hsfo = round3(hsfo + lift);
@@ -615,9 +676,10 @@ function buildRows(timetables, specByName) {
             }
           }
 
-          // --- MGO. Same rule against its own tank. Vessels on rotations that
-          // touch no ECA port never burn any, so this never fires for them.
-          if (mgo <= mgoTrigger || mgo - need.mgo < mgoMin) {
+          // --- MGO. Same rule against its own tank, gated the same way on
+          // supply. Vessels on rotations that touch no ECA port never burn any,
+          // so this never fires for them.
+          if (!NO_MGO_PORTS.has(port) && (mgo <= mgoTrigger || mgo - need.mgo < mgoMin)) {
             const lift = round3(Math.min(qty * MGO_STEM_RATIO, mgoMax - mgo));
             if (lift > 0) {
               stemM = lift;
@@ -801,8 +863,18 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
         }
       }
 
-      // Supply: the check whose absence let the old file stem HSFO at
-      // Chittagong and Yangon, where there is no high-sulphur market at all.
+      // Supply: one check per tank, against the CE sheet's availability matrix.
+      // The HSFO one is the check whose absence let an older file stem HSFO
+      // where there was no high-sulphur market; the other two are its
+      // counterparts, and they matter now that a port can sell HSFO and no
+      // VLSFO (Chittagong, Mongla, Kolkata) or nothing at all (Qinzhou,
+      // Yangon).
+      if (Number(r.VLSFO_Bunkered_MT) > 0 && NO_VLSFO_PORTS.has(r.Port_Code)) {
+        fail(`${where}: stemmed VLSFO at ${r.Port_Code}, which has no VLSFO market`);
+      }
+      if (Number(r.MGO_Bunkered_MT) > 0 && NO_MGO_PORTS.has(r.Port_Code)) {
+        fail(`${where}: stemmed MGO at ${r.Port_Code}, which has no distillate market`);
+      }
       if (Number(r.HSFO_Bunkered_MT) > 0 && NO_HSFO_PORTS.has(r.Port_Code)) {
         fail(`${where}: stemmed HSFO at ${r.Port_Code}, which has no HSFO market`);
       }

@@ -12,16 +12,63 @@ import type { Grade, VesselGrade, VesselTrack } from "./types";
  */
 
 /**
+ * Ports whose distillate market is the 0.10% LSMGO rather than plain MGO.
+ *
+ * Straight off the Chief Engineer's `TYPES OF FUEL.xlsx`, and the split is not
+ * arbitrary — it falls on the ECA line. China and Korea cap sulphur at 0.10% at
+ * berth, so what is sold there is the 0.10% distillate; Southeast Asia, India
+ * and the Bay of Bengal sell plain MGO. Surabaya and Qui Nhon sit on the LSMGO
+ * side because the sheet puts them there.
+ *
+ * Duplicated from data/pricing/bunker_basis.csv, where the split is reasoned
+ * about, for the same reason ECA_PORTS is duplicated in lib/eca.ts: this module
+ * is client-safe and must never reach for the CSV reader.
+ */
+const LSMGO_PORTS: ReadonlySet<string> = new Set([
+  "CNNGB", // Ningbo
+  "CNNSA", // Nansha
+  "CNSHA", // Shanghai
+  "CNSHK", // Shekou
+  "CNTAO", // Qingdao
+  "CNTSN", // Tianjin
+  "CNXMN", // Xiamen
+  "IDSUB", // Surabaya
+  "KRINC", // Incheon
+  "KRPUS", // Busan
+  "MYPKG", // Port Klang
+  "SGSIN", // Singapore
+  "VNUIH", // Qui Nhon
+]);
+
+/**
+ * The price column a stem is valued against.
+ *
  * The assessments quote high-sulphur fuel as IFO380; no column anywhere is
  * headed "HSFO". Mapping the two is the only way a scrubber-fitted vessel's
  * stem can be priced at all.
  *
- * MGO maps to the plain `MGO` column rather than `LSMGO`. Both exist in
- * "LSMGO_MGO Prices.csv", but the split is regional: every one of this fleet's
- * twenty-six ports carries `<PORT> MGO`, while `LSMGO` appears mostly at
- * Japan/Europe/Americas ports it never calls. See data/README.md.
+ * The distillate tank resolves per port rather than to one fixed column. It is
+ * the ECA compliance tank, so at a port selling the 0.10% grade that is what
+ * goes into it — and most of this fleet's distillate stems are ECA switches into
+ * China and Korea. Pricing those off a plain `MGO` column, as this did before
+ * the sheet was reconciled, valued a 0.10% lift at a 0.50% product's price.
  */
-export const PRICE_SERIES: Record<VesselGrade, Grade> = {
+export function priceSeriesFor(grade: VesselGrade, portCode: string): Grade {
+  if (grade === "VLSFO") return "VLSFO";
+  if (grade === "HSFO") return "IFO380";
+  return LSMGO_PORTS.has(portCode) ? "LSMGO" : "MGO";
+}
+
+/**
+ * The grade a *tank* is drawn and labelled as, for colour lookups.
+ *
+ * Deliberately port-independent, unlike priceSeriesFor: a tank's colour on the
+ * ROB chart must not change as the vessel moves between a Chinese berth and an
+ * Indian one. The distillate tank stays "MGO" here because that is what
+ * `VesselGrade` calls it — the 0.10%/0.50% distinction is a property of a
+ * particular lift, and it belongs on the priced stem, not on the tank.
+ */
+export const TANK_SERIES: Record<VesselGrade, Grade> = {
   VLSFO: "VLSFO",
   HSFO: "IFO380",
   MGO: "MGO",

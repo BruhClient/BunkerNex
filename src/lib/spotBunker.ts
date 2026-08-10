@@ -13,7 +13,21 @@
  * a simulated movement series and then edited. See data/README.md.
  */
 
-import { hasHsfoMarket, isEcaPort } from "./eca";
+import { hasMarketFor, isEcaPort } from "./eca";
+
+/**
+ * How each grade's market is named in a supply warning.
+ *
+ * Both distillates say "distillate": a port that sells neither LSMGO nor MGO
+ * sells no distillate at all, and naming the specific grade would imply the
+ * other one is available.
+ */
+const GRADE_MARKET_LABEL: Record<SpotFuelGrade, string> = {
+  HSFO: "high-sulphur",
+  VLSFO: "VLSFO",
+  LSMGO: "distillate",
+  MGO: "distillate",
+};
 import { portMeta } from "./ports";
 import {
   MGO_TANK_RATIO,
@@ -182,7 +196,12 @@ export interface SpotContext {
   activeGrade: VesselGrade;
   scrubberFitted: boolean;
   isEcaDestination: boolean;
-  hasHsfoMarket: boolean;
+  /**
+   * Grades this berth can actually supply, so the form can gate a segment
+   * rather than only warn after the fact. Per-grade since the CE sheet: a port
+   * can sell HSFO and no VLSFO, or nothing at all.
+   */
+  markets: Record<VesselGrade, boolean>;
 }
 
 const HOURS_PER_DAY = 24;
@@ -310,7 +329,11 @@ export function deriveSpotContext(
     activeGrade: activeGradeAt(track, stepIndex),
     scrubberFitted: track.scrubber,
     isEcaDestination: isEcaPort(portCode),
-    hasHsfoMarket: hasHsfoMarket(portCode),
+    markets: {
+      HSFO: hasMarketFor("HSFO", portCode),
+      VLSFO: hasMarketFor("VLSFO", portCode),
+      MGO: hasMarketFor("MGO", portCode),
+    },
   };
 }
 
@@ -425,12 +448,16 @@ export function validateSpotRequest(
         "Confirm the scrubber is fully operational. The specifications sheet records a fitting, not an operating state.",
       );
     }
-    if (!ctx.hasHsfoMarket) {
-      warn(
-        "grade",
-        `No high-sulphur bunker market at ${ctx.portName ?? ctx.portCode ?? "this port"}.`,
-      );
-    }
+  }
+
+  // Supply, for whichever grade is actually selected. Every grade has ports
+  // that cannot sell it now: Chittagong and Kolkata carry no VLSFO, Haiphong
+  // and Gangavaram no distillate, and Qinzhou and Yangon nothing at all.
+  if (grade !== null && !ctx.markets[tankFor(grade)]) {
+    warn(
+      "grade",
+      `No ${GRADE_MARKET_LABEL[grade]} bunker market at ${ctx.portName ?? ctx.portCode ?? "this port"}.`,
+    );
   }
 
   if (draft.isoVersion === null) {

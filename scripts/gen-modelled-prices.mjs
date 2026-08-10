@@ -45,6 +45,13 @@ const HUB_HEADER = {
  * src/lib/ports.ts, or the column is silently dropped at read time.
  */
 const PORT_HEADER = {
+  // Three assessment hubs also carry modelled columns now: the sheet gives
+  // Shanghai an HSFO market the assessment has no column for, LSMGO at Shanghai
+  // and Busan, and biofuel at Singapore. A hub port appearing in this table is
+  // exactly why `owned` has to be computed per grade — see the comment there.
+  SGSIN: "SINGAPORE",
+  KRPUS: "BUSAN",
+  CNSHA: "SHANGHAI",
   MYPKG: "PORTKLANG",
   BDCGP: "CHITTAGONG",
   BDMGL: "MONGLA",
@@ -71,15 +78,41 @@ const PORT_HEADER = {
 };
 
 /**
- * Which file carries each grade. MGO is modelled for chart completeness only —
- * the fleet never stems it (PRICE_SERIES in src/lib/bunkerEvents.ts maps only
- * VLSFO/HSFO), so it never reaches bunkerPriceSnapshot().
+ * Which file carries each grade's modelled columns.
+ *
+ * The grade set is the Chief Engineer's `TYPES OF FUEL.xlsx`. LSMGO and MGO are
+ * separate products there, and the split falls on the ECA line — China and Korea
+ * sell the 0.10% distillate, Southeast Asia and the Bay of Bengal sell plain
+ * MGO. Both reach bunkerPriceSnapshot(): PRICE_SERIES resolves a vessel's MGO
+ * tank to whichever of the two its port actually sells.
+ *
+ * MDO, B24 and B40 are priced but never burned by this fleet.
  */
 const GRADE_FILE = {
   VLSFO: "VLSFO Prices.csv",
   IFO380: "HSGO Prices.csv",
+  LSMGO: "LSMGO_MGO Prices.csv",
   MGO: "LSMGO_MGO Prices.csv",
+  MDO: "MDO Prices.csv",
+  LNG: "LNG Prices.csv",
+  B24: "Biofuel Prices.csv",
+  B40: "Biofuel Prices.csv",
+  MEOH: "Methanol Prices.csv",
 };
+
+/**
+ * Grades the sheet records as sold but this dataset cannot price.
+ *
+ * Empty, and worth keeping that way by choice rather than deleting: it is where
+ * a fuel goes when the sheet says a port sells it and nothing here can put a
+ * number on it. LNG lived here until its hub was reconstructed from published
+ * JKM anchors — see scripts/gen-lng-prices.mjs, which must run before this
+ * script because it writes the hub column the LNG basis is computed against.
+ */
+const UNPRICED_GRADES = new Set();
+
+/** Column prefixes belonging to an assessment hub. See `owned` in rewrite(). */
+const HUB_PREFIXES = new Set(Object.values(HUB_HEADER));
 
 function readBasis() {
   const text = fs.readFileSync(BASIS, "utf8");
@@ -98,6 +131,9 @@ function readBasis() {
     if (!portKey) return;
 
     const grade = (row.Grade ?? "").trim();
+    // A recorded-but-unpriceable market is skipped, not rejected: the row is the
+    // evidence that the port sells the fuel, and dropping it would lose that.
+    if (UNPRICED_GRADES.has(grade)) return;
     if (!GRADE_FILE[grade]) {
       throw new Error(`bunker_basis.csv line ${line}: unknown Grade "${grade}"`);
     }
@@ -178,6 +214,44 @@ function format(n) {
   return String(Math.round(n * 100) / 100);
 }
 
+/**
+ * A hub column as { date -> value }, read from whichever file carries it.
+ *
+ * Keyed by date rather than row index because a hub no longer always lives in
+ * the file being written: B24 models off SINGAPORE VLSFO, MDO off SINGAPORE MGO.
+ * The three fossil sheets share one 1,973-row spine but Methanol does not, so
+ * index arithmetic across files would silently misalign every methanol figure.
+ */
+const hubCache = new Map();
+
+function hubSeries(hubGrade, hubPortKey) {
+  const name = `${HUB_HEADER[hubPortKey]} ${hubGrade}`;
+  if (hubCache.has(name)) return hubCache.get(name);
+
+  const file = GRADE_FILE[hubGrade];
+  if (!file) {
+    throw new Error(`no file carries hub grade "${hubGrade}"`);
+  }
+
+  const text = fs.readFileSync(path.join(DATA, file), "utf8");
+  const lines = text.split(/\r?\n/).filter((l) => l !== "");
+  const header = lines[0].split(",");
+  const idx = header.findIndex((h) => h.trim() === name);
+  if (idx === -1) {
+    throw new Error(`${file}: hub column "${name}" not found`);
+  }
+
+  const series = new Map();
+  for (const line of lines.slice(1)) {
+    const cells = line.split(",");
+    const date = (cells[0] ?? "").trim();
+    if (date) series.set(date, (cells[idx] ?? "").trim());
+  }
+
+  hubCache.set(name, series);
+  return series;
+}
+
 function rewrite(grade, byPort) {
   const file = path.join(DATA, GRADE_FILE[grade]);
   const text = fs.readFileSync(file, "utf8");
@@ -199,21 +273,28 @@ function rewrite(grade, byPort) {
   // Drop every column this script could have written on a previous run — not
   // just the ones being written now — so a port that loses its market does not
   // leave a stale column behind.
+  //
+  // Three ports in PORT_HEADER are also assessment hubs, and their assessed
+  // columns are NOT this script's to drop. Claiming "SINGAPORE VLSFO" on the
+  // VLSFO pass would delete a sourced column and never re-add it, because SGSIN
+  // has no VLSFO basis row to rebuild it from. So a hub prefix is only owned for
+  // the grades that port is actually modelled in — which `byPort` is exactly the
+  // list of, blanked-out markets included, so a retired modelled column at a hub
+  // port is still dropped.
   const owned = new Set(
-    Object.values(PORT_HEADER).map((prefix) => `${prefix} ${grade}`),
+    Object.entries(PORT_HEADER)
+      .filter(
+        ([portKey, prefix]) => !HUB_PREFIXES.has(prefix) || byPort.has(portKey),
+      )
+      .map(([, prefix]) => `${prefix} ${grade}`),
   );
   const keep = header
     .map((_, i) => i)
     .filter((i) => !owned.has(header[i].trim()));
 
-  const hubIndex = new Map();
+  const hubs = new Map();
   for (const [portKey, entry] of byPort) {
-    const name = `${HUB_HEADER[entry.hubPortKey]} ${entry.hubGrade}`;
-    const idx = header.findIndex((h) => h.trim() === name);
-    if (idx === -1) {
-      throw new Error(`${GRADE_FILE[grade]}: hub column "${name}" not found`);
-    }
-    hubIndex.set(portKey, idx);
+    hubs.set(portKey, hubSeries(entry.hubGrade, entry.hubPortKey));
   }
 
   const out = [[...keep.map((i) => header[i]), ...newColumns].join(",")];
@@ -225,7 +306,9 @@ function rewrite(grade, byPort) {
 
     const values = ports.map((portKey) => {
       const entry = byPort.get(portKey);
-      const hubRaw = (cells[hubIndex.get(portKey)] ?? "").trim();
+      // A date the hub file does not carry is a gap, not a zero — same rule as
+      // a blank cell. This is the case the date key exists to get right.
+      const hubRaw = hubs.get(portKey).get(date) ?? "";
       const basis = basisOn(entry.segments, date);
       // Nulls propagate both ways and never become 0: with no hub quote there
       // is nothing to add a differential to, and a blank basis means the port

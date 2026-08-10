@@ -1,8 +1,8 @@
-import { PRICE_SERIES, type BunkerPriceSnapshot } from "./bunkerEvents";
+import { priceSeriesFor, type BunkerPriceSnapshot } from "./bunkerEvents";
 import { readCsv } from "./csv";
 import { resolvePricePort } from "./ports";
 import { latestPoint, trimNulls } from "./series";
-import type { Grade, PortPrices, PricePoint, VesselGrade } from "./types";
+import { VESSEL_GRADES, type Grade, type PortPrices, type PricePoint } from "./types";
 
 // Re-exported so server callers have one import site for price helpers.
 export { latestPoint, previousPoint } from "./series";
@@ -28,12 +28,18 @@ const PRICE_FILES = [
   "pricing/VLSFO Prices.csv",
   "pricing/HSGO Prices.csv",
   "pricing/LSMGO_MGO Prices.csv",
+  "pricing/MDO Prices.csv",
+  "pricing/LNG Prices.csv",
+  "pricing/Biofuel Prices.csv",
   "pricing/Methanol Prices.csv",
 ];
 
 /**
  * Grade suffixes, longest first so "MEOH VLSFOe" is matched before "MEOH"
  * and never mistaken for a plain VLSFO column.
+ *
+ * "LSMGO" must stay ahead of "MGO" for the same reason: the two are distinct
+ * products on the Chief Engineer's sheet, and "<PORT> LSMGO" ends in "MGO".
  */
 const GRADE_SUFFIXES: Array<[string, Grade]> = [
   ["MEOH VLSFOE", "MEOH_VLSFOe"],
@@ -43,6 +49,10 @@ const GRADE_SUFFIXES: Array<[string, Grade]> = [
   ["VLSFO", "VLSFO"],
   ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
+  ["MDO", "MDO"],
+  ["LNG", "LNG"],
+  ["B24", "B24"],
+  ["B40", "B40"],
 ];
 
 export type PriceIndex = Map<string, Map<Grade, PricePoint[]>>;
@@ -172,9 +182,10 @@ export function bunkerPriceSnapshot(): BunkerPriceSnapshot {
   for (const [portKey, byGrade] of getPriceIndex()) {
     if (portKey === BRENT_KEY) continue;
 
-    for (const [vesselGrade, series] of Object.entries(PRICE_SERIES) as Array<
-      [VesselGrade, Grade]
-    >) {
+    for (const vesselGrade of VESSEL_GRADES) {
+      // Which column values this tank depends on the port: the distillate tank
+      // is priced as LSMGO where the port sells the 0.10% grade, MGO elsewhere.
+      const series = priceSeriesFor(vesselGrade, portKey);
       const points = byGrade.get(series);
       if (!points) continue;
 

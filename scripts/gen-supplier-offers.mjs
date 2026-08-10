@@ -46,6 +46,9 @@ const PRICE_FILES = [
   "VLSFO Prices.csv",
   "HSGO Prices.csv",
   "LSMGO_MGO Prices.csv",
+  "MDO Prices.csv",
+  "LNG Prices.csv",
+  "Biofuel Prices.csv",
   "Methanol Prices.csv",
 ];
 
@@ -57,6 +60,10 @@ const GRADE_SUFFIXES = [
   ["VLSFO", "VLSFO"],
   ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
+  ["MDO", "MDO"],
+  ["LNG", "LNG"],
+  ["B24", "B24"],
+  ["B40", "B40"],
 ];
 
 /**
@@ -66,10 +73,22 @@ const GRADE_SUFFIXES = [
  * methanol restated in VLSFO- and MGO-equivalent energy terms, so quoting them
  * as separate fuel types would triple-count one market.
  */
-const OFFER_GRADES = ["VLSFO", "IFO380", "LSMGO", "MGO", "MEOH"];
+const OFFER_GRADES = ["VLSFO", "IFO380", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
 
 /** Display order, matching GRADE_ORDER in src/lib/colors.ts. */
-const GRADE_ORDER = ["VLSFO", "IFO380", "LSMGO", "MGO", "MEOH"];
+const GRADE_ORDER = ["VLSFO", "IFO380", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
+
+/**
+ * The alternative fuels, which tier 3 is scoped to.
+ *
+ * Widened from methanol alone when the CE sheet brought biofuel in as a real
+ * grade. The reasoning is unchanged: a certified renewable blend is not a
+ * like-for-like quote against a fossil grade, so the specialists quote these and
+ * nothing else. LNG is absent deliberately: it is a fossil fuel, and the majors
+ * and state refiners who run the bunkering infrastructure quote it, not the
+ * renewable specialists.
+ */
+const ALTERNATIVE_GRADES = new Set(["MEOH", "B24", "B40"]);
 
 /**
  * Column prefix -> LOCODE. A copy of PRICE_PORT_ALIASES in src/lib/ports.ts,
@@ -469,9 +488,10 @@ for (const o of offers) {
   if (!coverage.get(o.portKey)?.has(o.grade)) {
     throw new Error(`${o.portKey} has no ${o.grade} series to quote against`);
   }
-  if (o.tier === 3 && o.grade !== "MEOH") {
+  if (o.tier === 3 && !ALTERNATIVE_GRADES.has(o.grade)) {
     throw new Error(
-      `${o.supplier} quotes ${o.grade} at ${o.portKey}: tier 3 is methanol only`,
+      `${o.supplier} quotes ${o.grade} at ${o.portKey}: tier 3 is ` +
+        "alternative fuels only (methanol and biofuel)",
     );
   }
   if (o.minMt >= o.maxMt) {

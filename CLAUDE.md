@@ -40,7 +40,7 @@ Nothing in `src/` hardcodes a start or end date. The scrubbed window is **entire
 The generator, not the app, applies the fuel rules. Three constants in `scripts/gen-vessel-movement.mjs` carry them, and each has an invariant that fails the run if the output violates it:
 
 - `ECA_PORTS` — the 10 China/Korea ports capping sulphur at **0.10%**. A vessel is on MGO from `ECA_LEAD_STEPS` (8 = 24 h) before a berth there until `ECA_TRAIL_STEPS` (1 = 3 h) after. VLSFO is 0.50% and does **not** clear this, so switching between the two residual grades would be non-compliance dressed as compliance. Consecutive ECA calls merge into one window.
-- `NO_HSFO_PORTS` — the 12 of 26 ports with no `IFO380` column and no high-sulphur market. A scrubber vessel stemming there lifts VLSFO. Assigning grade by scrubber fitting alone is the bug this replaced; `data/README.md` records it.
+- `NO_HSFO_PORTS` / `NO_VLSFO_PORTS` / `NO_MGO_PORTS` — 8, 5 and 5 of the 26 ports, straight off the Chief Engineer's availability sheet (see below). A scrubber vessel lifts VLSFO where there is no high-sulphur market; where there is no residual market **at all** — Chittagong, Mongla and Kolkata sell HSFO and distillate but no VLSFO — a non-scrubber hull stems nothing and must reach its next opportunity on what it carries. Qinzhou and Yangon are in all three: no confirmed bunker market of any kind. Assigning grade by scrubber fitting alone is the bug the first of these replaced; `data/README.md` records it. **`needFrom()` scans to the next call that can supply each tank separately** — a call selling HSFO but no distillate is not a distillate opportunity, and treating it as one is how a hull sails past the port it could not skip.
 - `VLSFO_RESERVE_RATIO` / `MGO_MAX_RATIO` — scrubber vessels open 80/20 HSFO/VLSFO within `Max_ROB_MT`; the MGO tank is 0.20 × `Max_ROB_MT` and sits **outside** it. `MGO_MAX_RATIO` is duplicated as `MGO_TANK_RATIO` in `src/lib/types.ts` because the generator cannot import from `src/` — change one, change the other.
 
 `Active_Fuel` (column 9) names the burning grade per row. **Read it; do not infer it** — a tank standing still is indistinguishable from a tank not being burned, and MGO is flat all window for the 10 vessels on ECA-free rotations (BD1, BD2, CAS, YGS). `activeGradeAt` in `src/lib/vesselPosition.ts` is the only decoder.
@@ -67,7 +67,23 @@ Adding a pricing port needs both an alias entry and a `PORT_COORDS` entry, or th
 
 Only 3 of the 26 ports this fleet stems at are assessed — Singapore, Busan and Shanghai. The other 23 carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `LSMGO_MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
 
-`MGO` follows the same hub table as VLSFO. It was originally added for chart completeness, but **it now prices stems**: `PRICE_SERIES` in `src/lib/bunkerEvents.ts` maps `MGO → "MGO"`, and the ECA switch means 116 of the fleet's 250 lifts are MGO. At 23 of the 26 ports that figure is modelled at `inferred`/`judgment` confidence with no published spread behind it — softer than the VLSFO basis, and the softest number the app puts a dollar value on. `Methanol Prices.csv` was deliberately **not** extended: researched and found to have no bunkering market at any of the 23 ports as of August 2026 (infrastructure exists only at Singapore, Shanghai/Zhoushan and emerging Korea/India facilities, none of which are in this fleet's unassessed set) — see `data/README.md` for sources.
+### The Chief Engineer's sheet is the availability authority
+
+`TYPES OF FUEL.xlsx` (Drive, *Chief engineer input data (Operational Feasibility)*) lists, per port, the fuels actually sold. It governs **which port×grade pairs exist** across `bunker_basis.csv`, the three `NO_*_PORTS` sets and `suppliers.csv`, and it overrode contrary research previously recorded in `data/README.md` at six ports. `Market_Status` in `bunker_basis.csv` carries three states: `priced`, `no_market`, and `unpriced` (market exists, nothing here can price it). Nothing is `unpriced` today — LNG was, until its hub was reconstructed.
+
+Two things the sheet does **not** get the last word on, both deliberate:
+
+- **Assessed columns are never deleted.** The sheet lists only LSMGO at Busan and Shanghai, but `BUSAN MGO` and `SHANGHAI MGO` are real assessments in the source workbook. They stay; the sheet governs modelled columns and stem routing, so no stem prices off them.
+- **Bangladesh VLSFO.** The sheet omits it at Chittagong and Mongla while PORTLAND advertises VLSFO 0.50% at all three Bangladeshi seaports. The sheet wins by decision, with the contrary source recorded in the blanked rows' `Data_Notes`.
+
+**`LSMGO` and `MGO` are different products, and the split falls on the ECA line.** China, Korea, Port Klang, Singapore, Surabaya and Qui Nhon sell the 0.10% distillate; Southeast Asia, India and the Bay of Bengal sell plain MGO. So `PRICE_SERIES` is gone — `priceSeriesFor(grade, portCode)` in `src/lib/bunkerEvents.ts` resolves a vessel's distillate tank to whichever column its port actually sells. Pricing an ECA switch off a plain `MGO` column, as this did before, valued a 0.10% lift at a 0.50% product's price. Use `TANK_SERIES` for colours and labels: a tank's colour must not change with the berth.
+
+Beyond the fossil grades the sheet adds four fuels, all modelled from the hubs beside them:
+
+- **MDO** at Chittagong and Mongla — DMB, priced under this port's own MGO basis.
+- **B24** at Singapore, Port Klang, Ningbo, Laem Chabang, Ho Chi Minh, and **B40** at Jakarta and Surabaya. B40 is the one biofuel figure with a posted price behind it (Pertamina, 2025-01-01 mandate change). **B24 is modelled off a modelled hub** — this dataset holds no assessed biofuel column, so the Singapore B24 series is itself VLSFO plus a published premium. It is the softest priced column in the app.
+- **MEOH at Ningbo**, from the port's first supply licence in January 2026. This **reverses** the earlier finding that no unassessed port here has a methanol market — that pass predates the Jan/Apr 2026 events. The basis carries a green-certification premium the conventional hub assessment does not.
+- **LNG** at Singapore, Port Klang, Shanghai, Ningbo and Ho Chi Minh. The source workbook carries no gas column, so the Singapore hub is **reconstructed** by `scripts/gen-lng-prices.mjs` from published JKM anchors in `data/pricing/lng_anchors.csv`: `(JKM + delivery premium) × 52 MMBtu/t`. **Run that script before `gen-modelled-prices.mjs`** — it writes the hub column the four modelled ports need. It is the only reconstructed series in `data/pricing/`, it is emitted at **monthly resolution** so the chart draws a staircase rather than implying daily precision, it starts at its first anchor in September 2021 with earlier dates blank, and it self-checks against a published figure no anchor is fitted to (Platts' 2024 Singapore LNG bunker average). That check earned its keep: it caught a 13.3% overshoot on the first build.
 
 They are deliberately indistinguishable downstream. They resolve through `PRICE_PORT_ALIASES`, chart like any other series, and **flow through `bunkerPriceSnapshot()` into stem valuations** — so a stem at Chittagong is priced off Singapore plus a judgment differential and reads exactly like a quoted one. `data/README.md` is the only record of which columns are which; check it before presenting any figure as an assessment.
 
@@ -84,7 +100,7 @@ Working rules:
 ### Every priced port is a marketplace, and the offers are invented
 
 `data/contracts/` is read at runtime now. [src/lib/suppliers.ts](src/lib/suppliers.ts)
-turns each of the 50 priced ports into a market per fuel type: the baseline, plus 3–5
+turns each of the 48 priced ports into a market per fuel type: the baseline, plus 3–5
 suppliers quoting against it. It reaches the UI through `markets` on
 `GET /api/prices/[portKey]`, rendered by
 [src/components/SupplierOffers.tsx](src/components/SupplierOffers.tsx) inside the port
@@ -112,7 +128,9 @@ Working rules:
   entry and a re-run in one change — a LOCODE with no price series throws.
 - Randomness is seeded on `Port_Code|Grade|Supplier`, so the CSV is stable and
   reviewable. Don't hand-edit it; the next run overwrites it.
-- **Tier 3 (bio/sustainable) is methanol only** — a certified renewable blend is not a
+- **Tier 3 (bio/sustainable) is alternative fuels only** — methanol, B24 and B40.
+  Widened from methanol alone when the CE sheet brought biofuel in as a real grade;
+  the reasoning is unchanged, that a certified renewable blend is not a
   like-for-like quote against a fossil grade. `MEOH_VLSFOe` / `MEOH_MGOe` get no offers
   at all: they are the same physical methanol restated in energy-equivalent terms.
 - The offer differential is **not** coloured with `text-up` / `text-down`. Those mean

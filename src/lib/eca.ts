@@ -35,24 +35,48 @@ export const ECA_PORTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The 12 ports with no IFO380 column and no high-sulphur market.
+ * The 8 ports with no high-sulphur market.
  *
  * A scrubber-fitted hull calling here lifts VLSFO instead. Assigning grade by
  * scrubber fitting alone is the bug this set replaced — see data/README.md.
  */
 export const NO_HSFO_PORTS: ReadonlySet<string> = new Set([
+  "CNNSA", // Nansha
+  "CNQZH", // Qinzhou
+  "CNSHK", // Shekou
+  "IDSUB", // Surabaya
+  "INGAV", // Gangavaram
+  "MMRGN", // Yangon
+  "VNHPH", // Haiphong
+  "VNUIH", // Qui Nhon
+]);
+
+/**
+ * The 5 ports with no 0.50% residual market.
+ *
+ * Chittagong and Mongla sell IFO 180/380 and distillate but no VLSFO; Kolkata
+ * sells HSFO alone. A non-scrubber hull can stem no residual at any of them.
+ */
+export const NO_VLSFO_PORTS: ReadonlySet<string> = new Set([
   "BDCGP", // Chittagong
   "BDMGL", // Mongla
-  "CNSHA", // Shanghai
-  "IDJKT", // Jakarta
-  "IDSRG", // Semarang
-  "IDSUB", // Surabaya
+  "CNQZH", // Qinzhou
+  "INCCU", // Kolkata
+  "MMRGN", // Yangon
+]);
+
+/**
+ * The 5 ports with no distillate market of either grade.
+ *
+ * LSMGO and MGO are one market for this purpose — which of the two a port sells
+ * changes the price column, never whether the tank can be filled.
+ */
+export const NO_MGO_PORTS: ReadonlySet<string> = new Set([
+  "CNQZH", // Qinzhou
   "INCCU", // Kolkata
   "INGAV", // Gangavaram
   "MMRGN", // Yangon
-  "THBKK", // Bangkok
   "VNHPH", // Haiphong
-  "VNUIH", // Qui Nhon
 ]);
 
 /** Whether a berth caps sulphur at 0.10% rather than the global 0.50%. */
@@ -61,11 +85,32 @@ export function isEcaPort(portCode: string | null): boolean {
 }
 
 /**
- * Whether high-sulphur fuel can actually be bought at a port.
+ * Whether a grade can actually be bought at a port.
  *
- * Unknown codes return true: this gates a warning, and warning about a port we
+ * Unknown codes return true: these gate warnings, and warning about a port we
  * hold no information on would be inventing a fact.
+ *
+ * Qinzhou and Yangon fail all three — the CE sheet records no confirmed bunker
+ * market at either, so nothing can be lifted there at all.
  */
 export function hasHsfoMarket(portCode: string | null): boolean {
   return portCode === null || !NO_HSFO_PORTS.has(portCode);
+}
+
+export function hasVlsfoMarket(portCode: string | null): boolean {
+  return portCode === null || !NO_VLSFO_PORTS.has(portCode);
+}
+
+export function hasMgoMarket(portCode: string | null): boolean {
+  return portCode === null || !NO_MGO_PORTS.has(portCode);
+}
+
+/** Whether a berth can supply the grade a hull is asking for. */
+export function hasMarketFor(
+  grade: "VLSFO" | "HSFO" | "MGO",
+  portCode: string | null,
+): boolean {
+  if (grade === "HSFO") return hasHsfoMarket(portCode);
+  if (grade === "VLSFO") return hasVlsfoMarket(portCode);
+  return hasMgoMarket(portCode);
 }
