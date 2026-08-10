@@ -23,6 +23,18 @@ const PORTS_SOURCE = "ports";
 const SERVICE_LINE_GAP = 2.5;
 
 /**
+ * Roughly 270 km across a laptop pane — close enough that the hull is the
+ * subject, with nearby coast still in frame on a coastal leg.
+ *
+ * A fixed zoom, deliberately. Framing the vessel together with the berth it is
+ * sailing to was the first attempt and it barely zoomed at all: Singapore
+ * to Kolkata is ~2,900 km, which fits at about 5.6 against a starting
+ * trade-lane view of about 4.4.
+ */
+const FOCUS_ZOOM = 9;
+const FOCUS_MS = 700;
+
+/**
  * How a service's line is drawn in each of the three focus states.
  *
  * With eleven services on at once, drawing them all at full strength is what
@@ -113,6 +125,17 @@ interface Props {
   /** Index into every track's step arrays; all tracks share one time grid. */
   stepIndex: number;
   selectedVesselName: string | null;
+  /**
+   * Vessel the camera holds while the spot bunker form is open. `null` hands
+   * the view back and eases to wherever it was before focus was entered.
+   */
+  focusVesselName: string | null;
+  /**
+   * Horizontal pixel bias for the focus camera, so a panel overlaying the map
+   * does not end up sitting on top of the vessel it is about. 0 when nothing
+   * overlays.
+   */
+  focusOffsetX: number;
   onSelectPort: (key: string | null) => void;
   onSelectVessel: (name: string | null) => void;
 }
@@ -175,6 +198,8 @@ export default function RouteMap({
   focusedService,
   stepIndex,
   selectedVesselName,
+  focusVesselName,
+  focusOffsetX,
   onSelectPort,
   onSelectVessel,
 }: Props) {
@@ -195,11 +220,28 @@ export default function RouteMap({
   const fitRef = useRef<(() => void) | null>(null);
   // Once the user pans or zooms, stop re-framing the map for them.
   const userMovedRef = useRef(false);
+  /** The view to hand back on exit. Stashed on entry, cleared on restore. */
+  const preFocusCameraRef = useRef<{
+    center: maplibregl.LngLat;
+    zoom: number;
+  } | null>(null);
   // Keeps the map's click handler pointing at the latest callback.
   const onSelectRef = useRef(onSelectPort);
   onSelectRef.current = onSelectPort;
   const onSelectVesselRef = useRef(onSelectVessel);
   onSelectVesselRef.current = onSelectVessel;
+  /**
+   * Focus state for the ResizeObserver, assigned during render like the
+   * callbacks above rather than inside the focus effect below.
+   *
+   * The ordering matters and is not obvious: unmounting the services sidebar is
+   * a size change, and a ResizeObserver callback fires after layout but *before*
+   * passive effects. A ref written by the effect would therefore still read
+   * stale on the one tick that counts, and the observer would refit the trade
+   * lane over the vessel the form is about.
+   */
+  const focusVesselRef = useRef(focusVesselName);
+  focusVesselRef.current = focusVesselName;
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
@@ -540,6 +582,11 @@ export default function RouteMap({
     // Re-fit on every size change until the user takes over the view.
     const observer = new ResizeObserver(() => {
       map.resize();
+      // Focus mode owns the camera. Unmounting the services sidebar is itself a
+      // size change, so without this guard entering focus would refit the whole
+      // trade lane on the very tick the zoom is being set up. resize() preserves
+      // the centre, so nothing needs re-centring here.
+      if (focusVesselRef.current !== null) return;
       if (!userMovedRef.current) fitRef.current?.();
     });
     observer.observe(containerRef.current);
@@ -634,7 +681,11 @@ export default function RouteMap({
                 duration: 600,
               });
             };
-      fitRef.current?.();
+
+      // Focus mode owns the camera, and entering it narrows visibleServices to
+      // the one service — which lands here. Refitting the lane would fight the
+      // vessel zoom the focus effect is setting up.
+      if (focusVesselRef.current === null) fitRef.current?.();
     };
 
     if (readyRef.current) apply();
@@ -715,8 +766,16 @@ export default function RouteMap({
         }
 
         // A vessel hides with its own route line, so switching a service off
-        // clears both together.
-        el.style.display = visible.has(track.serviceCode) ? "" : "none";
+        // clears both together. Focus mode narrows further, to the single hull
+        // the requirement is about — visibleServices cannot express that, since
+        // a service may have several tracked vessels on it.
+        el.style.display = (
+          focusVesselName
+            ? name === focusVesselName
+            : visible.has(track.serviceCode)
+        )
+          ? ""
+          : "none";
         marker.setLngLat(fix.position);
 
         const hull = el.querySelector<HTMLElement>(".bn-vessel-icon");
@@ -760,7 +819,7 @@ export default function RouteMap({
 
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [stepIndex, resolvers, trackByName, visibleServices]);
+  }, [stepIndex, resolvers, trackByName, visibleServices, focusVesselName]);
 
   // --- Selected vessel styling ---
   useEffect(() => {
@@ -768,6 +827,51 @@ export default function RouteMap({
       el.classList.toggle("is-selected", name === selectedVesselName);
     }
   }, [selectedVesselName]);
+
+  // --- Focus mode: hold the camera on one vessel ---
+  // Programmatic moves never set userMovedRef — zoomstart checks
+  // e.originalEvent, and easeTo fires no dragstart — so entering focus does not
+  // permanently disable the trade-lane refit for the rest of the session.
+  // stepIndex is frozen while focused, so this settles after one pass.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const apply = () => {
+      if (!focusVesselName) {
+        const previous = preFocusCameraRef.current;
+        if (previous) {
+          preFocusCameraRef.current = null;
+          map.easeTo({ ...previous, duration: FOCUS_MS });
+        }
+        return;
+      }
+
+      const fix = resolvers.get(focusVesselName)?.(stepIndex) ?? null;
+      // No fix means no position to hold. Leave the camera alone rather than
+      // easing somewhere arbitrary.
+      if (!fix) return;
+
+      if (!preFocusCameraRef.current) {
+        preFocusCameraRef.current = {
+          center: map.getCenter(),
+          zoom: map.getZoom(),
+        };
+      }
+
+      map.easeTo({
+        center: fix.position,
+        zoom: FOCUS_ZOOM,
+        // Places the vessel this many pixels from the container centre, which
+        // is how it ends up centred in the strip an overlaying panel leaves.
+        offset: [focusOffsetX, 0],
+        duration: FOCUS_MS,
+      });
+    };
+
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [focusVesselName, focusOffsetX, stepIndex, resolvers]);
 
   // --- Selected marker styling + always-on label ---
   useEffect(() => {

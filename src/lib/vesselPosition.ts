@@ -35,6 +35,38 @@ export interface VesselFix {
 }
 
 /**
+ * Where a tank sits against its two thresholds.
+ *
+ * The distinction the panel kept collapsing: the bunkering trigger and the
+ * safety floor are not two severities of one alarm.
+ *
+ * - `due` — at or below `Bunkering_Trigger_MT` (1.5% DWT). The state the
+ *   generator is *built* to produce: it lifts a stem once ROB has fallen to
+ *   the trigger, so every vessel spends part of its loop here by design —
+ *   8.0% of all 26,040 rows, across all 35 vessels. Never a fault.
+ * - `breach` — below `Min_ROB_MT` (1.0% DWT). A genuine violation, and one
+ *   `scripts/gen-vessel-movement.mjs` asserts against every row before
+ *   writing, so it cannot occur in a file that script produced. Kept live
+ *   anyway: the CSV is regenerable and hand-editable, and a threshold nothing
+ *   checks is how this panel came to carry copy that outlived its own data.
+ */
+export type RobState = "ok" | "due" | "breach";
+
+/**
+ * `RobState` for one tank. A null threshold falls through to the looser
+ * reading — with no figure there is nothing to have crossed.
+ */
+export function robState(
+  robMt: number,
+  minMt: number | null,
+  triggerMt: number | null,
+): RobState {
+  if (minMt !== null && robMt < minMt) return "breach";
+  if (triggerMt !== null && robMt <= triggerMt) return "due";
+  return "ok";
+}
+
+/**
  * The grade being burned at a step, unpacked from the track's `activeGrades`.
  *
  * The char is written by the generator rather than inferred from which tank is

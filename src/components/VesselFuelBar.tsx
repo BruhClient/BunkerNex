@@ -3,6 +3,7 @@
 import { GRADE_COLORS, GRADE_LABELS } from "@/lib/colors";
 import { formatMt } from "@/lib/format";
 import { PRICE_SERIES } from "@/lib/bunkerEvents";
+import { robState, type RobState } from "@/lib/vesselPosition";
 import type { VesselGrade } from "@/lib/types";
 
 interface Props {
@@ -16,10 +17,22 @@ interface Props {
   maxRobMt: number | null;
   minRobMt: number | null;
   triggerMt: number | null;
+  /**
+   * Where the residual pair sits against those two. Computed by the parent so
+   * the bar and the note beneath it cannot disagree about one reading.
+   */
+  state: RobState;
   /** Capacity of the separate distillate tank. */
   mgoMaxMt: number | null;
   mgoMinMt: number | null;
 }
+
+/** Plain-language state for the bar's accessible name. */
+const STATE_LABEL: Record<RobState, string> = {
+  ok: "above the bunkering trigger",
+  due: "below the bunkering trigger, due to stem",
+  breach: "below the safety minimum",
+};
 
 /** Colour and label resolve through the price grade, as a stem's valuation does. */
 const colorFor = (grade: VesselGrade) => GRADE_COLORS[PRICE_SERIES[grade]];
@@ -39,6 +52,11 @@ const labelFor = (grade: VesselGrade) => GRADE_LABELS[PRICE_SERIES[grade]];
  * The active grade is marked rather than inferred: a vessel mid-ECA is burning
  * MGO while both residual tanks stand still, and on the ten rotations that
  * touch no ECA port the MGO tank never moves at all.
+ *
+ * The segment fills are always the grade colours. Recolouring them to signal a
+ * threshold — which this did — flattens a scrubber vessel's two segments into
+ * one block and takes the split with it, on 1,146 of its 14,880 rows. State is
+ * carried by the ticks and by a ring around the bar instead.
  */
 export default function VesselFuelBar({
   robMt,
@@ -47,12 +65,15 @@ export default function VesselFuelBar({
   maxRobMt,
   minRobMt,
   triggerMt,
+  state,
   mgoMaxMt,
   mgoMinMt,
 }: Props) {
   const residual = robMt.HSFO + robMt.VLSFO;
-  const belowMin = minRobMt !== null && residual < minRobMt;
-  const belowTrigger = triggerMt !== null && residual < triggerMt;
+
+  // The distillate tank has a floor but no trigger surfaced anywhere in the
+  // app, so this is only ever "breach" or "ok".
+  const mgoState = robState(robMt.MGO, mgoMinMt, null);
 
   // Capacity is 3% of deadweight for every vessel in the specs sheet and is
   // non-zero throughout, but the type admits null — without a scale there is no
@@ -83,7 +104,12 @@ export default function VesselFuelBar({
       {scale !== null ? (
         <>
           <div
-            className="relative mt-1.5 flex h-3 w-full overflow-hidden rounded-[2px] bg-surface-2"
+            className={
+              "relative mt-1.5 flex h-3 w-full overflow-hidden rounded-[2px] bg-surface-2" +
+              // A ring, not a repaint: it marks the whole bar without spending
+              // the fills that carry the split.
+              (state === "breach" ? " ring-1 ring-inset ring-warn" : "")
+            }
             role="img"
             aria-label={
               `${formatMt(residual)} MT of residual fuel onboard, ` +
@@ -93,7 +119,10 @@ export default function VesselFuelBar({
                 ? `: ${residualGrades
                     .map((g) => `${formatMt(robMt[g])} MT ${labelFor(g)}`)
                     .join(", ")}`
-                : "")
+                : "") +
+              // Said in words, because the ticks and the ring are the only
+              // other places it is said at all.
+              `. ${STATE_LABEL[state]}.`
             }
           >
             {residualGrades
@@ -104,28 +133,38 @@ export default function VesselFuelBar({
                   className="h-full transition-[width] duration-150"
                   style={{
                     width: `${Math.min(100, (robMt[grade] / scale) * 100)}%`,
-                    // Warn amber the moment the vessel is under a threshold, so
-                    // the bar carries the same signal as the box below it.
-                    background:
-                      belowMin || belowTrigger
-                        ? "var(--color-warn)"
-                        : colorFor(grade),
+                    background: colorFor(grade),
                   }}
                 />
               ))}
 
             {/* Thresholds sit on the bar rather than beside it — a vessel's
-                distance from its trigger is the thing being read here. */}
+                distance from its trigger is the thing being read here. The one
+                actually crossed is picked out; two identical hairlines left it
+                to the reader to work out which. */}
             {[
-              { at: triggerMt, key: "trigger" },
-              { at: minRobMt, key: "min" },
-            ].map(({ at, key }) =>
+              { at: triggerMt, key: "trigger", lit: state === "due" },
+              { at: minRobMt, key: "min", lit: state === "breach" },
+            ].map(({ at, key, lit }) =>
               at === null || at > scale ? null : (
                 <span
                   key={key}
                   aria-hidden
-                  className="absolute inset-y-0 w-px bg-bg/70"
-                  style={{ left: `${(at / scale) * 100}%` }}
+                  className={
+                    "absolute inset-y-0 " +
+                    (lit ? "w-0.5 -translate-x-px" : "w-px bg-bg/70")
+                  }
+                  style={{
+                    left: `${(at / scale) * 100}%`,
+                    ...(lit
+                      ? {
+                          background:
+                            key === "min"
+                              ? "var(--color-warn)"
+                              : "var(--color-accent)",
+                        }
+                      : null),
+                  }}
                 />
               ),
             )}
@@ -154,9 +193,17 @@ export default function VesselFuelBar({
             ))}
           </div>
 
+          {/* The crossed figure is brought up out of `faint`, so the reading
+              survives without relying on the tick's colour alone. */}
           <div className="mt-1 flex justify-between text-[10px] text-faint">
             <span className="tnum">
-              Min {formatMt(minRobMt)} · Trigger {formatMt(triggerMt)}
+              <span className={state === "breach" ? "text-warn" : undefined}>
+                Min {formatMt(minRobMt)}
+              </span>{" "}
+              ·{" "}
+              <span className={state === "due" ? "text-fg" : undefined}>
+                Trigger {formatMt(triggerMt)}
+              </span>
             </span>
             <span className="tnum">Capacity {formatMt(maxRobMt)} MT</span>
           </div>
@@ -190,49 +237,51 @@ export default function VesselFuelBar({
 
         {mgoMaxMt !== null && mgoMaxMt > 0 && (
           <div
-            className="relative mt-1.5 h-2 w-full overflow-hidden rounded-[2px] bg-surface-2"
+            className={
+              "relative mt-1.5 h-2 w-full overflow-hidden rounded-[2px] bg-surface-2" +
+              // Same vocabulary as the residual bar: amber ring means breach.
+              // The generator's MGO trigger has no counterpart here, so this
+              // tank has only the one threshold to be under.
+              (mgoState === "breach" ? " ring-1 ring-inset ring-warn" : "")
+            }
             role="img"
-            aria-label={`${formatMt(robMt.MGO)} MT of MGO onboard, ${Math.min(100, (robMt.MGO / mgoMaxMt) * 100).toFixed(0)} percent of ${formatMt(mgoMaxMt)} MT tank`}
+            aria-label={
+              `${formatMt(robMt.MGO)} MT of MGO onboard, ` +
+              `${Math.min(100, (robMt.MGO / mgoMaxMt) * 100).toFixed(0)} percent of ` +
+              `${formatMt(mgoMaxMt)} MT tank` +
+              (mgoState === "breach" ? ". Below the tank minimum." : "")
+            }
           >
             <div
               className="h-full transition-[width] duration-150"
               style={{
                 width: `${Math.min(100, (robMt.MGO / mgoMaxMt) * 100)}%`,
-                background:
-                  mgoMinMt !== null && robMt.MGO < mgoMinMt
-                    ? "var(--color-warn)"
-                    : GRADE_COLORS.MGO,
+                background: GRADE_COLORS.MGO,
                 opacity: 0.85,
               }}
             />
             {mgoMinMt !== null && mgoMinMt <= mgoMaxMt && (
               <span
                 aria-hidden
-                className="absolute inset-y-0 w-px bg-bg/70"
+                className={
+                  "absolute inset-y-0 " +
+                  (mgoState === "breach"
+                    ? "w-0.5 -translate-x-px bg-warn"
+                    : "w-px bg-bg/70")
+                }
                 style={{ left: `${(mgoMinMt / mgoMaxMt) * 100}%` }}
               />
             )}
           </div>
         )}
 
+        {/* The one thing the bars cannot show: why this tank moves at all. The
+            separate scale, heading and capacity already say it is its own tank,
+            and an unfitted hull never renders an HSFO row to explain away. */}
         <p className="mt-1 text-[10px] leading-relaxed text-faint">
-          A separate tank, outside the {formatMt(maxRobMt)} MT residual capacity
-          above. Burned in place of the main fuel through China and Korea ECA
-          calls, which cap sulphur at 0.10% — below what VLSFO clears. It stays
-          flat all window on the rotations that call at no ECA port.
+          Burned through ECA calls — China and Korea cap sulphur at 0.10%.
         </p>
       </div>
-
-      <p className="mt-2 text-[10px] leading-relaxed text-faint">
-        {scrubber
-          ? "Scrubber-fitted, so this vessel may burn high-sulphur fuel and " +
-            "carries VLSFO as its compliant reserve — lifted wherever a port " +
-            "cannot supply HSFO, which is twelve of the twenty-six it calls."
-          : "No scrubber, so HSFO would not be MARPOL Annex VI compliant on " +
-            "this hull. Its HSFO figure is a true zero, not a missing value — " +
-            "the source lists all three grades for every vessel as engine " +
-            "capability, not as lawful use."}
-      </p>
     </div>
   );
 }

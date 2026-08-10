@@ -19,11 +19,15 @@ interface Props {
  * scrubber starts.
  */
 export default function VesselStems({ events, stepIndex, onSeek }: Props) {
+  // Unreachable against the current file — all 35 vessels stem at least three
+  // times in the window — but the CSV is regenerable, and a shorter window
+  // could leave a vessel on its opening tanks. Worded as the general case
+  // rather than asserting what this data happens to do.
   if (events.length === 0) {
     return (
       <p className="px-4 text-[11px] leading-relaxed text-faint">
-        This vessel takes no bunkers in the window. It opens at full tanks and
-        the simulation never brings it down to its trigger.
+        This vessel takes no bunkers in the window: it opens with enough
+        onboard that no call within these dates meets its bunkering trigger.
       </p>
     );
   }

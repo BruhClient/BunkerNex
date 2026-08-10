@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo } from "react";
 import { serviceColor } from "@/lib/colors";
-import { activeGradeAt, buildLegs, stepTimestamp } from "@/lib/vesselPosition";
+import {
+  activeGradeAt,
+  buildLegs,
+  robState,
+  stepTimestamp,
+} from "@/lib/vesselPosition";
 import VesselFuelBar from "./VesselFuelBar";
 import VesselRobChart from "./VesselRobChart";
 import VesselStems from "./VesselStems";
@@ -26,6 +31,11 @@ interface Props {
   /** Every stem in the window. Filtered to this vessel here. */
   events: BunkerEvent[];
   onSeek: (step: number) => void;
+  /**
+   * Opens the spot bunker requirement form. Only offered while the vessel is in
+   * transit — a stem is nominated on the way to a berth, not from alongside it.
+   */
+  onEvaluateSpot?: () => void;
   onClose: () => void;
 }
 
@@ -68,6 +78,7 @@ export default function VesselPanel({
   stepIndex,
   events,
   onSeek,
+  onEvaluateSpot,
   onClose,
 }: Props) {
   const vesselName = spec?.name ?? null;
@@ -134,12 +145,24 @@ export default function VesselPanel({
     spec.maxRobMt === null ? null : spec.maxRobMt * MGO_TANK_RATIO;
   const mgoMinMt = mgoMaxMt === null ? null : mgoMaxMt * MGO_TANK_MIN_RATIO;
 
-  // The two thresholds the simulation ignores — see data/README.md. Surfacing
-  // them here is the point of the panel: a vessel below its minimum is not a
-  // schedule anyone could actually run.
-  const belowMin = spec.minRobMt !== null && residualRob < spec.minRobMt;
-  const belowTrigger =
-    spec.bunkeringTriggerMt !== null && residualRob < spec.bunkeringTriggerMt;
+  // Both thresholds are enforced by scripts/gen-vessel-movement.mjs, which
+  // asserts Min_ROB_MT ≤ HSFO + VLSFO ≤ Max_ROB_MT across all 26,040 rows
+  // before writing — data/README.md, "The bunkering trigger is now enforced".
+  // So what is worth surfacing is distance to the next stem, not a breach:
+  // crossing the trigger is the generator working, not failing.
+  const state = robState(residualRob, spec.minRobMt, spec.bunkeringTriggerMt);
+
+  // The stem this vessel is heading for, once it is under the trigger. MGO is
+  // excluded: it stems against its own tank on its own trigger, so an ECA lift
+  // two days out says nothing about when the residual pair is topped up.
+  const nextStem =
+    state === "due"
+      ? (stems.find((e) => e.step >= stepIndex && e.grade !== "MGO") ?? null)
+      : null;
+  const stemDays =
+    nextStem === null
+      ? null
+      : ((nextStem.step - stepIndex) * track.stepHours) / 24;
 
   return (
     <aside
@@ -221,32 +244,74 @@ export default function VesselPanel({
               maxRobMt={spec.maxRobMt}
               minRobMt={spec.minRobMt}
               triggerMt={spec.bunkeringTriggerMt}
+              state={state}
               mgoMaxMt={mgoMaxMt}
               mgoMinMt={mgoMinMt}
             />
           </div>
 
-          {(belowMin || belowTrigger) && (
-            <div className="mx-4 mt-2 rounded border border-warn/40 bg-warn/10 px-3 py-2">
-              <p className="text-[11px] leading-relaxed text-warn">
-                {residualRob <= 0 ? (
+          {/* Two different things, deliberately styled apart. Under the trigger
+              is the plan running to plan; under the floor would mean the CSV
+              broke a rule its own generator asserts. Amber is only ever the
+              second. */}
+          {state === "due" && (
+            <div className="mx-4 mt-2 rounded border border-line bg-surface-2 px-3 py-2">
+              <p className="text-[11px] leading-relaxed text-muted">
+                <span className="font-semibold text-fg">Due to bunker</span> —
+                residual is under the {int(spec.bunkeringTriggerMt)} MT trigger.{" "}
+                {nextStem === null ? (
                   <>
-                    <span className="font-semibold">No fuel onboard.</span> The
-                    simulation runs this vessel to zero — not a survivable state.
-                  </>
-                ) : belowMin ? (
-                  <>
-                    <span className="font-semibold">Below safety minimum</span>{" "}
-                    of {int(spec.minRobMt)} MT.
+                    No further residual stem falls inside the window, so the
+                    curve runs to the end on what is onboard.
                   </>
                 ) : (
                   <>
-                    <span className="font-semibold">Below bunker trigger</span>{" "}
-                    of {int(spec.bunkeringTriggerMt)} MT.
+                    Next stem is {int(nextStem.quantityMt)} MT {nextStem.grade}{" "}
+                    at {nextStem.portName}
+                    {stemDays !== null && stemDays > 0 && (
+                      <>
+                        ,{" "}
+                        {stemDays < 1
+                          ? "within a day"
+                          : `in ${dec(stemDays, 1)} days`}
+                      </>
+                    )}
+                    .
                   </>
                 )}{" "}
-                The movement data does not enforce either threshold, so these
-                ROB curves are not a feasible operating plan.
+                The {int(spec.minRobMt)} MT floor holds on every row of the
+                window — the trigger is the prompt to stem, not a breach.
+              </p>
+            </div>
+          )}
+
+          {state === "breach" && (
+            <div className="mx-4 mt-2 rounded border border-warn/40 bg-warn/10 px-3 py-2">
+              <p className="text-[11px] leading-relaxed text-warn">
+                <span className="font-semibold">Below safety minimum</span> of{" "}
+                {int(spec.minRobMt)} MT.{" "}
+                <code className="font-mono">gen-vessel-movement.mjs</code>{" "}
+                asserts this cannot happen before it writes the file, so a
+                vessel reaching here means the movement CSV was hand-edited or
+                is stale. Re-run the generator rather than reading this curve as
+                an operating plan.
+              </p>
+            </div>
+          )}
+
+          {/* A stem is nominated on passage, against the berth ahead — so this
+              is offered in transit and withdrawn once the vessel is alongside. */}
+          {phase !== "Berthed" && onEvaluateSpot && (
+            <div className="px-4 pt-3">
+              <button
+                type="button"
+                onClick={onEvaluateSpot}
+                className="flex w-full items-center justify-center gap-1.5 rounded border border-down/40 bg-down/15 px-3 py-2 text-[11px] font-semibold text-down transition-colors hover:bg-down/25"
+              >
+                Evaluate spot bunkering
+              </button>
+              <p className="mt-1 text-[10px] leading-relaxed text-faint">
+                Nominate against {leg ? leg.toKey : "the next call"}.
               </p>
             </div>
           )}
