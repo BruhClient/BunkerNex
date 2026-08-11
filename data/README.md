@@ -525,9 +525,16 @@ list is prose with no rates and no port coverage. These files therefore support
 
 | File | Grain |
 |---|---|
-| `suppliers.csv` | one row per supplier (74), tiered as the source groups them |
-| `supplier_offers.csv` | one row per port × grade × supplier (465), **generated** |
+| `suppliers.csv` | one row per supplier (73), tiered as the source groups them |
+| `supplier_offers.csv` | one row per port × grade × supplier (563), **generated** |
+| `supplier_fleet.csv` | one row per supplier × port (317), **generated** |
+| `supplier_quote_history.csv` | one row per port × grade × supplier × week (28,909), **generated** |
+| `supplier_transactions.csv` | one row per settled stem (7,797), **generated** |
 | `term_terms.csv` | one row per negotiable commercial parameter, with its clause |
+
+The last three were added for the HQ supplier-evaluation desk (`/hq`) and are described
+under "The supplier-evaluation trio" below. `term_terms.csv` is read by nothing in
+`src/` — its figures were hand-copied into the generators.
 
 The most load-bearing value in `term_terms.csv` is the guaranteed pumping rate,
 400–800 MT/hour (clause 3.3) — it feeds the `quantity ÷ pump rate` transfer-time
@@ -608,6 +615,158 @@ Working rules:
 modelled ports they spread off a baseline that is not an assessment either** — a hub
 series plus a documented basis, per the `pricing/` section above. The port panel says
 so in copy; anything else that presents them must too.
+
+### The supplier-evaluation trio — fleet, quote history, transactions
+
+Three generated files added for the HQ desk at `/hq`. They exist because a supplier
+cannot be evaluated from `supplier_offers.csv` alone: that file answers *who is cheapest
+to ask today*, and a bunker desk needs *who is cheapest to buy from over time*, which is
+a different supplier whenever one of them negotiates harder or delivers more reliably.
+
+**Run them in this order.** Each reads the one before it:
+
+```
+gen-supplier-offers.mjs        →  supplier_offers.csv
+gen-supplier-fleet.mjs         →  supplier_fleet.csv          (reads offers)
+gen-supplier-quote-history.mjs →  supplier_quote_history.csv  (reads offers + pricing/)
+gen-supplier-transactions.mjs  →  supplier_transactions.csv   (reads quote history)
+```
+
+`gen-supplier-transactions.mjs` throws on a missing quote-history file rather than
+emitting a stale ledger. The quote history copies the benchmark column in, so — unlike
+`supplier_offers.csv` — **it does go stale on a price refresh** and must be re-run with
+the modelled-price generators, followed by the transaction ledger.
+
+#### `supplier_fleet.csv` — delivery capability, derived from the offers
+
+One row per supplier per port: barge count, total and largest barge tonnage, a
+mode-agnostic `Delivery_Capacity_MT_Per_Day`, average barge age and a reliability
+percentage. Nothing in any source document carries a barge figure; two of the 73
+suppliers mention barges in `suppliers.csv`'s free-text `notes`, narratively and without
+numbers.
+
+The fleet is **derived from that supplier's own offers**, not drawn independently: the
+largest barge is sized off the biggest parcel it already quotes at that port, throughput
+off its own `Pump_Rate_MT_Per_Hour`, and reliability is docked where its own
+`Availability` column already says `Enquire`. Three invariants are asserted — the
+largest barge must clear the biggest quoted parcel, fleet capacity must clear the
+largest barge, and daily throughput must clear the parcel ceiling. A supplier quoting a
+5,000 MT ceiling can therefore never come out unable to lift it.
+
+51 of the 317 rows have **zero barges**. Those are shore-supplied only (ex-wharf or
+pipeline at that port), which is a real distinction and not a gap —
+`Delivery_Capacity_MT_Per_Day` stays populated for them, which is why the scatter plots
+against it rather than against barge tonnage.
+
+#### `supplier_quote_history.csv` — the axis `supplier_offers.csv` does not have
+
+52 weekly points per supplier-market, against the port's own benchmark on the same date.
+`supplier_offers.csv` has no `Date` column at all.
+
+**The deviation is the whole point.** Repeating the static differential across 52 weeks
+would draw perfectly parallel lines, which say nothing the single current number does
+not. Each supplier-market gets a mean-reverting weekly shock plus a slow competitiveness
+swing, so suppliers cross each other and can be read as getting keener or dearer across
+the year. The generator asserts that no market moves less than $1/mt across the year,
+precisely to catch a regression back to parallel lines.
+
+**The last row reconciles exactly to `supplier_offers.csv`.** The deviation series is
+normalised to be zero on the final date, and that is asserted. Without it the chart's
+right-hand edge would contradict the price the port panel quotes, two screens apart.
+
+Two sampling rules worth knowing:
+
+- **The window is anchored to the newest date in `pricing/` (2026-08-05), not to each
+  series' own last point.** Anchoring per-series would silently relabel a dead column as
+  current — `SANTOS HSFO` was last assessed on 2019-11-14, and "its last 52 buckets"
+  would have drawn 2019 prices under a heading of *past year*. Anchored globally it
+  correctly falls out of the window, and it is the one market excluded (named on stdout,
+  never silently dropped). 558 of the 563 supplier-markets are covered.
+- **A short series is not a bad one, and is kept at its true length.** Ningbo's methanol
+  market opened on the port's first supply licence in January 2026 and carries 30 of the
+  52 weeks; the weekly methanol columns land at 50 because one point per week cannot
+  fill 52 buckets. Consumers must read the covered window off the rows and **not assume
+  52 weeks**.
+
+#### `supplier_transactions.csv` — quoted, contracted, benchmark, forecast
+
+The ledger the three variance tiles and the supplier recommendation are computed from:
+what was quoted, what the contract was actually signed at, the benchmark on the day, and
+what a forecast run ten days earlier had projected.
+
+```
+Contracted = Quoted − concession(supplier, rounds, parcel size)
+```
+
+**Negotiability is seeded on the supplier name alone**, not on the market. A house that
+gives ground at Singapore gives comparable ground at Rotterdam. That is what makes the
+benchmark-vs-contract figure a statement about the counterparty rather than about the
+port, and it is the single most load-bearing draw in the file. Bands are per tier and
+follow the same commercial logic as the offer differentials — a major concedes least
+because the premium *is* the brand and the credit line; a trader on a thin margin moves
+furthest; the renewable specialists barely move because the product is scarce.
+
+The resulting spread across suppliers is ~2.4 percentage points of realised saving, and
+the generator asserts it exceeds 0.5 — a ledger where everyone concedes equally would
+make the tile it feeds unable to discriminate, which is the failure mode worth catching.
+
+391 of the 7,797 rows take their **vessel name and lifted quantity from a real stem** in
+`PIL_Fleet_Live_Movement.csv`, so the ledger lines up with the bunker log the rest of the
+app renders. That is only possible inside the movement window (2026-05-05 → 2026-08-05,
+13 of the 52 weeks); the rest is backfilled, and `Source_Basis` distinguishes the two
+(`simulated (fleet stem)` vs `simulated`). **Every commercial figure is simulated in
+both cases** — only the vessel and the tonnage are ever real.
+
+`Forecast_At_Time_USD_Per_MT` is built from past data only: the benchmark as it stood
+two weeks earlier, extended by the slope of the three weeks before that. Computing it
+with hindsight would make the desk's forecasting look better than it is, which is the one
+thing that column exists to measure.
+
+**A caution on reading these tiles across grades.** Tier-3 renewable suppliers quote
++14% to +21% over their benchmark and concede almost nothing, while tier-2 traders quote
+below benchmark and concede ~2.6%. Both are correct within their own market. Averaging a
+supplier's variance across grades therefore compares a certified renewable product to a
+fossil one — the `/hq` scorecard scopes every tile to the selected port × grade for
+exactly this reason.
+
+---
+
+## `requests/` — the HQ desk's inbox
+
+`bunker_requests.csv`, generated by
+[`scripts/gen-bunker-requests.mjs`](../scripts/gen-bunker-requests.mjs). One row per
+open bunkering request: what the chief engineer asked for, where, and by when — plus
+the forward legs the desk needs in order to plan further ahead than the CE was asked to.
+
+PIL publishes no bunkering requisitions, so the requisition itself is simulated. The
+vessel, port, rotation and timing are taken from `PIL_Fleet_Live_Movement.csv`, and the
+quantity and ROB reading are the real stem and tank level recorded there.
+
+**`Forward_Legs` is the reason this file exists.** It packs the next three calls as
+`PORT@ETA@TRANSIT_DAYS@DWELL_DAYS`, `;`-separated — the same convention `Key_Features`
+and `suppliers.csv`'s `ports`/`grades` already use. A chief engineer plans on a
+next-port basis: enough fuel, of the right grade, to reach the next berth legally. That
+is the right scope for the ship and the wrong one for the desk, which can see that the
+port *after* next is inside a DECA zone with no distillate market. Baking the chain into
+the request also keeps `/hq` off the movement series entirely — that file is ~690 KB as
+page props and CLAUDE.md already flags it as being at the edge of what should ship to a
+client.
+
+Two things the generator gets right that are easy to get wrong:
+
+- **A leg boundary is read off `Operational_Phase`, not `Port_Code`.** That column holds
+  the *destination* while a vessel is in transit and the berth only while alongside, so
+  it flips the moment a ship casts off. Using it directly dates every arrival to the
+  previous port's departure and produces three-hour "voyages".
+- **Transit and dwell are carried separately.** They burn at different rates
+  (`Consumption_Transit_MT_Per_Day` vs `Consumption_Berth_MT_Per_Day`), and folding them
+  together across a long dwell overstates the fuel remaining — an error in the one
+  direction a compliance projection must never make.
+
+Requests are only raised on stems that have all three onward calls inside the movement
+window, so the latest stems in the series do not qualify: a partial chain would show the
+desk a two-port horizon and ask it to plan three ports ahead. 18 requests across 13
+ports, one per vessel — a desk works a fleet, not a hull.
 
 ---
 
