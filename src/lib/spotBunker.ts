@@ -50,12 +50,6 @@ export type SpotFuelGrade = "HSFO" | "VLSFO" | "LSMGO" | "MGO";
 /** ISO 8217 editions the desk will accept. 2017 is the working standard. */
 export type IsoSpecVersion = "2024" | "2017" | "2012" | "2010";
 
-/**
- * Bunker plan status in Flamingo. Only "Confirmed" is a green light to order,
- * and it lands 7–10 days before ETA. Not in any dataset.
- */
-export type FlamingoStatus = "Registered" | "Confirmed";
-
 export type DeliveryLocation = "Anchorage" | "Alongside";
 
 export type Surveyor = "VPS" | "Maritec" | "Intertek";
@@ -101,7 +95,6 @@ export interface SpotBunkerRequest {
   /** Burn to delivery. Derived from an assumed daily rate, not measured. */
   projectedConsumptionMt: number | null;
   portStayDays: number | null;
-  flamingoStatus: FlamingoStatus | null;
 
   // --- 3. Critical temperature and cold flow limits ------------------------
   /** °C. Declared for the voyage climate — ARA Nov–Jan and similar. */
@@ -180,9 +173,8 @@ export interface SpotContext {
    * NOT a lead time against a published ETA — no ETA exists in this data.
    * PIL's schedule CSVs carry loop-relative day numbers, not dates, so this is
    * read off the generated movement series. Intra-Asia legs are short, so this
-   * routinely sits under the ETA-minus-6-working-days window and almost never
-   * inside the 7–10 day Flamingo band. Warn on it; never gate on it, or every
-   * vessel in the fleet fails.
+   * routinely sits under the ETA-minus-6-working-days window. Warn on it;
+   * never gate on it, or every vessel in the fleet fails.
    */
   daysToArrival: number | null;
   portStayDays: number | null;
@@ -350,9 +342,7 @@ export function deriveSpotContext(
 /**
  * A draft seeded from where the vessel actually is.
  *
- * Only figures the data genuinely supports are filled. flamingoStatus stays
- * null because nothing in this repo records it, and a guessed "Confirmed"
- * would read as a green light to order.
+ * Only figures the data genuinely supports are filled.
  */
 export function prefillSpotRequest(ctx: SpotContext): SpotBunkerRequest {
   // What the engine is burning now, not the hull's primary grade — those differ
@@ -376,7 +366,6 @@ export function prefillSpotRequest(ctx: SpotContext): SpotBunkerRequest {
     robMt: grade === null ? null : ctx.robByGrade[tankFor(grade)],
     projectedConsumptionMt: ctx.projectedBurnToArrivalMt,
     portStayDays: ctx.portStayDays,
-    flamingoStatus: null,
 
     maxPourPointC: null,
     minViscosityCst: null,
@@ -422,8 +411,6 @@ export interface SpotIssue {
 
 /** Ordering window the MSA mandates, in Mon–Fri days before arrival. */
 const ORDER_LEAD_WORKING_DAYS = 6;
-/** Flamingo flips Registered → Confirmed inside this band, in days before ETA. */
-const FLAMINGO_WINDOW_DAYS: readonly [number, number] = [7, 10];
 
 /**
  * Everything wrong with a draft, as errors and warnings.
@@ -500,13 +487,6 @@ export function validateSpotRequest(
         `${Math.round(draft.nominationMt)} MT exceeds the ${Math.round(headroom)} MT headroom. Capacity is a percentage of deadweight — a derived figure, not a measured tank.`,
       );
     }
-  }
-
-  if (draft.flamingoStatus !== "Confirmed") {
-    warn(
-      "flamingoStatus",
-      "Only a Confirmed plan is a green light to order. Flamingo status is not carried in this data.",
-    );
   }
 
   // --- 3. Cold flow --------------------------------------------------------
@@ -586,16 +566,6 @@ export function validateSpotRequest(
       warn(
         "etaWindowStart",
         `${lead} working days to arrival; the ETA-minus-6-working-days ordering window has passed. Mon–Fri count only — no port holiday calendar exists in this data.`,
-      );
-    }
-  }
-
-  if (ctx.daysToArrival !== null) {
-    const [lo, hi] = FLAMINGO_WINDOW_DAYS;
-    if (ctx.daysToArrival < lo || ctx.daysToArrival > hi) {
-      warn(
-        "flamingoStatus",
-        `Arrival is ${ctx.daysToArrival} days out, outside the ${lo}–${hi} day Flamingo confirmation window.`,
       );
     }
   }

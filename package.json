@@ -8,21 +8,22 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
+    "maplibre-gl": "^5.6.1",
     "next": "^15.5.4",
+    "papaparse": "^5.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "maplibre-gl": "^5.6.1",
-    "recharts": "^2.15.4",
-    "papaparse": "^5.5.3"
+    "recharts": "^2.15.4"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
+    "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^22.15.3",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
-    "@types/papaparse": "^5.3.16",
+    "postcss": "^8.5.6",
     "tailwindcss": "^4.1.11",
-    "@tailwindcss/postcss": "^4.1.11",
-    "postcss": "^8.5.6"
+    "typescript": "^5.9.2"
   }
 }

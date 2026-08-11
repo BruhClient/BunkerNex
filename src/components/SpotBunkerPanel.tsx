@@ -31,10 +31,10 @@ import {
   tankFor,
   validateSpotRequest,
   type DeliveryLocation,
-  type FlamingoStatus,
   type IsoSpecVersion,
   type ResidualViscosityGrade,
   type SpotBunkerRequest,
+  type SpotContext,
   type SpotFuelGrade,
   type SpotIssue,
   type Surveyor,
@@ -61,9 +61,9 @@ import type { VesselSpec, VesselTrack } from "@/lib/types";
  * on the header. The submit sits outside the scroll area because with sections
  * shut the error count is the only signal the form is incomplete.
  *
- * There is no <form> element and the submit is disabled. Supplier matching is
- * not built; this collects the requirement and nothing else. A real form would
- * give Enter a keystroke that looks like it works.
+ * There is no <form> element — Enter does nothing, only the button submits.
+ * `onSubmit` hands the validated draft and its derived `ctx` to Explorer,
+ * which swaps this panel for SpotMatchPanel and posts to /api/spot-match.
  */
 
 interface Props {
@@ -73,6 +73,7 @@ interface Props {
   /** Held by Explorer so going back and returning keeps typed input. */
   draft: SpotBunkerRequest | null;
   onChange: (next: SpotBunkerRequest) => void;
+  onSubmit: (value: SpotBunkerRequest, ctx: SpotContext) => void;
   onBack: () => void;
   onClose: () => void;
 }
@@ -82,11 +83,6 @@ const ISO_OPTIONS: ReadonlyArray<Option<IsoSpecVersion>> = [
   { value: "2017", label: "ISO 8217:2017 — standard" },
   { value: "2012", label: "ISO 8217:2012" },
   { value: "2010", label: "ISO 8217:2010" },
-];
-
-const FLAMINGO_OPTIONS: ReadonlyArray<Option<FlamingoStatus>> = [
-  { value: "Registered", label: "Registered" },
-  { value: "Confirmed", label: "Confirmed" },
 ];
 
 const DELIVERY_OPTIONS: ReadonlyArray<Option<DeliveryLocation>> = [
@@ -164,10 +160,6 @@ const DEFAULT_OPEN: ReadonlyArray<SectionId> = ["grade", "quantity"];
  * from here, and a warning raised against an unclaimed field would otherwise
  * render nowhere at all — which is exactly what the hand-written per-section
  * field lists this replaces made possible.
- *
- * `flamingoStatus` collects a warning raised in the validator's *schedule*
- * block as well as its own, but stays claimed by `quantity`, where its control
- * lives.
  */
 const FIELD_SECTION: Record<keyof SpotBunkerRequest, SectionId> = {
   grade: "grade",
@@ -178,7 +170,6 @@ const FIELD_SECTION: Record<keyof SpotBunkerRequest, SectionId> = {
   robMt: "quantity",
   projectedConsumptionMt: "quantity",
   portStayDays: "quantity",
-  flamingoStatus: "quantity",
 
   maxPourPointC: "coldflow",
   minViscosityCst: "coldflow",
@@ -400,6 +391,7 @@ export default function SpotBunkerPanel({
   stepIndex,
   draft,
   onChange,
+  onSubmit,
   onBack,
   onClose,
 }: Props) {
@@ -475,7 +467,6 @@ export default function SpotBunkerPanel({
     rob: useFieldId("rob"),
     burn: useFieldId("burn"),
     stay: useFieldId("stay"),
-    flamingo: useFieldId("flam"),
     pour: useFieldId("pour"),
     visc: useFieldId("visc"),
     sulphur: useFieldId("sul"),
@@ -758,18 +749,6 @@ export default function SpotBunkerPanel({
                 onChange={(v) => patch({ portStayDays: v })}
                 unit="days"
                 step={0.5}
-              />
-            </Field>
-            <Field
-              label="Flamingo plan"
-              htmlFor={ids.flamingo}
-              error={err("flamingoStatus")}
-            >
-              <SelectInput
-                id={ids.flamingo}
-                value={value.flamingoStatus}
-                options={FLAMINGO_OPTIONS}
-                onChange={(v) => patch({ flamingoStatus: v })}
               />
             </Field>
           </FieldRow>
@@ -1100,7 +1079,7 @@ export default function SpotBunkerPanel({
         </Section>
       </div>
 
-      {/* --- Dead submit, pinned --- */}
+      {/* --- Submit, pinned --- */}
       {/* Outside the scroll area: with sections shut the error count is the
           only thing saying the form is incomplete, and it should never be three
           screens down. No position:sticky needed — the aside is a flex column
@@ -1118,15 +1097,12 @@ export default function SpotBunkerPanel({
         )}
         <button
           type="button"
-          disabled
-          className="w-full rounded border border-line-strong bg-surface-2 px-3 py-2 text-[12px] font-semibold text-faint/60 disabled:cursor-default"
+          disabled={errorCount > 0}
+          onClick={() => onSubmit(value, ctx)}
+          className="w-full rounded border border-line-strong bg-accent/15 px-3 py-2 text-[12px] font-semibold text-accent transition-colors hover:bg-accent/25 disabled:cursor-default disabled:bg-surface-2 disabled:text-faint/60 disabled:hover:bg-surface-2"
         >
           Find best supplier fit
         </button>
-        <p className="mt-1.5 text-center text-[10px] leading-relaxed text-faint">
-          Not wired up — supplier matching is not built. Nothing is sent
-          anywhere and nothing is saved.
-        </p>
       </div>
     </aside>
   );
