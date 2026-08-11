@@ -19,7 +19,6 @@ import type { SpotMatchApiResponse } from "@/app/api/spot-match/route";
 import { allBunkerEvents } from "@/lib/bunkerEvents";
 import type { Co2eCostPoint, Co2eFactors } from "@/lib/emissions";
 import { computeFilterResult } from "@/lib/filterLogic";
-import type { PortRegion } from "@/lib/filterLogic";
 import { formatDate } from "@/lib/format";
 import { buildLegs, stepTimestamp } from "@/lib/vesselPosition";
 import type { BunkerPriceSnapshot } from "@/lib/bunkerEvents";
@@ -109,13 +108,10 @@ export default function Explorer({
   const [forecastOpen, setForecastOpen] = useState(true);
 
   // Filter sidebar state, beyond visibleServices above. Region/service stay
-  // one axis (visibleServices) — these three are the genuinely new ones:
-  // vessel/port name search and port region, computed together into a
-  // cross-filter result by computeFilterResult below.
+  // one axis (visibleServices) — these two are the genuinely new ones:
+  // vessel/port name search, computed together into a cross-filter result by
+  // computeFilterResult below.
   const [vesselQuery, setVesselQuery] = useState("");
-  const [portRegions, setPortRegions] = useState<Set<PortRegion>>(
-    () => new Set(),
-  );
   const [portQuery, setPortQuery] = useState("");
 
   const portsByKey = useMemo(
@@ -256,30 +252,16 @@ export default function Explorer({
     [services],
   );
 
-  const togglePortRegion = useCallback((region: PortRegion) => {
-    setPortRegions((prev) => {
-      const next = new Set(prev);
-      if (next.has(region)) next.delete(region);
-      else next.add(region);
-      return next;
-    });
-  }, []);
-
   const resetFilters = useCallback(() => {
     setAll(true);
     setVesselQuery("");
-    setPortRegions(new Set());
     setPortQuery("");
   }, [setAll]);
 
   const filterResult = useMemo(
     () =>
-      computeFilterResult(
-        { vesselQuery, portRegions, portQuery },
-        ports,
-        vesselTracks,
-      ),
-    [vesselQuery, portRegions, portQuery, ports, vesselTracks],
+      computeFilterResult({ vesselQuery, portQuery }, ports, vesselTracks),
+    [vesselQuery, portQuery, ports, vesselTracks],
   );
 
   const selectPort = useCallback(
@@ -530,11 +512,11 @@ export default function Explorer({
             vesselSpecs={vesselSpecs}
             vesselQuery={vesselQuery}
             onVesselQueryChange={setVesselQuery}
+            onSelectVessel={selectVessel}
             ports={ports}
-            portRegions={portRegions}
-            onTogglePortRegion={togglePortRegion}
             portQuery={portQuery}
             onPortQueryChange={setPortQuery}
+            onSelectPort={selectPort}
             onReset={resetFilters}
             open={sidebarOpen}
             onClose={() => setSidebarOpen(false)}

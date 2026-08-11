@@ -550,27 +550,38 @@ export default function SpotBunkerPanel({
   const residual = isResidual(value.grade);
   const distillate = value.grade === "MGO";
 
-  // Only the grades this specific hull actually carries are selectable —
-  // ctx.carriedGrades (src/lib/spotBunker.ts) accounts for scrubber fitting
-  // and, separately, whether this hull's one ECA-compliance tank is MGO at
-  // all (a METHANOL_VESSELS/LNG_VESSELS/B40_VESSELS hull carries none of
-  // this form's three tanks). validateSpotRequest enforces the same set as a
-  // backstop if a draft is ever mutated some other way.
+  // Only grades this specific hull can actually lift *and* that are lawful
+  // at the destination are selectable — ctx.eligibleGrades (src/lib/spotBunker.ts)
+  // narrows ctx.carriedGrades (scrubber fitting, and whether this hull's one
+  // ECA-compliance tank is MGO at all — a METHANOL_VESSELS/LNG_VESSELS/
+  // B40_VESSELS hull carries none of this form's three tanks) further by
+  // ctx.isEcaDestination: inside a port ECA, HSFO/VLSFO drop out regardless
+  // of hull capability, since neither can meet the 0.10% cap. validateSpotRequest
+  // enforces the same set as a backstop if a draft is ever mutated some other way.
   const gradeOptions: ReadonlyArray<Option<SpotFuelGrade>> = [
     {
       value: "HSFO",
       label: "HSFO",
-      disabled: !ctx.carriedGrades.has("HSFO"),
-      disabledReason: ctx.carriedGrades.has("HSFO")
+      disabled: !ctx.eligibleGrades.has("HSFO"),
+      disabledReason: ctx.eligibleGrades.has("HSFO")
         ? undefined
-        : "No scrubber fitted — HSFO is not a lawful lift for this hull.",
+        : ctx.carriedGrades.has("HSFO")
+          ? `${ctx.portName ?? "This port"} is inside an ECA — HSFO cannot meet the 0.10% cap.`
+          : "No scrubber fitted — HSFO is not a lawful lift for this hull.",
     },
-    { value: "VLSFO", label: "VLSFO" },
+    {
+      value: "VLSFO",
+      label: "VLSFO",
+      disabled: !ctx.eligibleGrades.has("VLSFO"),
+      disabledReason: ctx.eligibleGrades.has("VLSFO")
+        ? undefined
+        : `${ctx.portName ?? "This port"} is inside an ECA — VLSFO cannot meet the 0.10% cap.`,
+    },
     {
       value: "MGO",
       label: "MGO",
-      disabled: !ctx.carriedGrades.has("MGO"),
-      disabledReason: ctx.carriedGrades.has("MGO")
+      disabled: !ctx.eligibleGrades.has("MGO"),
+      disabledReason: ctx.eligibleGrades.has("MGO")
         ? undefined
         : "This hull's ECA-compliance tank is not MGO — it has no MGO to lift.",
     },
@@ -677,7 +688,7 @@ export default function SpotBunkerPanel({
               gradeOptions
                 .filter((o) => o.disabled && o.disabledReason)
                 .map((o) => o.disabledReason)
-                .join(" ") || "Every grade below is a lawful lift for this hull."
+                .join(" ") || "Every grade below is a lawful lift here."
             }
             error={err("grade")}
           >

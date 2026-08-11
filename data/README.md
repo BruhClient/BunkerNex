@@ -555,10 +555,10 @@ list is prose with no rates and no port coverage. These files therefore support
 | File | Grain |
 |---|---|
 | `suppliers.csv` | one row per supplier (73), tiered as the source groups them |
-| `supplier_offers.csv` | one row per port × grade × supplier (563), **generated** |
-| `supplier_fleet.csv` | one row per supplier × port (317), **generated** |
-| `supplier_quote_history.csv` | one row per port × grade × supplier × week (28,909), **generated** |
-| `supplier_transactions.csv` | one row per settled stem (7,797), **generated** |
+| `supplier_offers.csv` | one row per port × grade × supplier (547), **generated** |
+| `supplier_fleet.csv` | one row per supplier × port (318), **generated** |
+| `supplier_quote_history.csv` | one row per port × grade × supplier × week (28,075), **generated** |
+| `supplier_transactions.csv` | one row per settled stem (7,645), **generated** |
 | `term_terms.csv` | one row per negotiable commercial parameter, with its clause |
 
 The last three were added for the HQ supplier-evaluation desk (`/hq`) and are described
@@ -625,8 +625,24 @@ Working rules:
 - **Randomness is seeded** on `Port_Code|Grade|Supplier`. The output is reviewable in
   git and re-running is a no-op. Never hand-edit the file — the next run overwrites it.
 - **Three suppliers per port × grade is a floor, asserted, not a hope.** The generator
-  throws naming the pair if coverage falls short. 75 of the 154 markets sit exactly on
-  it; the rest carry 4 or 5.
+  throws naming the pair if coverage falls short. 74 of the 149 markets sit exactly on
+  it; most of the rest carry 4 or 5 — one, Rotterdam MEOH, carries 6 (see the
+  guarantee pass below).
+- **A per-market floor doesn't guarantee every supplier ever wins a market.** Checked
+  directly: 4 of the 73 roster suppliers — Argent Energy (Rotterdam MEOH only, and one
+  of 10 eligible names competing for 5 slots there), Equatorial Marine Fuel Management,
+  ENEOS Corporation and Ceylon Petroleum Corporation — won zero panels by the ordinary
+  seeded draw, which means zero rows in this file and, since `supplier_fleet.csv` /
+  `supplier_quote_history.csv` / `supplier_transactions.csv` are all derived purely
+  from it, zero rows in those three too. All four are real, correctly-scoped suppliers
+  (see their `data_notes` in `suppliers.csv`) — this was a gap in the selection
+  algorithm, not a coverage-authoring problem, so no port/grade was changed to fix it.
+  A guarantee pass now runs after the normal per-market draw: any supplier with zero
+  wins is appended to the single eligible market where its own seeded rank score was
+  best, growing that one panel past the usual 3-5 cap rather than evicting anyone
+  (evicting would risk silently zeroing out whoever got displaced). Deterministic and
+  idempotent like the rest of this generator. `gen-supplier-offers.mjs` asserts every
+  roster supplier has at least one offer before it writes the file.
 - **Tier 3 is alternative fuels only** — methanol, B24 and B40. A certified renewable
   blend is not a like-for-like quote against a fossil grade, so those suppliers never
   appear in a VLSFO or HSFO panel. Widened from methanol alone when the CE sheet
@@ -682,7 +698,7 @@ largest barge must clear the biggest quoted parcel, fleet capacity must clear th
 largest barge, and daily throughput must clear the parcel ceiling. A supplier quoting a
 5,000 MT ceiling can therefore never come out unable to lift it.
 
-51 of the 317 rows have **zero barges**. Those are shore-supplied only (ex-wharf or
+50 of the 318 rows have **zero barges**. Those are shore-supplied only (ex-wharf or
 pipeline at that port), which is a real distinction and not a gap —
 `Delivery_Capacity_MT_Per_Day` stays populated for them, which is why the scatter plots
 against it rather than against barge tonnage.
@@ -710,7 +726,7 @@ Two sampling rules worth knowing:
   current — `SANTOS HSFO` was last assessed on 2019-11-14, and "its last 52 buckets"
   would have drawn 2019 prices under a heading of *past year*. Anchored globally it
   correctly falls out of the window, and it is the one market excluded (named on stdout,
-  never silently dropped). 558 of the 563 supplier-markets are covered.
+  never silently dropped). 542 of the 547 supplier-markets are covered.
 - **A short series is not a bad one, and is kept at its true length.** Ningbo's methanol
   market opened on the port's first supply licence in January 2026 and carries 30 of the
   52 weeks; the weekly methanol columns land at 50 because one point per week cannot
@@ -739,7 +755,7 @@ The resulting spread across suppliers is ~2.4 percentage points of realised savi
 the generator asserts it exceeds 0.5 — a ledger where everyone concedes equally would
 make the tile it feeds unable to discriminate, which is the failure mode worth catching.
 
-391 of the 7,797 rows take their **vessel name and lifted quantity from a real stem** in
+395 of the 7,645 rows take their **vessel name and lifted quantity from a real stem** in
 `PIL_Fleet_Live_Movement.csv`, so the ledger lines up with the bunker log the rest of the
 app renders. That is only possible inside the movement window (2026-05-05 → 2026-08-05,
 13 of the 52 weeks); the rest is backfilled, and `Source_Basis` distinguishes the two

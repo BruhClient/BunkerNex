@@ -20,6 +20,15 @@
  *
  * Randomness is seeded on `Port_Code|Grade|Supplier`, so "random" is stable:
  * the output is reviewable in git and re-running changes nothing. Idempotent.
+ *
+ * A per-market floor (MIN_OFFERS) does not guarantee roster-wide coverage: a
+ * supplier with few eligible markets, or one that only ever competes in a
+ * crowded one, can legitimately lose every draw it is eligible for. A GUARANTEE
+ * PASS runs after the normal per-market selection and appends any supplier who
+ * won zero panels anywhere into the single eligible market where its own
+ * (seeded, deterministic) rank score was best — growing that one panel past the
+ * usual 3-5 cap rather than evicting anyone. See the pass itself, below the main
+ * loop, for why appending beats eviction here.
  */
 
 import fs from "node:fs";
@@ -422,7 +431,12 @@ function buildOffer(portKey, grade, supplier, thin) {
   };
 }
 
-/** The panel quoting one port×grade: 3-5 names, local physical first. */
+/**
+ * The panel quoting one port×grade: 3-5 names, local physical first.
+ *
+ * Returns `ranked` too — the guarantee pass below re-uses it (same eligible set,
+ * same rank scores) rather than recomputing eligibility from scratch.
+ */
 function selectPanel(portKey, grade, suppliers) {
   const eligible = suppliers.filter(
     (s) => s.ports.has(portKey) && s.grades.has(grade),
@@ -456,14 +470,17 @@ function selectPanel(portKey, grade, suppliers) {
     if (physical) picked[picked.length - 1] = physical.supplier;
   }
 
-  return { picked, eligibleCount: eligible.length };
+  return { picked, ranked, eligibleCount: eligible.length };
 }
 
-// --- run -------------------------------------------------------------------
+// --- selection ---------------------------------------------------------------
 
 const coverage = readPriceCoverage();
 const suppliers = readSuppliers(coverage);
-const offers = [];
+
+/** `port|grade` -> { portKey, grade, picked: Supplier[], ranked, eligibleCount } */
+const panels = new Map();
+const globalCount = new Map();
 
 for (const portKey of [...coverage.keys()].sort()) {
   const grades = [...coverage.get(portKey)].sort(
@@ -471,15 +488,79 @@ for (const portKey of [...coverage.keys()].sort()) {
   );
 
   for (const grade of grades) {
-    const { picked, eligibleCount } = selectPanel(portKey, grade, suppliers);
-    const thin = eligibleCount < THIN_MARKET_THRESHOLD;
-
-    const panel = picked.map((s) => buildOffer(portKey, grade, s, thin));
-    panel.sort(
-      (a, b) => a.basis - b.basis || a.supplier.localeCompare(b.supplier),
-    );
-    offers.push(...panel);
+    const { picked, ranked, eligibleCount } = selectPanel(portKey, grade, suppliers);
+    panels.set(`${portKey}|${grade}`, { portKey, grade, picked, ranked, eligibleCount });
+    for (const s of picked) {
+      globalCount.set(s.name, (globalCount.get(s.name) ?? 0) + 1);
+    }
   }
+}
+
+/**
+ * Guarantee pass: every roster supplier must win at least one panel.
+ *
+ * A supplier that wins zero of its eligible markets never appears in
+ * supplier_offers.csv, and since supplier_fleet.csv / supplier_quote_history.csv /
+ * supplier_transactions.csv are all derived purely from that file, it never
+ * appears in any of them either — a roster entry with no quote, no fleet row and
+ * no transaction, which reads as a data bug rather than a quiet loser.
+ *
+ * For each such supplier, find its best-ranked eligible pair — reusing the
+ * `ranked` list selectPanel() already computed there, so this is the exact same
+ * rank score, not a recomputation that could drift — and APPEND it to that
+ * panel's picks. Appending rather than evicting means no other supplier's
+ * coverage is put at risk chasing this fix: the panel simply grows past its
+ * usual 3-5 cap for that one market.
+ */
+const uncovered = suppliers
+  .map((s) => {
+    const pairs = [];
+    for (const port of s.ports) {
+      const grades = coverage.get(port);
+      if (!grades) continue;
+      for (const grade of s.grades) {
+        if (grades.has(grade)) pairs.push(`${port}|${grade}`);
+      }
+    }
+    return { supplier: s, pairs };
+  })
+  .filter(({ supplier }) => (globalCount.get(supplier.name) ?? 0) === 0)
+  // Most-constrained first: not load-bearing today (no two of the fixed
+  // suppliers land on the same pair), but keeps the pass well-defined if the
+  // roster grows and a future collision becomes possible.
+  .sort(
+    (a, b) =>
+      a.pairs.length - b.pairs.length ||
+      a.supplier.name.localeCompare(b.supplier.name),
+  );
+
+for (const { supplier, pairs } of uncovered) {
+  if (pairs.length === 0) {
+    throw new Error(
+      `${supplier.name}: has no port×grade pair with a price series to be ` +
+        "quoted in at all — check its ports/grades in suppliers.csv",
+    );
+  }
+
+  let best = null;
+  for (const pair of pairs) {
+    const entry = panels.get(pair).ranked.find((e) => e.supplier === supplier);
+    if (!best || entry.rank < best.rank) best = { pair, rank: entry.rank };
+  }
+
+  panels.get(best.pair).picked.push(supplier);
+  globalCount.set(supplier.name, (globalCount.get(supplier.name) ?? 0) + 1);
+}
+
+// --- offer construction ------------------------------------------------------
+
+const offers = [];
+for (const { portKey, grade, picked, eligibleCount } of panels.values()) {
+  const thin = eligibleCount < THIN_MARKET_THRESHOLD;
+
+  const panel = picked.map((s) => buildOffer(portKey, grade, s, thin));
+  panel.sort((a, b) => a.basis - b.basis || a.supplier.localeCompare(b.supplier));
+  offers.push(...panel);
 }
 
 // --- asserts ---------------------------------------------------------------
@@ -522,6 +603,15 @@ for (const [portKey, grades] of coverage) {
     if (!byPair.has(`${portKey}|${grade}`)) {
       throw new Error(`${portKey} ${grade} has a price series but no offers`);
     }
+  }
+}
+
+// The guarantee pass exists to make this true. Check it against the actual
+// written offers, not just the in-memory panels, in case the two ever drift.
+const quotingSuppliers = new Set(offers.map((o) => o.supplier));
+for (const s of suppliers) {
+  if (!quotingSuppliers.has(s.name)) {
+    throw new Error(`${s.name}: still has zero offers after the guarantee pass`);
   }
 }
 
@@ -575,5 +665,21 @@ const atFloor = [...byPair.values()].filter((c) => c === MIN_OFFERS).length;
 console.log(
   `supplier_offers.csv: ${offers.length} offers across ${byPair.size} ` +
     `port-grade markets in ${coverage.size} ports ` +
-    `(${atFloor} at the ${MIN_OFFERS}-supplier floor)`,
+    `(${atFloor} at the ${MIN_OFFERS}-supplier floor, ${suppliers.length} of ` +
+    `${suppliers.length} suppliers quoting somewhere)`,
 );
+if (uncovered.length > 0) {
+  console.log(
+    `  guarantee pass: ${uncovered.length} supplier(s) won zero panels by draw, ` +
+      "appended to their best-ranked eligible market:",
+  );
+  for (const { supplier, pairs } of uncovered) {
+    const entry = pairs
+      .map((pair) => ({
+        pair,
+        rank: panels.get(pair).ranked.find((e) => e.supplier === supplier).rank,
+      }))
+      .sort((a, b) => a.rank - b.rank)[0];
+    console.log(`    ${supplier.name} -> ${entry.pair}`);
+  }
+}

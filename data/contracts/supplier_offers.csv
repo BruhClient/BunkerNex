@@ -300,6 +300,7 @@ JPTYO,VLSFO,Idemitsu Kosan,4,-2.5,Ex-wharf,150,2500,7,15,725,Enquire,simulated,D
 JPTYO,VLSFO,KPI Bridge Oil A/S,2,-1,Barge,450,3000,7,15,675,5 days,simulated,Differential against the port baseline; see data/README.md
 JPTYO,HSFO,Idemitsu Kosan,4,-5,Barge,200,2500,6,15,700,Prompt,simulated,Differential against the port baseline; see data/README.md
 JPTYO,HSFO,Cosmo Oil Marketing,4,-4,Ex-wharf,300,2000,6,15,750,Prompt,simulated,Differential against the port baseline; see data/README.md
+JPTYO,HSFO,ENEOS Corporation,4,1.5,Barge,250,1500,5,30,400,5 days,simulated,Differential against the port baseline; see data/README.md
 JPTYO,HSFO,Minerva Bunkering,2,1.5,Barge,500,3000,3,30,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 JPTYO,MGO,Vitol Bunkers,2,-5.5,Barge,350,3500,4,15,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 JPTYO,MGO,World Fuel Services Corp.,2,-3.5,Barge,350,3000,3,15,600,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -333,6 +334,7 @@ KRPUS,MGO,HD Hyundai Oilbank,4,-5,Barge,300,2000,3,15,450,Prompt,simulated,Diffe
 KRPUS,MGO,Bunker Holding A/S,2,-4.5,Barge,450,2500,5,15,400,Prompt,simulated,Differential against the port baseline; see data/README.md
 KRPUS,MGO,GS Caltex,4,-3,Ex-wharf,150,2500,6,15,725,Prompt,simulated,Differential against the port baseline; see data/README.md
 LKCMB,VLSFO,Dan-Bunkering,2,-8,Ex-wharf,400,3000,4,15,700,Prompt,simulated,Differential against the port baseline; see data/README.md
+LKCMB,VLSFO,Ceylon Petroleum Corporation,4,0,Barge,300,3000,5,30,475,Prompt,simulated,Differential against the port baseline; see data/README.md
 LKCMB,VLSFO,Vitol Bunkers,2,1.5,Barge,450,3500,5,30,525,Enquire,simulated,Differential against the port baseline; see data/README.md
 LKCMB,VLSFO,Lanka Marine Services,4,2.5,Ex-wharf,150,3000,7,30,800,5 days,simulated,Differential against the port baseline; see data/README.md
 LKCMB,MGO,Monjasa,2,-5.5,Barge,350,3500,4,15,625,Prompt,simulated,Differential against the port baseline; see data/README.md
@@ -348,6 +350,7 @@ MTMLA,MGO,Repsol,1,12.5,Barge,650,6000,6,45,575,Prompt,simulated,Differential ag
 MYPKG,VLSFO,Petco Trading Labuan,4,-1.5,Pipeline,100,1500,6,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,VLSFO,Petronas Dagangan,4,2.5,Ex-wharf,150,2000,5,30,800,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,VLSFO,ExxonMobil Corporation,1,11.5,Barge,800,4000,5,45,475,Prompt,simulated,Differential against the port baseline; see data/README.md
+MYPKG,HSFO,Equatorial Marine Fuel Management,2,-8,Barge,300,4000,5,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,HSFO,Petronas Dagangan,4,-3.5,Pipeline,150,2000,6,15,700,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,HSFO,Sentek Marine & Trading,2,0.5,Barge,350,2500,5,30,600,Prompt,simulated,Differential against the port baseline; see data/README.md
 MYPKG,HSFO,Chevron Corporation,1,11,Ex-wharf,850,5500,6,45,650,5 days,simulated,Differential against the port baseline; see data/README.md
@@ -375,6 +378,7 @@ NLRTM,MGO,ExxonMobil Corporation,1,12.5,Ex-wharf,550,5500,5,45,625,Prompt,simula
 NLRTM,MEOH,Eni S.p.A (Enilive),3,15,Barge,200,1300,6,45,650,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,MEOH,FincoEnergies,3,28.5,Barge,150,1000,3,45,525,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,MEOH,GoodFuels,3,28.5,Barge,100,800,6,45,525,Prompt,simulated,Differential against the port baseline; see data/README.md
+NLRTM,MEOH,Argent Energy,3,37,Barge,150,1400,6,45,650,5 days,simulated,Differential against the port baseline; see data/README.md
 NLRTM,MEOH,Moeve,3,56,Barge,200,800,4,45,425,Prompt,simulated,Differential against the port baseline; see data/README.md
 NLRTM,MEOH,Sunpine AB,3,59.5,Barge,150,1200,5,45,600,Prompt,simulated,Differential against the port baseline; see data/README.md
 PABLB,VLSFO,Chemoil Energy Limited,2,-7,Barge,350,4000,7,15,675,Prompt,simulated,Differential against the port baseline; see data/README.md

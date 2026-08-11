@@ -202,6 +202,14 @@ export interface SpotContext {
    * no tank for; validateSpotRequest's grade check is the backstop.
    */
   carriedGrades: ReadonlySet<SpotFuelGrade>;
+  /**
+   * Grades actually selectable right now: carriedGrades narrowed further by
+   * the ECA cap. Inside a port ECA, HSFO and VLSFO are residual grades that
+   * cannot meet the 0.10% limit at any sulphur number typed into the form —
+   * only the hull's compliance tank (MGO, if it carries one) is a lawful
+   * lift. Outside an ECA this is identical to carriedGrades.
+   */
+  eligibleGrades: ReadonlySet<SpotFuelGrade>;
 }
 
 const HOURS_PER_DAY = 24;
@@ -331,6 +339,18 @@ export function deriveSpotContext(
       ? null
       : round1(spec.consumptionTransitMtPerDay * Math.max(daysToArrival, 0));
 
+  const isEcaDestination = isEcaPort(portCode);
+  const carriedGrades = new Set<SpotFuelGrade>([
+    ...(track.scrubber ? (["HSFO"] as const) : []),
+    "VLSFO",
+    ...(track.complianceGrade === "MGO" ? (["MGO"] as const) : []),
+  ]);
+  // Inside an ECA, HSFO/VLSFO drop out regardless of hull capability — only
+  // the compliance tank (MGO, if carried) survives the narrowing.
+  const eligibleGrades = isEcaDestination
+    ? new Set<SpotFuelGrade>(carriedGrades.has("MGO") ? ["MGO"] : [])
+    : carriedGrades;
+
   return {
     portCode,
     portName: portCode ? (portMeta(portCode)?.name ?? portCode) : null,
@@ -347,7 +367,7 @@ export function deriveSpotContext(
     projectedBurnToArrivalMt,
     activeGrade: activeGradeAt(track, stepIndex),
     scrubberFitted: track.scrubber,
-    isEcaDestination: isEcaPort(portCode),
+    isEcaDestination,
     markets: {
       HSFO: hasMarketFor("HSFO", portCode),
       VLSFO: hasMarketFor("VLSFO", portCode),
@@ -358,11 +378,8 @@ export function deriveSpotContext(
       LNG: false,
       B40: false,
     },
-    carriedGrades: new Set<SpotFuelGrade>([
-      ...(track.scrubber ? (["HSFO"] as const) : []),
-      "VLSFO",
-      ...(track.complianceGrade === "MGO" ? (["MGO"] as const) : []),
-    ]),
+    carriedGrades,
+    eligibleGrades,
   };
 }
 
@@ -480,14 +497,17 @@ export function validateSpotRequest(
   // --- 1. Grade and ISO ----------------------------------------------------
   if (grade === null) {
     err("grade", "Nominate a grade.");
-  } else if (!ctx.carriedGrades.has(grade)) {
+  } else if (!ctx.eligibleGrades.has(grade)) {
     // Unreachable through the UI, which disables any segment the hull does
-    // not carry. Guards a draft mutated any other way.
+    // not carry or the destination ECA rules out. Guards a draft mutated any
+    // other way.
     err(
       "grade",
-      grade === "HSFO"
-        ? "No scrubber fitted — HSFO is not a lawful lift for this hull."
-        : "This hull's ECA-compliance tank is not MGO — it has no MGO to lift.",
+      ctx.carriedGrades.has(grade)
+        ? `${ctx.portName ?? ctx.portCode} is inside an ECA — ${grade} cannot meet the 0.10% cap. Only this hull's compliance grade is a lawful lift here.`
+        : grade === "HSFO"
+          ? "No scrubber fitted — HSFO is not a lawful lift for this hull."
+          : "This hull's ECA-compliance tank is not MGO — it has no MGO to lift.",
     );
   } else if (grade === "HSFO" && !draft.scrubberOperational) {
     err(
@@ -619,10 +639,15 @@ export function validateSpotRequest(
       err("bargePairingGrade", "Name the second grade on the barge.");
     } else if (draft.bargePairingGrade === grade) {
       err("bargePairingGrade", "A dual-grade barge needs two different grades.");
-    } else if (!ctx.carriedGrades.has(draft.bargePairingGrade)) {
+    } else if (!ctx.eligibleGrades.has(draft.bargePairingGrade)) {
       // Same backstop as the primary grade check above — unreachable through
-      // the UI once its options are filtered to ctx.carriedGrades too.
-      err("bargePairingGrade", "This hull does not carry that grade.");
+      // the UI once its options are filtered to ctx.eligibleGrades too.
+      err(
+        "bargePairingGrade",
+        ctx.carriedGrades.has(draft.bargePairingGrade)
+          ? `${ctx.portName ?? ctx.portCode} is inside an ECA — that grade cannot meet the 0.10% cap.`
+          : "This hull does not carry that grade.",
+      );
     }
   }
 

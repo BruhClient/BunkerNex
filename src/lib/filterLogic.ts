@@ -53,7 +53,6 @@ export function portRegion(port: Port): PortRegion {
 
 export interface FilterState {
   vesselQuery: string;
-  portRegions: Set<PortRegion>;
   portQuery: string;
 }
 
@@ -65,36 +64,28 @@ export interface FilterResult {
 
 /**
  * Service-code visibility stays RouteMap's own existing axis (visibleServices)
- * — this only computes the two new ones (region/search), so a filter left at
- * its default never restricts anything (null, not an empty Set).
+ * — this only computes the two name-search ones, so a filter left at its
+ * default never restricts anything (null, not an empty Set).
  */
 export function computeFilterResult(
   state: FilterState,
   ports: Port[],
   vesselTracks: VesselTrack[],
 ): FilterResult {
-  const { vesselQuery, portRegions, portQuery } = state;
+  const { vesselQuery, portQuery } = state;
   const vq = vesselQuery.trim().toLowerCase();
   const pq = portQuery.trim().toLowerCase();
 
   const visiblePortKeys =
-    portRegions.size === 0 && pq === ""
+    pq === ""
       ? null
       : new Set(
           ports
-            .filter((p) => {
-              if (portRegions.size > 0 && !portRegions.has(portRegion(p))) {
-                return false;
-              }
-              if (
-                pq &&
-                !p.name.toLowerCase().includes(pq) &&
-                !p.key.toLowerCase().includes(pq)
-              ) {
-                return false;
-              }
-              return true;
-            })
+            .filter(
+              (p) =>
+                p.name.toLowerCase().includes(pq) ||
+                p.key.toLowerCase().includes(pq),
+            )
             .map((p) => p.key),
         );
 

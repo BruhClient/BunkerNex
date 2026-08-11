@@ -1,14 +1,11 @@
 "use client";
 
-import type { PortRegion } from "@/lib/filterLogic";
 import type { Service } from "@/lib/types";
 
 interface Props {
   services: Service[];
   visibleServices: string[];
   onToggleService: (code: string) => void;
-  portRegions: Set<PortRegion>;
-  onToggleRegion: (region: PortRegion) => void;
   portQuery: string;
   onPortQueryChange: (query: string) => void;
   vesselQuery: string;
@@ -25,8 +22,6 @@ export default function ActiveFilterPills({
   services,
   visibleServices,
   onToggleService,
-  portRegions,
-  onToggleRegion,
   portQuery,
   onPortQueryChange,
   vesselQuery,
@@ -43,11 +38,6 @@ export default function ActiveFilterPills({
       key: `service:${code}`,
       label: `Service: ${code}`,
       onRemove: () => onToggleService(code),
-    })),
-    ...[...portRegions].map((region) => ({
-      key: `region:${region}`,
-      label: `Port region: ${region}`,
-      onRemove: () => onToggleRegion(region),
     })),
     ...(portQuery
       ? [

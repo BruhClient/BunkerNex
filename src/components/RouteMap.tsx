@@ -248,6 +248,10 @@ export default function RouteMap({
    */
   const focusVesselRef = useRef(focusVesselName);
   focusVesselRef.current = focusVesselName;
+  // Read by the select-to-pan effect below, so a fresh selection eases to
+  // wherever the vessel is *now* without the effect re-running on every tick.
+  const stepIndexRef = useRef(stepIndex);
+  stepIndexRef.current = stepIndex;
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
@@ -955,6 +959,41 @@ export default function RouteMap({
     if (readyRef.current) apply();
     else map.once("load", apply);
   }, [selectedKey]);
+
+  // --- Pan toward a freshly selected vessel ---
+  // A one-time ease, not a hard lock like focus mode above: the user is free
+  // to pan away afterward, and this only fires when the selection itself
+  // changes — stepIndex is read from a ref rather than a dependency, or every
+  // scrubber tick would re-trigger it. Skipped while focus mode already owns
+  // the camera, so the two don't fight over the view.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedVesselName || focusVesselName) return;
+    const apply = () => {
+      const fix =
+        resolvers.get(selectedVesselName)?.(stepIndexRef.current) ?? null;
+      if (!fix) return;
+      map.easeTo({ center: fix.position, zoom: FOCUS_ZOOM, duration: FOCUS_MS });
+    };
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [selectedVesselName, focusVesselName, resolvers]);
+
+  // --- Pan toward a freshly selected port ---
+  useEffect(() => {
+    const map = mapRef.current;
+    const port = selectedKey ? portsByKey.get(selectedKey) : null;
+    if (!map || !port) return;
+    const apply = () => {
+      map.easeTo({
+        center: [port.lon, port.lat],
+        zoom: FOCUS_ZOOM,
+        duration: FOCUS_MS,
+      });
+    };
+    if (readyRef.current) apply();
+    else map.once("load", apply);
+  }, [selectedKey, portsByKey]);
 
   // Sized with height rather than absolute insets: MapLibre ships unlayered
   // CSS (.maplibregl-map { position: relative }) which outranks any Tailwind

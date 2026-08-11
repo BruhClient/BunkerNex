@@ -154,6 +154,7 @@ KPI Bridge Oil A/S,ITGOA,2,4,12450,4000,30000,12.8,93.5,simulated,Fleet sized fr
 TotalEnergies Marine Fuels,ITGOA,1,7,35600,7300,27000,5.7,96.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 World Fuel Services Corp.,ITGOA,2,2,3950,2700,17000,7.3,88.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Cosmo Oil Marketing,JPTYO,4,0,0,0,15000,0,93.2,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
+ENEOS Corporation,JPTYO,4,4,5550,2300,24000,6.9,94.3,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Idemitsu Kosan,JPTYO,4,3,9050,3400,43500,8.8,92.5,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 KPI Bridge Oil A/S,JPTYO,2,1,4300,4300,13500,14.7,92.5,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Minerva Bunkering,JPTYO,2,1,4300,4300,13500,14.1,93.3,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
@@ -174,6 +175,7 @@ Minerva Bunkering,KRPUS,2,4,7900,2700,36000,10.5,90.2,simulated,Fleet sized from
 Royal Dutch Shell,KRPUS,1,4,20650,8100,30000,8.5,97,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 S-Oil Corporation,KRPUS,4,0,0,0,14000,0,94.8,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Vitol Bunkers,KRPUS,2,2,6050,4400,27000,8.6,93.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
+Ceylon Petroleum Corporation,LKCMB,4,4,9800,3600,28500,10.4,93.6,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Dan-Bunkering,LKCMB,2,0,0,0,14000,0,94.1,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 GAC Bunker Fuels Ltd.,LKCMB,2,3,9400,4600,24000,7.9,93,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Lanka Marine Services,LKCMB,4,5,6350,2000,48000,11.9,95.3,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
@@ -185,6 +187,7 @@ Repsol,MTMLA,1,7,41150,7600,34500,7,96,simulated,Fleet sized from this supplier'
 Royal Dutch Shell,MTMLA,1,8,43100,7300,33000,7.2,95.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Vitol Bunkers,MTMLA,2,2,4950,3400,23000,9.4,93.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Chevron Corporation,MYPKG,1,0,0,0,13000,0,97.7,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
+Equatorial Marine Fuel Management,MYPKG,2,2,8000,5700,27000,7.4,92.4,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 ExxonMobil Corporation,MYPKG,1,7,28400,6000,46500,6.5,98,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Monjasa,MYPKG,2,2,4200,3000,23000,14.4,92.5,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Petco Trading Labuan,MYPKG,4,6,11450,2800,40500,7.4,92.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
@@ -192,6 +195,7 @@ Petronas Dagangan,MYPKG,4,5,15400,4500,48000,8.4,94,simulated,Fleet sized from t
 Sentek Marine & Trading,MYPKG,2,3,9100,3800,36000,14.6,94.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Vitol Bunkers,MYPKG,2,3,8600,3700,33000,8.5,93.9,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 "Aegean Marine Petroleum Network, Inc.",NLRTM,2,4,13000,4500,40500,9.4,94.4,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
+Argent Energy,NLRTM,3,2,3350,2300,26000,5,95.1,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 BP PLC,NLRTM,1,8,42100,8500,30000,4.4,95.8,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Chemoil Energy Limited,NLRTM,2,3,7000,3000,40500,13.1,93.5,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md
 Eni S.p.A (Enilive),NLRTM,3,1,1700,1700,13000,7,95.7,simulated,Fleet sized from this supplier's own quoted parcel ceiling and pump rate; see data/README.md

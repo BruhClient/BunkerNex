@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { TextInput } from "./FormControls";
 import { serviceColor } from "@/lib/colors";
-import type { Service, VesselSpec, VesselTrack } from "@/lib/types";
+import type { Service } from "@/lib/types";
 
 interface Props {
   services: Service[];
@@ -15,19 +14,21 @@ interface Props {
   onSelectService: (code: string) => void;
   onHoverService: (code: string | null) => void;
   trackedVessels: Map<string, number>;
-  vesselTracks: VesselTrack[];
-  vesselSpecs: VesselSpec[];
-  vesselQuery: string;
-  onVesselQueryChange: (query: string) => void;
 }
 
 /**
  * "Vessels" section of the filter sidebar: the region bulk-select buttons and
  * per-service rows (absorbed from the old ServiceSidebar, unchanged markup),
- * grouped by Service.tradeRegion, plus a vessel name search beneath them.
+ * grouped by Service.tradeRegion. The vessel name search that used to sit
+ * beneath this list now lives at the top of the sidebar — see
+ * VesselSearch.tsx.
  *
  * Region and Service Route are two ways of writing the same visibleServices
  * set, not independent filter axes — see filterLogic.ts's doc comment.
+ *
+ * Each row is a click-to-toggle button rather than a checkbox control — no
+ * checkbox-style indicator box, the route code's own color/weight carries
+ * the on/off state instead.
  */
 export default function VesselFilters({
   services,
@@ -38,10 +39,6 @@ export default function VesselFilters({
   onSelectService,
   onHoverService,
   trackedVessels,
-  vesselTracks,
-  vesselSpecs,
-  vesselQuery,
-  onVesselQueryChange,
 }: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const allOn = visibleServices.length === services.length;
@@ -55,18 +52,6 @@ export default function VesselFilters({
     }
     return map;
   }, [services]);
-
-  const vq = vesselQuery.trim().toLowerCase();
-  const vesselMatches = useMemo(() => {
-    if (!vq) return [];
-    return vesselTracks
-      .filter((t) => t.name.toLowerCase().includes(vq))
-      .slice(0, 25)
-      .map((track) => ({
-        track,
-        spec: vesselSpecs.find((v) => v.name === track.name) ?? null,
-      }));
-  }, [vq, vesselTracks, vesselSpecs]);
 
   return (
     <div className="border-b border-line">
@@ -150,34 +135,6 @@ export default function VesselFilters({
           </div>
         );
       })}
-
-      <div className="border-t border-line/60 px-4 py-2.5">
-        <TextInput
-          value={vesselQuery || null}
-          onChange={(v) => onVesselQueryChange(v ?? "")}
-          placeholder='Search vessels, e.g. "KOTA EAGLE"'
-        />
-      </div>
-      {vesselMatches.length > 0 && (
-        <div className="max-h-40 overflow-y-auto border-t border-line/60">
-          {vesselMatches.map(({ track, spec }) => (
-            <button
-              key={track.name}
-              type="button"
-              onClick={() => onVesselQueryChange(track.name)}
-              className="flex w-full items-baseline justify-between gap-2 px-4 py-1.5 text-left transition-colors hover:bg-surface-2"
-            >
-              <span className="truncate text-[11px] text-fg">
-                {track.name}
-              </span>
-              <span className="tnum shrink-0 text-[10px] text-faint">
-                {track.serviceCode}
-                {spec?.nominalTeu ? ` · ${spec.nominalTeu} TEU` : ""}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -200,7 +157,12 @@ function RegionButton({
   );
 }
 
-/** Lifted verbatim from the old ServiceSidebar's per-service row. */
+/**
+ * Lifted from the old ServiceSidebar's per-service row, minus the leading
+ * checkbox-style swatch — the whole row is still the toggle button (onToggle
+ * fires on click), just without a checkbox-look indicator drawing the on/off
+ * state. The route code's own color does that instead.
+ */
 function ServiceRow({
   service,
   on,
@@ -234,14 +196,6 @@ function ServiceRow({
       >
         <span className="flex items-baseline justify-between gap-2">
           <span className="flex min-w-0 items-baseline gap-2">
-            <span
-              aria-hidden
-              className="block size-2.5 shrink-0 rounded-[3px] border transition-colors"
-              style={{
-                borderColor: on ? color : "var(--color-line-strong)",
-                background: on ? color : "transparent",
-              }}
-            />
             <span
               className="tnum text-[13px] font-semibold tracking-wide transition-colors"
               style={{ color: on ? color : "var(--color-faint)" }}

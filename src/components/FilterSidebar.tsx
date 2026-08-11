@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import ActiveFilterPills from "./ActiveFilterPills";
 import PortFilters from "./PortFilters";
 import VesselFilters from "./VesselFilters";
-import type { PortRegion } from "@/lib/filterLogic";
+import VesselSearch from "./VesselSearch";
 import type { Port, Service, VesselSpec, VesselTrack } from "@/lib/types";
 
 interface Props {
@@ -20,12 +20,14 @@ interface Props {
   vesselSpecs: VesselSpec[];
   vesselQuery: string;
   onVesselQueryChange: (query: string) => void;
+  /** Opens a vessel's detail sheet and pans the map toward it. */
+  onSelectVessel: (name: string) => void;
 
   ports: Port[];
-  portRegions: Set<PortRegion>;
-  onTogglePortRegion: (region: PortRegion) => void;
   portQuery: string;
   onPortQueryChange: (query: string) => void;
+  /** Opens a port's detail sheet and pans the map toward it. */
+  onSelectPort: (key: string) => void;
 
   onReset: () => void;
   open: boolean;
@@ -34,10 +36,14 @@ interface Props {
 
 /**
  * Left "FILTERS" panel: replaces the old ServiceSidebar with a hierarchical,
- * multi-select filter over vessels (service/region/name) and ports
- * (region/code), cross-filtering the map in real time via Explorer.tsx's
+ * multi-select filter over vessels (service/region/name) and a port
+ * name/code search, cross-filtering the map in real time via Explorer.tsx's
  * computeFilterResult. Same mobile-drawer contract ServiceSidebar had
  * (open/onClose), so Explorer mounts it the same way.
+ *
+ * The two name searches (VesselSearch, PortFilters) are pinned at the top —
+ * they're how you jump straight to a ship or a berth, so they shouldn't sit
+ * beneath the route toggle list. Everything else keeps its prior order.
  */
 export default function FilterSidebar({
   services,
@@ -52,11 +58,11 @@ export default function FilterSidebar({
   vesselSpecs,
   vesselQuery,
   onVesselQueryChange,
+  onSelectVessel,
   ports,
-  portRegions,
-  onTogglePortRegion,
   portQuery,
   onPortQueryChange,
+  onSelectPort,
   onReset,
   open,
   onClose,
@@ -87,12 +93,26 @@ export default function FilterSidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="px-4 py-2.5">
+          <span className="label">Search</span>
+        </div>
+        <VesselSearch
+          vesselTracks={vesselTracks}
+          vesselSpecs={vesselSpecs}
+          vesselQuery={vesselQuery}
+          onVesselQueryChange={onVesselQueryChange}
+          onSelectVessel={onSelectVessel}
+        />
+        <PortFilters
+          ports={ports}
+          portQuery={portQuery}
+          onPortQueryChange={onPortQueryChange}
+          onSelectPort={onSelectPort}
+        />
         <ActiveFilterPills
           services={services}
           visibleServices={visibleServices}
           onToggleService={onToggleService}
-          portRegions={portRegions}
-          onToggleRegion={onTogglePortRegion}
           portQuery={portQuery}
           onPortQueryChange={onPortQueryChange}
           vesselQuery={vesselQuery}
@@ -108,17 +128,6 @@ export default function FilterSidebar({
           onSelectService={onSelectService}
           onHoverService={onHoverService}
           trackedVessels={trackedVessels}
-          vesselTracks={vesselTracks}
-          vesselSpecs={vesselSpecs}
-          vesselQuery={vesselQuery}
-          onVesselQueryChange={onVesselQueryChange}
-        />
-        <PortFilters
-          ports={ports}
-          portRegions={portRegions}
-          onToggleRegion={onTogglePortRegion}
-          portQuery={portQuery}
-          onPortQueryChange={onPortQueryChange}
         />
       </div>
 

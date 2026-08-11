@@ -1,28 +1,28 @@
 "use client";
 
 import { useMemo } from "react";
-import { CheckRow, TextInput } from "./FormControls";
-import type { PortRegion } from "@/lib/filterLogic";
+import { TextInput } from "./FormControls";
 import { portRegion } from "@/lib/filterLogic";
 import type { Port } from "@/lib/types";
 
-const REGIONS: PortRegion[] = ["Asia", "Europe", "Middle East", "Other"];
-
 interface Props {
   ports: Port[];
-  portRegions: Set<PortRegion>;
-  onToggleRegion: (region: PortRegion) => void;
   portQuery: string;
   onPortQueryChange: (query: string) => void;
+  /** Opens the port's detail sheet and pans the map toward it. */
+  onSelectPort: (key: string) => void;
 }
 
-/** "Ports" section: region multi-select + a name/code search. */
+/**
+ * Port name/code search, pinned at the top of the filter sidebar alongside
+ * VesselSearch. Picking a suggestion navigates there and clears the query —
+ * the search's job ends once it has opened the port's panel.
+ */
 export default function PortFilters({
   ports,
-  portRegions,
-  onToggleRegion,
   portQuery,
   onPortQueryChange,
+  onSelectPort,
 }: Props) {
   const pq = portQuery.trim().toLowerCase();
   const matches = useMemo(() => {
@@ -38,21 +38,6 @@ export default function PortFilters({
   return (
     <div className="border-b border-line">
       <div className="px-4 py-2.5">
-        <span className="label">Ports</span>
-      </div>
-
-      <div className="pb-1">
-        {REGIONS.map((region) => (
-          <CheckRow
-            key={region}
-            checked={portRegions.has(region)}
-            onChange={() => onToggleRegion(region)}
-            label={region}
-          />
-        ))}
-      </div>
-
-      <div className="border-t border-line/60 px-4 py-2.5">
         <TextInput
           value={portQuery || null}
           onChange={(v) => onPortQueryChange(v ?? "")}
@@ -65,7 +50,10 @@ export default function PortFilters({
             <button
               key={port.key}
               type="button"
-              onClick={() => onPortQueryChange(port.name)}
+              onClick={() => {
+                onSelectPort(port.key);
+                onPortQueryChange("");
+              }}
               className="flex w-full items-baseline justify-between gap-2 px-4 py-1.5 text-left transition-colors hover:bg-surface-2"
             >
               <span className="truncate text-[11px] text-fg">
