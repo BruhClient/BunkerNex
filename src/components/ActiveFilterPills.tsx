@@ -1,8 +1,7 @@
 "use client";
 
-import { GRADE_LABELS } from "@/lib/colors";
 import type { PortRegion } from "@/lib/filterLogic";
-import type { Service, VesselGrade } from "@/lib/types";
+import type { Service } from "@/lib/types";
 
 interface Props {
   services: Service[];
@@ -14,8 +13,6 @@ interface Props {
   onPortQueryChange: (query: string) => void;
   vesselQuery: string;
   onVesselQueryChange: (query: string) => void;
-  fuelGrades: Set<VesselGrade>;
-  onToggleFuel: (grade: VesselGrade) => void;
   onReset: () => void;
 }
 
@@ -34,8 +31,6 @@ export default function ActiveFilterPills({
   onPortQueryChange,
   vesselQuery,
   onVesselQueryChange,
-  fuelGrades,
-  onToggleFuel,
   onReset,
 }: Props) {
   const partialServices =
@@ -72,11 +67,6 @@ export default function ActiveFilterPills({
           },
         ]
       : []),
-    ...[...fuelGrades].map((grade) => ({
-      key: `fuel:${grade}`,
-      label: `Fuel: ${GRADE_LABELS[grade]}`,
-      onRemove: () => onToggleFuel(grade),
-    })),
   ];
 
   if (chips.length === 0) return null;

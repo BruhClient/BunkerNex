@@ -1,4 +1,4 @@
-import type { Port, VesselGrade, VesselTrack } from "./types";
+import type { Port, VesselTrack } from "./types";
 
 /**
  * Derived, not sourced — Port carries no region field. Covers every country
@@ -51,30 +51,10 @@ export function portRegion(port: Port): PortRegion {
   return COUNTRY_REGION[port.country] ?? "Other";
 }
 
-/**
- * Not from VesselSpec.fuelTypes — that column is flagged in its own doc
- * comment as the same three grades for every vessel, so it can't answer
- * this. Mirrors the generator's own rules instead: every hull can burn
- * VLSFO, a scrubber-fitted hull can also burn HSFO (the documented 80/20
- * HSFO/VLSFO split), and every hull's one ECA-compliance tank is whichever
- * grade VesselTrack.complianceGrade names.
- */
-export function vesselCanBurn(track: VesselTrack, grade: VesselGrade): boolean {
-  if (grade === track.complianceGrade) return true;
-  if (grade === "VLSFO") return true;
-  if (grade === "HSFO") return track.scrubber;
-  return false;
-}
-
-export function portHasGrade(port: Port, grade: VesselGrade): boolean {
-  return port.grades.includes(grade);
-}
-
 export interface FilterState {
   vesselQuery: string;
   portRegions: Set<PortRegion>;
   portQuery: string;
-  fuelGrades: Set<VesselGrade>;
 }
 
 export interface FilterResult {
@@ -85,20 +65,20 @@ export interface FilterResult {
 
 /**
  * Service-code visibility stays RouteMap's own existing axis (visibleServices)
- * — this only computes the two new ones (region/search/fuel), so a filter
- * left at its default never restricts anything (null, not an empty Set).
+ * — this only computes the two new ones (region/search), so a filter left at
+ * its default never restricts anything (null, not an empty Set).
  */
 export function computeFilterResult(
   state: FilterState,
   ports: Port[],
   vesselTracks: VesselTrack[],
 ): FilterResult {
-  const { vesselQuery, portRegions, portQuery, fuelGrades } = state;
+  const { vesselQuery, portRegions, portQuery } = state;
   const vq = vesselQuery.trim().toLowerCase();
   const pq = portQuery.trim().toLowerCase();
 
   const visiblePortKeys =
-    portRegions.size === 0 && pq === "" && fuelGrades.size === 0
+    portRegions.size === 0 && pq === ""
       ? null
       : new Set(
           ports
@@ -113,32 +93,17 @@ export function computeFilterResult(
               ) {
                 return false;
               }
-              if (
-                fuelGrades.size > 0 &&
-                ![...fuelGrades].some((g) => portHasGrade(p, g))
-              ) {
-                return false;
-              }
               return true;
             })
             .map((p) => p.key),
         );
 
   const visibleVesselNames =
-    vq === "" && fuelGrades.size === 0
+    vq === ""
       ? null
       : new Set(
           vesselTracks
-            .filter((t) => {
-              if (vq && !t.name.toLowerCase().includes(vq)) return false;
-              if (
-                fuelGrades.size > 0 &&
-                ![...fuelGrades].some((g) => vesselCanBurn(t, g))
-              ) {
-                return false;
-              }
-              return true;
-            })
+            .filter((t) => t.name.toLowerCase().includes(vq))
             .map((t) => t.name),
         );
 

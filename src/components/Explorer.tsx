@@ -29,7 +29,6 @@ import type {
   PortCall,
   Service,
   TransitTime,
-  VesselGrade,
   VesselSpec,
   VesselTrack,
 } from "@/lib/types";
@@ -110,17 +109,14 @@ export default function Explorer({
   const [forecastOpen, setForecastOpen] = useState(true);
 
   // Filter sidebar state, beyond visibleServices above. Region/service stay
-  // one axis (visibleServices) — these four are the genuinely new ones:
-  // vessel/port name search, port region, and fuel type, all computed
-  // together into a cross-filter result by computeFilterResult below.
+  // one axis (visibleServices) — these three are the genuinely new ones:
+  // vessel/port name search and port region, computed together into a
+  // cross-filter result by computeFilterResult below.
   const [vesselQuery, setVesselQuery] = useState("");
   const [portRegions, setPortRegions] = useState<Set<PortRegion>>(
     () => new Set(),
   );
   const [portQuery, setPortQuery] = useState("");
-  const [fuelGrades, setFuelGrades] = useState<Set<VesselGrade>>(
-    () => new Set(),
-  );
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
@@ -269,31 +265,21 @@ export default function Explorer({
     });
   }, []);
 
-  const toggleFuelGrade = useCallback((grade: VesselGrade) => {
-    setFuelGrades((prev) => {
-      const next = new Set(prev);
-      if (next.has(grade)) next.delete(grade);
-      else next.add(grade);
-      return next;
-    });
-  }, []);
-
   const resetFilters = useCallback(() => {
     setAll(true);
     setVesselQuery("");
     setPortRegions(new Set());
     setPortQuery("");
-    setFuelGrades(new Set());
   }, [setAll]);
 
   const filterResult = useMemo(
     () =>
       computeFilterResult(
-        { vesselQuery, portRegions, portQuery, fuelGrades },
+        { vesselQuery, portRegions, portQuery },
         ports,
         vesselTracks,
       ),
-    [vesselQuery, portRegions, portQuery, fuelGrades, ports, vesselTracks],
+    [vesselQuery, portRegions, portQuery, ports, vesselTracks],
   );
 
   const selectPort = useCallback(
@@ -549,8 +535,6 @@ export default function Explorer({
             onTogglePortRegion={togglePortRegion}
             portQuery={portQuery}
             onPortQueryChange={setPortQuery}
-            fuelGrades={fuelGrades}
-            onToggleFuel={toggleFuelGrade}
             onReset={resetFilters}
             open={sidebarOpen}
             onClose={() => setSidebarOpen(false)}

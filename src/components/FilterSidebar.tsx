@@ -2,17 +2,10 @@
 
 import type { ReactNode } from "react";
 import ActiveFilterPills from "./ActiveFilterPills";
-import FuelFilters from "./FuelFilters";
 import PortFilters from "./PortFilters";
 import VesselFilters from "./VesselFilters";
 import type { PortRegion } from "@/lib/filterLogic";
-import type {
-  Port,
-  Service,
-  VesselGrade,
-  VesselSpec,
-  VesselTrack,
-} from "@/lib/types";
+import type { Port, Service, VesselSpec, VesselTrack } from "@/lib/types";
 
 interface Props {
   services: Service[];
@@ -34,9 +27,6 @@ interface Props {
   portQuery: string;
   onPortQueryChange: (query: string) => void;
 
-  fuelGrades: Set<VesselGrade>;
-  onToggleFuel: (grade: VesselGrade) => void;
-
   onReset: () => void;
   open: boolean;
   onClose: () => void;
@@ -44,10 +34,10 @@ interface Props {
 
 /**
  * Left "FILTERS" panel: replaces the old ServiceSidebar with a hierarchical,
- * multi-select filter over vessels (service/region/name), ports
- * (region/code) and fuel type, cross-filtering the map in real time via
- * Explorer.tsx's computeFilterResult. Same mobile-drawer contract
- * ServiceSidebar had (open/onClose), so Explorer mounts it the same way.
+ * multi-select filter over vessels (service/region/name) and ports
+ * (region/code), cross-filtering the map in real time via Explorer.tsx's
+ * computeFilterResult. Same mobile-drawer contract ServiceSidebar had
+ * (open/onClose), so Explorer mounts it the same way.
  */
 export default function FilterSidebar({
   services,
@@ -67,8 +57,6 @@ export default function FilterSidebar({
   onTogglePortRegion,
   portQuery,
   onPortQueryChange,
-  fuelGrades,
-  onToggleFuel,
   onReset,
   open,
   onClose,
@@ -109,8 +97,6 @@ export default function FilterSidebar({
           onPortQueryChange={onPortQueryChange}
           vesselQuery={vesselQuery}
           onVesselQueryChange={onVesselQueryChange}
-          fuelGrades={fuelGrades}
-          onToggleFuel={onToggleFuel}
           onReset={onReset}
         />
         <VesselFilters
@@ -134,7 +120,6 @@ export default function FilterSidebar({
           portQuery={portQuery}
           onPortQueryChange={onPortQueryChange}
         />
-        <FuelFilters fuelGrades={fuelGrades} onToggle={onToggleFuel} />
       </div>
 
       <div className="border-t border-line px-4 py-3">
