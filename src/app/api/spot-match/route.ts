@@ -3,17 +3,32 @@ import { NextResponse } from "next/server";
 import { loadCo2eCostSeries, loadCo2eFactors } from "@/lib/emissions";
 import { computePriceForecast, type PriceForecast } from "@/lib/priceForecast";
 import { computeTrendSignal } from "@/lib/priceTrend";
+import { portMeta } from "@/lib/ports";
 import { getPortPrices } from "@/lib/prices";
+import {
+  computeRoutePriceOutlook,
+  type FutureCall,
+  type RoutePriceOutlookEntry,
+} from "@/lib/routePriceOutlook";
 import {
   matchSpotRequest,
   resolveEmissionsCostUsdPerMt,
   type SpotMatchResult,
 } from "@/lib/spotMatch";
 import {
+  evaluateOpportunisticTopUps,
+  type OpportunisticTopUp,
+} from "@/lib/spotOpportunity";
+import {
   simulateBunkering,
   type BunkeringSimulation,
 } from "@/lib/spotSimulation";
-import { tankFor, type SpotBunkerRequest, type SpotContext } from "@/lib/spotBunker";
+import {
+  tankFor,
+  type SpotBunkerRequest,
+  type SpotContext,
+  type SpotFuelGrade,
+} from "@/lib/spotBunker";
 import { getPortMarkets } from "@/lib/suppliers";
 import type { VesselSpec } from "@/lib/types";
 
@@ -35,6 +50,7 @@ interface RequestBody {
   request: SpotBunkerRequest;
   ctx: SpotContext;
   spec: VesselSpec;
+  futureCalls: FutureCall[];
 }
 
 export interface Narrative {
@@ -42,6 +58,8 @@ export interface Narrative {
   reasons: string[];
   risks: string[];
   simulationNarrative: string;
+  opportunities: string[];
+  routeOutlook: string[];
 }
 
 /** Tank-to-wake mass for this nomination — the $ side already lives on RankedOffer. */
@@ -57,6 +75,8 @@ export interface SpotMatchApiResponse {
   narrativeError: string | null;
   emissions: EmissionsEstimate | null;
   priceForecast: PriceForecast | null;
+  opportunisticTopUps: OpportunisticTopUp[] | null;
+  routeOutlook: RoutePriceOutlookEntry[] | null;
 }
 
 const NARRATIVE_SCHEMA = {
@@ -84,8 +104,32 @@ const NARRATIVE_SCHEMA = {
       description:
         "1-2 sentences describing the cost breakdown and ROB trajectory in the given simulation.",
     },
+    opportunities: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "0 to 2 short notes mentioning an item in the given opportunisticTopUps list, if any. " +
+        "Reference only the grade, quantity and price already given — never invent a number. " +
+        "Empty array if opportunisticTopUps is empty or not worth mentioning.",
+    },
+    routeOutlook: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "0 to 3 short notes on genuinely notable upcoming price moves from the given " +
+        "routeOutlookSummary list (e.g. a much cheaper or pricier call ahead) — not a " +
+        "restatement of every port. Reference only the given figures, never invent a " +
+        "number. Empty array if routeOutlookSummary is empty or nothing stands out.",
+    },
   },
-  required: ["headline", "reasons", "risks", "simulationNarrative"],
+  required: [
+    "headline",
+    "reasons",
+    "risks",
+    "simulationNarrative",
+    "opportunities",
+    "routeOutlook",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -94,6 +138,7 @@ export async function POST(request: Request) {
   const spotRequest = body.request;
   const ctx = body.ctx;
   const spec = body.spec;
+  const futureCalls = body.futureCalls ?? [];
 
   if (!spotRequest || !ctx || !spec) {
     return NextResponse.json(
@@ -140,6 +185,33 @@ export async function POST(request: Request) {
     co2eFactorTPerMt,
   };
 
+  const opportunityCandidates: SpotFuelGrade[] = ctx.scrubberFitted
+    ? ["HSFO", "VLSFO"]
+    : ["VLSFO"];
+  const opportunisticTopUps = evaluateOpportunisticTopUps({
+    request: spotRequest,
+    ctx,
+    candidateGrades: opportunityCandidates,
+    trendFor: (grade) => computeTrendSignal(prices[grade] ?? []),
+    marketFor: (grade) =>
+      getPortMarkets(ctx.portCode as string).find((m) => m.grade === grade) ??
+      null,
+    emissionsCostFor: (grade) =>
+      resolveEmissionsCostUsdPerMt(
+        loadCo2eCostSeries(),
+        tankFor(grade),
+        ctx.arrivalTimestamp,
+      ),
+  });
+
+  const nominatedGrade = spotRequest.grade;
+  const routeOutlook = computeRoutePriceOutlook({
+    grade: nominatedGrade,
+    futureCalls,
+    seriesFor: (portCode) => getPortPrices(portCode)[nominatedGrade] ?? [],
+    nameFor: (portCode) => portMeta(portCode)?.name ?? null,
+  });
+
   const result = matchSpotRequest({
     request: spotRequest,
     ctx,
@@ -157,6 +229,8 @@ export async function POST(request: Request) {
       narrativeError: null,
       emissions,
       priceForecast,
+      opportunisticTopUps,
+      routeOutlook,
     } satisfies SpotMatchApiResponse);
   }
 
@@ -165,6 +239,8 @@ export async function POST(request: Request) {
   const { narrative, error: narrativeError } = await generateNarrative(
     result,
     simulation,
+    opportunisticTopUps,
+    routeOutlook,
   );
 
   return NextResponse.json({
@@ -174,16 +250,31 @@ export async function POST(request: Request) {
     narrativeError,
     emissions,
     priceForecast,
+    opportunisticTopUps,
+    routeOutlook,
   } satisfies SpotMatchApiResponse);
 }
 
 async function generateNarrative(
   result: SpotMatchResult,
   simulation: BunkeringSimulation,
+  opportunisticTopUps: OpportunisticTopUp[],
+  routeOutlook: RoutePriceOutlookEntry[],
 ): Promise<{ narrative: Narrative | null; error: string | null }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return { narrative: null, error: "ANTHROPIC_API_KEY is not configured." };
   }
+
+  // Full PriceForecast point arrays are chart data, not something the
+  // narrative needs — hand Claude the per-port summary only.
+  const routeOutlookSummary = routeOutlook.map((entry) => ({
+    portCode: entry.portCode,
+    portName: entry.portName,
+    arrivalTimestamp: entry.arrivalTimestamp,
+    daysFromNow: Math.round(entry.daysFromNow),
+    predictedPriceUsdPerMt: entry.forecast?.forecast.at(-1)?.value ?? null,
+    trend: entry.trend?.direction ?? null,
+  }));
 
   try {
     const client = new Anthropic();
@@ -195,14 +286,28 @@ async function generateNarrative(
         "supplier recommendation. Every number you are given below is " +
         "already computed and final — do not recompute, alter, invent, or " +
         "contradict any figure. Reference the given values verbatim in your " +
-        "prose. Write only the requested prose.",
+        "prose. opportunisticTopUps, if non-empty, are separate advisory " +
+        "suggestions (topping up a residual tank while already stopped for " +
+        "this compliance-grade stem) — not part of the winning offer; " +
+        "mention them only in the opportunities field, using only the given " +
+        "numbers. routeOutlookSummary, if non-empty, is a per-port forecast " +
+        "of this same nomination's grade at every remaining port on the " +
+        "vessel's route — mention only a genuinely notable move (e.g. a " +
+        "much cheaper or pricier call ahead) in the routeOutlook field, " +
+        "using only the given numbers, not a restatement of every port. " +
+        "Write only the requested prose.",
       output_config: {
         format: { type: "json_schema", schema: NARRATIVE_SCHEMA },
       },
       messages: [
         {
           role: "user",
-          content: JSON.stringify({ result, simulation }),
+          content: JSON.stringify({
+            result,
+            simulation,
+            opportunisticTopUps,
+            routeOutlookSummary,
+          }),
         },
       ],
     });

@@ -117,6 +117,9 @@ interface Props {
   portCalls: PortCall[];
   vesselTracks: VesselTrack[];
   visibleServices: string[];
+  /** From the filter sidebar's region/search/fuel axes. null = no restriction. */
+  visiblePortKeys: Set<string> | null;
+  visibleVesselNames: Set<string> | null;
   selectedKey: string | null;
   /**
    * The one service brought forward on the map — hovered or selected in the
@@ -195,6 +198,8 @@ export default function RouteMap({
   portCalls,
   vesselTracks,
   visibleServices,
+  visiblePortKeys,
+  visibleVesselNames,
   selectedKey,
   focusedService,
   stepIndex,
@@ -679,9 +684,16 @@ export default function RouteMap({
         }
       }
 
-      // Dim route ports whose services are all switched off. Markers and
-      // labels share one rule so they cannot drift apart.
-      const active = activePortKeys(ports, visible);
+      // Dim route ports whose services are all switched off, then AND in the
+      // filter sidebar's region/search/fuel restriction (null = no further
+      // restriction). Markers and labels share one rule so they cannot drift
+      // apart.
+      const serviceActive = activePortKeys(ports, visible);
+      const active = visiblePortKeys
+        ? new Set(
+            [...serviceActive].filter((key) => visiblePortKeys.has(key)),
+          )
+        : serviceActive;
       for (const port of ports) {
         markersRef.current
           .get(port.key)
@@ -718,7 +730,7 @@ export default function RouteMap({
 
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [visibleKey, ports, serviceCodes]);
+  }, [visibleKey, ports, serviceCodes, visiblePortKeys]);
 
   // --- Bring the focused service forward, push the rest back ---
   // Also owns chevron visibility: direction marks belong to one service at a
@@ -796,11 +808,13 @@ export default function RouteMap({
         // A vessel hides with its own route line, so switching a service off
         // clears both together. Focus mode narrows further, to the single hull
         // the requirement is about — visibleServices cannot express that, since
-        // a service may have several tracked vessels on it.
+        // a service may have several tracked vessels on it. Focus mode also
+        // bypasses the filter sidebar's own vessel restriction, same reason.
         el.style.display = (
           focusVesselName
             ? name === focusVesselName
-            : visible.has(track.serviceCode)
+            : visible.has(track.serviceCode) &&
+              (visibleVesselNames === null || visibleVesselNames.has(name))
         )
           ? ""
           : "none";
@@ -847,7 +861,14 @@ export default function RouteMap({
 
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [stepIndex, resolvers, trackByName, visibleServices, focusVesselName]);
+  }, [
+    stepIndex,
+    resolvers,
+    trackByName,
+    visibleServices,
+    visibleVesselNames,
+    focusVesselName,
+  ]);
 
   // --- Selected vessel styling ---
   useEffect(() => {

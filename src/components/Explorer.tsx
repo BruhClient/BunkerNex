@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import BunkerLog from "./BunkerLog";
+import FilterSidebar from "./FilterSidebar";
 import PortPanel from "./PortPanel";
+import PriceForecastDrawer from "./PriceForecastDrawer";
 import RouteMap from "./RouteMap";
 import ServicePanel from "./ServicePanel";
-import ServiceSidebar from "./ServiceSidebar";
 import SpotBunkerPanel, {
   SPOT_PANEL_INLINE_MIN,
   SPOT_PANEL_WIDTH,
@@ -16,8 +17,10 @@ import VesselPanel from "./VesselPanel";
 import type { SpotMatchApiResponse } from "@/app/api/spot-match/route";
 import { allBunkerEvents } from "@/lib/bunkerEvents";
 import type { Co2eCostPoint, Co2eFactors } from "@/lib/emissions";
+import { computeFilterResult } from "@/lib/filterLogic";
+import type { PortRegion } from "@/lib/filterLogic";
 import { formatDate } from "@/lib/format";
-import { stepTimestamp } from "@/lib/vesselPosition";
+import { buildLegs, stepTimestamp } from "@/lib/vesselPosition";
 import type { BunkerPriceSnapshot } from "@/lib/bunkerEvents";
 import type { SpotBunkerRequest, SpotContext } from "@/lib/spotBunker";
 import type {
@@ -25,6 +28,7 @@ import type {
   PortCall,
   Service,
   TransitTime,
+  VesselGrade,
   VesselSpec,
   VesselTrack,
 } from "@/lib/types";
@@ -100,6 +104,22 @@ export default function Explorer({
   // Collapsed by default: the map is the point, and a shut drawer costs
   // nothing per playback tick since only its header renders.
   const [logOpen, setLogOpen] = useState(false);
+  // Open by default, unlike the log — this is the thing to check before
+  // the log is even worth opening.
+  const [forecastOpen, setForecastOpen] = useState(true);
+
+  // Filter sidebar state, beyond visibleServices above. Region/service stay
+  // one axis (visibleServices) — these four are the genuinely new ones:
+  // vessel/port name search, port region, and fuel type, all computed
+  // together into a cross-filter result by computeFilterResult below.
+  const [vesselQuery, setVesselQuery] = useState("");
+  const [portRegions, setPortRegions] = useState<Set<PortRegion>>(
+    () => new Set(),
+  );
+  const [portQuery, setPortQuery] = useState("");
+  const [fuelGrades, setFuelGrades] = useState<Set<VesselGrade>>(
+    () => new Set(),
+  );
 
   const portsByKey = useMemo(
     () => new Map(ports.map((p) => [p.key, p])),
@@ -224,6 +244,57 @@ export default function Explorer({
     [services],
   );
 
+  // The Region bulk-select buttons write into the same visibleServices set
+  // the Service Route checkboxes do — one filter axis, two ways to set it.
+  const setServicesByRegion = useCallback(
+    (tradeRegion: string | null) => {
+      setVisibleServices(
+        tradeRegion === null
+          ? services.map((s) => s.code)
+          : services
+              .filter((s) => s.tradeRegion === tradeRegion)
+              .map((s) => s.code),
+      );
+    },
+    [services],
+  );
+
+  const togglePortRegion = useCallback((region: PortRegion) => {
+    setPortRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(region)) next.delete(region);
+      else next.add(region);
+      return next;
+    });
+  }, []);
+
+  const toggleFuelGrade = useCallback((grade: VesselGrade) => {
+    setFuelGrades((prev) => {
+      const next = new Set(prev);
+      if (next.has(grade)) next.delete(grade);
+      else next.add(grade);
+      return next;
+    });
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setAll(true);
+    setVesselQuery("");
+    setPortRegions(new Set());
+    setPortQuery("");
+    setFuelGrades(new Set());
+  }, [setAll]);
+
+  const filterResult = useMemo(
+    () =>
+      computeFilterResult(
+        { vesselQuery, portRegions, portQuery, fuelGrades },
+        ports,
+        vesselTracks,
+      ),
+    [vesselQuery, portRegions, portQuery, fuelGrades, ports, vesselTracks],
+  );
+
   const selectPort = useCallback(
     (key: string | null) => {
       // A port marker on the map stays clickable in focus mode; don't let it
@@ -311,11 +382,38 @@ export default function Explorer({
       setSpotSubmission({ request: req, ctx });
       setSpotError(null);
       setSpotPhase("matching");
+
+      // Every remaining port call on this vessel's simulated route, so the
+      // match service can forecast the nominated grade at each one — bounded
+      // by the track's own window, not an arbitrary cap.
+      const futureCalls = selectedVesselTrack
+        ? (() => {
+            const legs = buildLegs(selectedVesselTrack);
+            const currentLegIdx = legs.findIndex(
+              (l) => stepIndex >= l.start && stepIndex < l.start + l.length,
+            );
+            return legs.slice(currentLegIdx + 1).map((leg) => {
+              const arrivalStep = leg.start + leg.transitSteps;
+              return {
+                portCode: leg.toKey,
+                arrivalTimestamp: stepTimestamp(selectedVesselTrack, arrivalStep),
+                daysFromNow:
+                  ((arrivalStep - stepIndex) * selectedVesselTrack.stepHours) / 24,
+              };
+            });
+          })()
+        : [];
+
       try {
         const res = await fetch("/api/spot-match", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ request: req, ctx, spec: selectedVesselSpec }),
+          body: JSON.stringify({
+            request: req,
+            ctx,
+            spec: selectedVesselSpec,
+            futureCalls,
+          }),
         });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as {
@@ -333,7 +431,7 @@ export default function Explorer({
         setSpotPhase("error");
       }
     },
-    [selectedVesselSpec],
+    [selectedVesselSpec, selectedVesselTrack, stepIndex],
   );
 
   /**
@@ -419,14 +517,27 @@ export default function Explorer({
             it renders lives here, so it costs nothing to rebuild, and <main>
             is flex-1 so the map takes the 300px back on its own. */}
         {!spotFocus && (
-          <ServiceSidebar
+          <FilterSidebar
             services={services}
             visibleServices={visibleServices}
-            onToggle={toggleService}
+            onToggleService={toggleService}
             onSetAll={setAll}
+            onSetRegion={setServicesByRegion}
             onSelectService={selectService}
             onHoverService={setHoveredServiceCode}
             trackedVessels={trackedVessels}
+            vesselTracks={vesselTracks}
+            vesselSpecs={vesselSpecs}
+            vesselQuery={vesselQuery}
+            onVesselQueryChange={setVesselQuery}
+            ports={ports}
+            portRegions={portRegions}
+            onTogglePortRegion={togglePortRegion}
+            portQuery={portQuery}
+            onPortQueryChange={setPortQuery}
+            fuelGrades={fuelGrades}
+            onToggleFuel={toggleFuelGrade}
+            onReset={resetFilters}
             open={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />
@@ -438,6 +549,8 @@ export default function Explorer({
             portCalls={portCalls}
             vesselTracks={vesselTracks}
             visibleServices={mapServices}
+            visiblePortKeys={filterResult.visiblePortKeys}
+            visibleVesselNames={filterResult.visibleVesselNames}
             selectedKey={selectedKey}
             focusedService={focusedService}
             stepIndex={stepIndex}
@@ -493,6 +606,11 @@ export default function Explorer({
               held, so a live-looking scrubber would only invite a seek. */}
           {clock && stepCount > 0 && !spotFocus && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col">
+              <PriceForecastDrawer
+                ports={ports}
+                open={forecastOpen}
+                onToggle={() => setForecastOpen((o) => !o)}
+              />
               <BunkerLog
                 events={bunkerEvents}
                 visibleServices={visibleServices}
@@ -541,6 +659,8 @@ export default function Explorer({
                 narrativeError={spotResult?.narrativeError ?? null}
                 emissions={spotResult?.emissions ?? null}
                 priceForecast={spotResult?.priceForecast ?? null}
+                opportunisticTopUps={spotResult?.opportunisticTopUps ?? null}
+                routeOutlook={spotResult?.routeOutlook ?? null}
                 errorMessage={spotError}
                 onBack={exitSpotMode}
                 onClose={() => selectVessel(null)}

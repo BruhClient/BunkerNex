@@ -42,6 +42,7 @@ function addDays(date: string, days: number): string {
 export function computePriceForecast(
   points: PricePoint[],
   trend: TrendSignal | null,
+  forecastDays: number = FORECAST_DAYS,
 ): PriceForecast | null {
   if (trend === null) return null;
   const quoted = trimNulls(points).filter((p) => p.value !== null);
@@ -54,7 +55,7 @@ export function computePriceForecast(
   const lastValue = last.value as number;
 
   const forecast: PricePoint[] = [{ date: last.date, value: lastValue }];
-  for (let i = 1; i <= FORECAST_DAYS; i++) {
+  for (let i = 1; i <= forecastDays; i++) {
     forecast.push({
       date: addDays(last.date, i),
       value: Math.max(0, lastValue + driftUsdPerDay * i),
@@ -67,7 +68,7 @@ export function computePriceForecast(
     method: "trend-nudge-drift",
     note:
       `Illustrative projection only — extends the ${trend.windowDays}-day ` +
-      `trend nudge (${trend.direction}) forward ${FORECAST_DAYS} days, not a ` +
+      `trend nudge (${trend.direction}) forward ${forecastDays} days, not a ` +
       `market forecast.`,
   };
 }

@@ -14,8 +14,11 @@ import type { EmissionsEstimate, Narrative } from "@/app/api/spot-match/route";
 import { THEME } from "@/lib/colors";
 import { formatDateShort, formatMt, formatPrice } from "@/lib/format";
 import type { PriceForecast } from "@/lib/priceForecast";
+import type { RoutePriceOutlookEntry } from "@/lib/routePriceOutlook";
 import type { SpotMatchResult } from "@/lib/spotMatch";
+import type { OpportunisticTopUp } from "@/lib/spotOpportunity";
 import type { BunkeringSimulation, RobPoint } from "@/lib/spotSimulation";
+import { PriceForecastChart } from "./PriceForecastChart";
 import { SPOT_PANEL_WIDTH } from "./SpotBunkerPanel";
 
 export type SpotMatchPhase = "matching" | "result" | "error";
@@ -29,6 +32,8 @@ interface Props {
   narrativeError: string | null;
   emissions: EmissionsEstimate | null;
   priceForecast: PriceForecast | null;
+  opportunisticTopUps: OpportunisticTopUp[] | null;
+  routeOutlook: RoutePriceOutlookEntry[] | null;
   /** Network-level failure message, set only when phase is "error". */
   errorMessage: string | null;
   onBack: () => void;
@@ -56,6 +61,8 @@ export default function SpotMatchPanel({
   narrativeError,
   emissions,
   priceForecast,
+  opportunisticTopUps,
+  routeOutlook,
   errorMessage,
   onBack,
   onClose,
@@ -145,6 +152,8 @@ export default function SpotMatchPanel({
             narrativeError={narrativeError}
             emissions={emissions}
             priceForecast={priceForecast}
+            opportunisticTopUps={opportunisticTopUps}
+            routeOutlook={routeOutlook}
             onEdit={onEdit}
           />
         )}
@@ -231,6 +240,8 @@ function ResultBody({
   narrativeError,
   emissions,
   priceForecast,
+  opportunisticTopUps,
+  routeOutlook,
   onEdit,
 }: {
   result: SpotMatchResult;
@@ -239,6 +250,8 @@ function ResultBody({
   narrativeError: string | null;
   emissions: EmissionsEstimate | null;
   priceForecast: PriceForecast | null;
+  opportunisticTopUps: OpportunisticTopUp[] | null;
+  routeOutlook: RoutePriceOutlookEntry[] | null;
   onEdit: () => void;
 }) {
   const { winner, candidates, disqualified, warnings } = result;
@@ -338,6 +351,20 @@ function ResultBody({
                 ))}
               </ul>
             )}
+            {narrative.opportunities.length > 0 && (
+              <ul className="mt-1.5 space-y-1 text-[11px] leading-relaxed text-accent">
+                {narrative.opportunities.map((o, i) => (
+                  <li key={i}>↑ {o}</li>
+                ))}
+              </ul>
+            )}
+            {narrative.routeOutlook.length > 0 && (
+              <ul className="mt-1.5 space-y-1 text-[11px] leading-relaxed text-accent">
+                {narrative.routeOutlook.map((o, i) => (
+                  <li key={i}>→ {o}</li>
+                ))}
+              </ul>
+            )}
           </>
         ) : (
           <>
@@ -427,6 +454,79 @@ function ResultBody({
         </div>
       )}
 
+      {/* Opportunistic top-up — advisory only, not part of the winning offer */}
+      {opportunisticTopUps && opportunisticTopUps.length > 0 && (
+        <div>
+          <h3 className="label mb-1.5">While you&apos;re here</h3>
+          <ul className="space-y-2">
+            {opportunisticTopUps.map((op) => (
+              <li
+                key={op.grade}
+                className="rounded border border-line px-2.5 py-2 text-[11px]"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-fg">
+                    {op.grade} top-up
+                  </span>
+                  <span className="tnum text-faint">
+                    ${formatPrice(op.match.winner?.priceUsdPerMt ?? 0)}/mt · {op.match.winner?.offer.supplier}
+                  </span>
+                </div>
+                <p className="mt-1 leading-relaxed text-muted">
+                  {op.rationale}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
+            Indicative only — submit a separate nomination to act on this.
+          </p>
+        </div>
+      )}
+
+      {/* Route price outlook — every remaining port on this loop, each
+          forecast horizon matched to that call's own arrival date. */}
+      {routeOutlook && routeOutlook.length > 0 && (
+        <div>
+          <h3 className="label mb-1.5">Route price outlook</h3>
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+            {routeOutlook.map((entry, i) => (
+              <div
+                key={`${entry.portCode}-${i}`}
+                className="rounded border border-line px-2.5 py-2"
+              >
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="font-semibold text-fg">
+                    {entry.portName ?? entry.portCode}
+                  </span>
+                  <span className="tnum text-faint">
+                    +{Math.round(entry.daysFromNow)}d ·{" "}
+                    {formatDateShort(entry.arrivalTimestamp.split(" ")[0])}
+                  </span>
+                </div>
+                {entry.forecast ? (
+                  <>
+                    <PriceForecastChart forecast={entry.forecast} />
+                    <p className="mt-1 text-[10px] leading-relaxed text-faint">
+                      {entry.grade} projected at $
+                      {formatPrice(
+                        entry.forecast.forecast.at(-1)?.value ?? null,
+                      )}
+                      /mt on arrival · {entry.forecast.note}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-[10px] leading-relaxed text-faint">
+                    No price history for {entry.grade} at{" "}
+                    {entry.portName ?? entry.portCode}.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="border-t border-line pt-3 text-[10px] leading-relaxed text-faint">
         Nothing here is sourced — supplier prices, differentials and this
         write-up are all generated for this demo. Emissions cost is a flat,
@@ -511,104 +611,3 @@ function RobPointTooltip({
   );
 }
 
-interface PriceTrendRow {
-  date: string;
-  actual: number | null;
-  projected: number | null;
-}
-
-/**
- * Actual history (solid) joined to the trend-drift projection (dashed) at a
- * single shared row so the two lines meet — never let the dashed half look
- * like a continuation of real quotes without that visual break.
- */
-function buildPriceTrendRows(forecast: PriceForecast): PriceTrendRow[] {
-  const rows: PriceTrendRow[] = forecast.actual.map((p) => ({
-    date: p.date,
-    actual: p.value,
-    projected: null,
-  }));
-
-  for (const p of forecast.forecast) {
-    const last = rows[rows.length - 1];
-    if (last && last.date === p.date) {
-      last.projected = p.value;
-    } else {
-      rows.push({ date: p.date, actual: null, projected: p.value });
-    }
-  }
-  return rows;
-}
-
-function PriceForecastChart({ forecast }: { forecast: PriceForecast }) {
-  const data = buildPriceTrendRows(forecast);
-  return (
-    <div className="h-[140px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke={THEME.line} strokeDasharray="2 4" vertical={false} />
-          <XAxis
-            dataKey="date"
-            tickFormatter={(d: string) => formatDateShort(d)}
-            tick={{ fill: THEME.faint, fontSize: 9 }}
-            axisLine={{ stroke: THEME.line }}
-            tickLine={false}
-            minTickGap={24}
-          />
-          <YAxis
-            width={40}
-            tick={{ fill: THEME.faint, fontSize: 10 }}
-            axisLine={false}
-            tickLine={false}
-            domain={["auto", "auto"]}
-            tickFormatter={(v: number) => Math.round(v).toString()}
-          />
-          <Tooltip content={<PriceTrendTooltip />} cursor={{ stroke: THEME.lineStrong }} />
-          <Line
-            type="linear"
-            dataKey="actual"
-            stroke={THEME.accent}
-            strokeWidth={1.5}
-            dot={false}
-            activeDot={{ r: 3, strokeWidth: 0 }}
-            isAnimationActive={false}
-          />
-          <Line
-            type="linear"
-            dataKey="projected"
-            stroke={THEME.muted}
-            strokeWidth={1.5}
-            strokeDasharray="4 3"
-            dot={false}
-            activeDot={{ r: 3, strokeWidth: 0 }}
-            connectNulls
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function PriceTrendTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: PriceTrendRow }>;
-}) {
-  if (!active || !payload?.length) return null;
-  const point = payload[0].payload;
-  const value = point.actual ?? point.projected;
-  return (
-    <div className="rounded border border-line-strong bg-surface px-2.5 py-2 shadow-xl">
-      <div className="text-[10px] text-faint">{formatDateShort(point.date)}</div>
-      <div className="tnum text-[11px] text-fg">
-        ${formatPrice(value)}/mt
-        {point.actual === null && point.projected !== null && (
-          <span className="ml-1 text-[9px] font-normal text-muted">projected</span>
-        )}
-      </div>
-    </div>
-  );
-}
