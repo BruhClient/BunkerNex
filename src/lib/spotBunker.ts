@@ -295,6 +295,11 @@ export function deriveSpotContext(
     HSFO: track.robMt.HSFO[stepIndex] ?? 0,
     VLSFO: track.robMt.VLSFO[stepIndex] ?? 0,
     MGO: track.robMt.MGO[stepIndex] ?? 0,
+    // Not surfaced anywhere in this form (see SpotFuelGrade below) — carried
+    // only so this record has a value for every VesselGrade.
+    MEOH: track.robMt.MEOH[stepIndex] ?? 0,
+    LNG: track.robMt.LNG[stepIndex] ?? 0,
+    B40: track.robMt.B40[stepIndex] ?? 0,
   };
   const residualRobMt = robByGrade.HSFO + robByGrade.VLSFO;
 
@@ -333,6 +338,11 @@ export function deriveSpotContext(
       HSFO: hasMarketFor("HSFO", portCode),
       VLSFO: hasMarketFor("VLSFO", portCode),
       MGO: hasMarketFor("MGO", portCode),
+      // Methanol, LNG and B40 are never nominable through this desk form —
+      // see SpotFuelGrade below — so these are never true regardless of port.
+      MEOH: false,
+      LNG: false,
+      B40: false,
     },
   };
 }
@@ -346,8 +356,16 @@ export function deriveSpotContext(
  */
 export function prefillSpotRequest(ctx: SpotContext): SpotBunkerRequest {
   // What the engine is burning now, not the hull's primary grade — those differ
-  // through every ECA call.
-  const grade: SpotFuelGrade = ctx.activeGrade;
+  // through every ECA call. Null when it's an alternative compliance fuel
+  // (methanol, LNG or B40): this form's ISO 8217/viscosity/pour-point fields
+  // model conventional and distillate fuel, not the IGF-Code territory
+  // methanol/LNG fall under or the biofuel-lifting convention B40 would need,
+  // so those vessels get no prefill while mid-ECA and the CE picks a grade
+  // manually.
+  const SPOT_FUEL_GRADES = new Set<VesselGrade>(["HSFO", "VLSFO", "MGO"]);
+  const grade: SpotFuelGrade | null = SPOT_FUEL_GRADES.has(ctx.activeGrade)
+    ? (ctx.activeGrade as SpotFuelGrade)
+    : null;
 
   return {
     grade,
@@ -355,7 +373,7 @@ export function prefillSpotRequest(ctx: SpotContext): SpotBunkerRequest {
     isoVersion: "2017",
 
     nominationMt: null,
-    robMt: ctx.robByGrade[tankFor(grade)],
+    robMt: grade === null ? null : ctx.robByGrade[tankFor(grade)],
     projectedConsumptionMt: ctx.projectedBurnToArrivalMt,
     portStayDays: ctx.portStayDays,
     flamingoStatus: null,

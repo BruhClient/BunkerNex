@@ -14,14 +14,14 @@
  */
 
 /**
- * The 11 China/Korea ports capping sulphur at 0.10%.
+ * The 22 ports capping sulphur at 0.10%, across all four ECA/DECA zones drawn
+ * on the map (src/lib/ecaZones.ts): China's national port ECA, Korea's, the
+ * North Sea & English Channel ECA, and the Mediterranean SOx ECA.
  *
  * A vessel runs MGO from a day before berthing here until shortly after
  * departure. VLSFO is a 0.50% grade and does not clear this cap — switching
  * between the two residual grades would be non-compliance dressed as
- * compliance. Deliberately does NOT include the North Sea/Channel or
- * Mediterranean SECAs the Asia-Europe services' European ports sit in in
- * reality — out of scope, see data/README.md.
+ * compliance.
  */
 export const ECA_PORTS: ReadonlySet<string> = new Set([
   "CNNGB", // Ningbo
@@ -35,6 +35,21 @@ export const ECA_PORTS: ReadonlySet<string> = new Set([
   "CNYTN", // Yantian
   "KRINC", // Incheon
   "KRPUS", // Busan
+
+  // North Sea & English Channel ECA
+  "NLRTM", // Rotterdam
+  "BEANR", // Antwerp
+  "DEHAM", // Hamburg
+  "FRLEH", // Le Havre
+  "GBSOU", // Southampton
+  "GBFXT", // Felixstowe
+
+  // Mediterranean SOx ECA
+  "ESALG", // Algeciras
+  "GRPIR", // Piraeus
+  "MTMLA", // Malta
+  "EGPSD", // Port Said
+  "ESVLC", // Valencia
 ]);
 
 /**
@@ -43,7 +58,7 @@ export const ECA_PORTS: ReadonlySet<string> = new Set([
  * A scrubber-fitted hull calling here lifts VLSFO instead. Assigning grade by
  * scrubber fitting alone is the bug this set replaced — see data/README.md.
  * Algeciras/Piraeus/Malta are here for a different reason than the first
- * eight: not a CE-sheet finding, but the absence of an assessed IFO380
+ * eight: not a CE-sheet finding, but the absence of an assessed HSFO
  * column for any of the three.
  */
 export const NO_HSFO_PORTS: ReadonlySet<string> = new Set([
@@ -55,9 +70,9 @@ export const NO_HSFO_PORTS: ReadonlySet<string> = new Set([
   "MMRGN", // Yangon
   "VNHPH", // Haiphong
   "VNUIH", // Qui Nhon
-  "ESALG", // Algeciras - no priced IFO380 market
-  "GRPIR", // Piraeus - no priced IFO380 market
-  "MTMLA", // Malta - no priced IFO380 market
+  "ESALG", // Algeciras - no priced HSFO market
+  "GRPIR", // Piraeus - no priced HSFO market
+  "MTMLA", // Malta - no priced HSFO market
 ]);
 
 /**

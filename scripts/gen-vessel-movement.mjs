@@ -38,6 +38,8 @@ const ROOT = process.cwd();
 const DATA = path.join(ROOT, "data");
 const PORT_CALLS = path.join(DATA, "schedules", "PIL_Intra_Asia_Port_Calls.csv");
 const SPECS = path.join(DATA, "vessels", "PIL_Fleet_Vessel_Specifications.csv");
+const ENERGY_PER_MT = path.join(DATA, "emissions", "energy_per_mt.csv");
+const ECA_ZONE_WINDOWS = path.join(DATA, "derived", "eca_zone_windows.json");
 const OUT = path.join(DATA, "vessels", "PIL_Fleet_Live_Movement.csv");
 
 // --- The window. These two lines are the timeline. ------------------------
@@ -82,10 +84,21 @@ const HEADER = [
   "Active_Fuel",
   "VLSFO_ROB_MT",
   "HSFO_ROB_MT",
+  // Every vessel carries exactly one compliance tank — MGO, MEOH, LNG or
+  // B40 — chosen by COMPLIANCE_FUEL below. The other three compliance
+  // columns are present for every vessel anyway, same convention as HSFO
+  // for a non-scrubber hull: flat "0" throughout for whichever three this
+  // vessel doesn't carry.
   "MGO_ROB_MT",
+  "MEOH_ROB_MT",
+  "LNG_ROB_MT",
+  "B40_ROB_MT",
   "VLSFO_Bunkered_MT",
   "HSFO_Bunkered_MT",
   "MGO_Bunkered_MT",
+  "MEOH_Bunkered_MT",
+  "LNG_Bunkered_MT",
+  "B40_Bunkered_MT",
   "Source_File",
   "Data_Notes",
 ];
@@ -233,16 +246,42 @@ const DEPLOYMENT_NOTES = {
 /**
  * Ports where the fleet must burn 0.10% S fuel, i.e. LSMGO.
  *
- * China and Korea both run national port ECAs rather than an IMO SECA — Korea's
- * covers Busan, Incheon, Ulsan and Yeosu/Gwangyang; China's covers its coastal
- * ports — so this is a port list, not a polygon. Every one of the ten also
- * publishes a Bunker_Quantity_MT somewhere in this fleet's schedules, which is
- * what lets a vessel top its MGO up inside a window rather than having to carry
- * the whole stretch from outside.
+ * Four regulatory zones, all port-list rather than polygon (the fleet has no
+ * continuous position — schematic arcs, no synthetic lat/lon — so "in an ECA"
+ * can only mean "near a call at one of these ports", the same approximation
+ * the original 11-port set already made):
+ *
+ *  - China's national port ECA (nine coastal ports) and Korea's (Busan,
+ *    Incheon) — a port list rather than an IMO SECA either way.
+ *  - The North Sea & English Channel ECA — Rotterdam, Antwerp, Hamburg, Le
+ *    Havre, Southampton, Felixstowe.
+ *  - The Mediterranean SOx ECA (IMO-designated, effective 2025) — Algeciras,
+ *    Piraeus, Malta, Port Said, Valencia.
+ *
+ * All 22 also publish a Bunker_Quantity_MT somewhere in this fleet's
+ * schedules, which is what lets a vessel top its MGO up inside a window
+ * rather than having to carry the whole stretch from outside.
  *
  * VLSFO does not clear this: it is 0.50% S against a 0.10% limit. Switching
  * between the two residual grades would look like compliance without being it,
  * which is why MGO has to be the switch fuel.
+ *
+ * The North Sea/Channel and Mediterranean ports were deliberately left out of
+ * this set until the MGO tank was resized to fit their longer, sometimes
+ * merged windows (Le Havre-Southampton-Felixstowe-Antwerp-Rotterdam-Hamburg
+ * can flag as one continuous stretch) — see MGO_MAX_RATIO. Also NOT here:
+ * TWKHH (Kaohsiung) — Taiwan isn't covered by the China/Korea national-ECA
+ * rule this set otherwise encodes, and there's no evidence otherwise.
+ *
+ * This set is ground truth for BERTHED steps only — a vessel alongside one of
+ * these ports is unconditionally on 0.10% S fuel, regardless of map geometry.
+ * TRANSIT steps are decided by ECA_ZONE_PROFILE below instead: a call window
+ * (this set's ECA_LEAD_STEPS/ECA_TRAIL_STEPS) covers only ~1 day either side
+ * of a call, but the shaded zones the map draws (src/lib/ecaZones.ts) are
+ * generous envelopes — the Mediterranean SOx ring alone spans Gibraltar to
+ * Port Said — so a multi-day crossing or coastal hop sits inside a zone far
+ * longer than that window, and the map would otherwise show a vessel burning
+ * VLSFO/HSFO while its marker sits inside yellow.
  */
 const ECA_PORTS = new Set([
   "CNNGB", // Ningbo
@@ -257,15 +296,20 @@ const ECA_PORTS = new Set([
   "KRINC", // Incheon
   "KRPUS", // Busan
 
-  // Deliberately NOT here: the North Sea/Channel and Mediterranean SECAs that
-  // cover most of the Asia-Europe services' European ports in reality. Adding
-  // them is out of scope for this change — the MGO tank's fleet-wide autonomy
-  // is only ~4.4 days full-to-min, and ECA windows merge across consecutive
-  // calls, so a Le Havre-Southampton-Felixstowe-Antwerp-Rotterdam-Hamburg run
-  // flagged as one continuous window needs its own sizing pass against the
-  // actual leg days, not a silent addition here. Also NOT here: TWKHH
-  // (Kaohsiung) — Taiwan isn't covered by the China/Korea national-ECA rule
-  // this set otherwise encodes, and there's no evidence otherwise.
+  // North Sea & English Channel ECA
+  "NLRTM", // Rotterdam
+  "BEANR", // Antwerp
+  "DEHAM", // Hamburg
+  "FRLEH", // Le Havre
+  "GBSOU", // Southampton
+  "GBFXT", // Felixstowe
+
+  // Mediterranean SOx ECA
+  "ESALG", // Algeciras
+  "GRPIR", // Piraeus
+  "MTMLA", // Malta
+  "EGPSD", // Port Said
+  "ESVLC", // Valencia
 ]);
 
 /** Switch to MGO one day before berthing at an ECA port. */
@@ -275,11 +319,24 @@ const ECA_LEAD_STEPS = STEPS_PER_DAY;
 const ECA_TRAIL_STEPS = 1;
 
 /**
+ * Per-leg [startFraction, endFraction) windows during which the vessel's
+ * charted position sits inside a shaded ECA/DECA zone, keyed "FROM>TO".
+ *
+ * Written by scripts/gen-eca-zone-profile.mjs from the same route geometry
+ * the map renders (src/lib/searoutes.ts + src/lib/ecaZones.ts) — re-run that
+ * script first if either changes, or this goes stale the way a modelled price
+ * column does after a hub refresh. Empty array means the leg never enters a
+ * zone; a missing key for a leg the timetable actually sails is a bug (the
+ * lookup below throws rather than silently treating it as empty).
+ */
+const ECA_ZONE_PROFILE = JSON.parse(fs.readFileSync(ECA_ZONE_WINDOWS, "utf8"));
+
+/**
  * Ports with no high-sulphur bunker market.
  *
  * Held as a literal rather than read from data/pricing/, which the generator
  * deliberately does not parse. The evidence is there though: none of these has
- * an IFO380 column in "HSGO Prices.csv", and bunker_basis.csv models no IFO380
+ * an HSFO column in "HSGO Prices.csv", and bunker_basis.csv models no HSFO
  * basis for them either — researched and recorded in data/README.md as an
  * absence of market, not an absence of data.
  *
@@ -289,7 +346,7 @@ const ECA_TRAIL_STEPS = 1;
  * secondary residual tank instead — which is the whole reason a scrubber vessel
  * needs a second residual grade at all.
  *
- * Laem Chabang is deliberately NOT in this list: LAEMCHABANG IFO380 carries
+ * Laem Chabang is deliberately NOT in this list: LAEMCHABANG HSFO carries
  * 1,715 values through 2026-08-05. data/README.md used to name it here.
  */
 const NO_HSFO_PORTS = new Set([
@@ -304,14 +361,14 @@ const NO_HSFO_PORTS = new Set([
 
   // Added with the Asia-Europe services. Unlike the entries above, these
   // three aren't CE-sheet findings — Algeciras, Piraeus and Malta have no
-  // assessed IFO380 column in HSGO Prices.csv and none is added for them in
+  // assessed HSFO column in HSGO Prices.csv and none is added for them in
   // this change either (out of scope). Without this, a scrubber vessel
   // routed through MEDI/EUROMED could stem HSFO here and the bunker log
   // would render that stem with a null price — the silent valuation gap this
   // set exists to prevent.
-  "ESALG", // Algeciras - no priced IFO380 market
-  "GRPIR", // Piraeus - no priced IFO380 market
-  "MTMLA", // Malta - no priced IFO380 market
+  "ESALG", // Algeciras - no priced HSFO market
+  "GRPIR", // Piraeus - no priced HSFO market
+  "MTMLA", // Malta - no priced HSFO market
 ]);
 
 /**
@@ -389,23 +446,286 @@ const VLSFO_RESERVE_RATIO = 0.2;
  * than parked, holding five hand figures beside thirty derived ones would make
  * the series inconsistent, so all thirty-five come from this ratio.
  *
- * Raise it if the ECA-heavy rotations (KCS, KCI) ever breach the MGO floor —
- * checkInvariants will say so before anything is written.
+ * Raised from 0.2 to 0.4 when ECA coverage extended to the North Sea/Channel
+ * and Mediterranean SOx zones: those ports' windows can merge into stretches
+ * longer than the original ~4.4-day autonomy covered. Held at 0.4 through a
+ * second, bigger change — position-based ECA detection (ECA_ZONE_PROFILE) —
+ * because that change's real fix was the MGO stem lift, not this ratio: MGO
+ * used to cap each stem at a fifth of the published quantity, which could
+ * never keep pace once transit time inside a zone stopped being a ~1-day
+ * approximation. See the MGO stem comment below. checkInvariants' tightest
+ * case at 0.4 is AE7's KOTA ORKID; raise this further if a future rotation
+ * change breaches the MGO floor again. Mirrored as MGO_TANK_RATIO in
+ * src/lib/types.ts.
  */
-const MGO_MAX_RATIO = 0.2;
+const MGO_MAX_RATIO = 0.4;
 
 /** Floor and trigger as fractions of the MGO tank, mirroring the residual ones. */
 const MGO_MIN_RATIO = 1 / 3;
 const MGO_TRIGGER_RATIO = 1 / 2;
 
 /**
- * Share of a call's published Bunker_Quantity_MT liftable as MGO.
+ * The MGO stem lifts up to the full published Bunker_Quantity_MT, capped by
+ * tank room — exactly the residual formula (`Math.min(qty, max - residual)`
+ * above), no separate ratio.
  *
- * The schedules publish one quantity per call, sized for the residual stem. The
- * MGO lift is pegged to it at the same ratio the tank is, so the figure stays
- * anchored to published data rather than invented outright.
+ * Used to be capped at a fifth of the published quantity (the same fraction
+ * the tank itself was, "so the figure stays anchored to published data
+ * rather than invented outright"): a 0.6 MT/day MGO tank drawn down over a
+ * ~1-day call window never needed more. Position-based ECA detection (see
+ * ECA_ZONE_PROFILE) broke that: the North Sea/Channel and Mediterranean
+ * zones are large enough that a vessel hopping Algeciras-Le Havre-Antwerp-
+ * Rotterdam-Hamburg-Valencia (MEDI's KOTA PUSAKA) burns roughly 2,460 MT of
+ * MGO across one 42-day loop — a fifth of a 600 MT call could never keep up
+ * regardless of how large the tank was sized, a structural shortfall no
+ * MGO_MAX_RATIO increase fixes. Every stop on that chain publishes a
+ * quantity anyway (600-1,200 MT), so lifting the same way residual does is
+ * the direct fix, not an invented one.
  */
-const MGO_STEM_RATIO = 0.2;
+
+/**
+ * Energy demand, not mass, is what's proportional to DWT.
+ *
+ * Consumption_Transit_MT_Per_Day / Consumption_Berth_MT_Per_Day
+ * (vessel_assumptions.csv: 0.09%/0.015% of DWT_MT/day) were, until now, burned
+ * as a flat mass rate regardless of grade — a tonne of MGO and a tonne of HSFO
+ * cost the same ROB to deliver the same nautical mile, which isn't physically
+ * true. The two grades hold different energy content (data/emissions/
+ * energy_per_mt.csv): MGO is 42.7 GJ/mt, VLSFO 41.7, HSFO 40.2.
+ *
+ * So the propulsive demand is now modelled as energy, `GJ/day = c x DWT_MT`,
+ * flat across the fleet under the constant-speed assumption (no vessel sails
+ * faster or slower than another), and mass burned per step is derived from
+ * whichever grade is actually lit. `c` is calibrated so a vessel burning
+ * VLSFO outside an ECA reproduces today's MT/day exactly — 0.0009 x 41.7 for
+ * transit, 0.00015 x 41.7 for berth — so the only observable change outside
+ * an ECA window is a scrubber vessel's HSFO rate diverging slightly from the
+ * VLSFO baseline (40.2 vs 41.7 GJ/mt: slightly more HSFO mass for the same
+ * energy), and MGO burns measurably less mass per day than VLSFO would for
+ * the same work (42.7 vs 41.7 GJ/mt) wherever an ECA window forces it.
+ */
+const ENERGY_RATE_TRANSIT_GJ_PER_DWT_DAY = 0.0009 * 41.7;
+const ENERGY_RATE_BERTH_GJ_PER_DWT_DAY = 0.00015 * 41.7;
+
+/** Energy content per tonne, by tank grade. Read from energy_per_mt.csv. */
+function loadEnergyPerMt() {
+  const rows = readCsv(ENERGY_PER_MT);
+  const byGrade = new Map(rows.map((r) => [cell(r, "Grade"), Number(cell(r, "Energy_Content_GJ_Per_MT"))]));
+  const gjPerMt = {};
+  for (const grade of ["HSFO", "VLSFO", "MGO", "MEOH", "LNG", "B40"]) {
+    const v = byGrade.get(grade);
+    if (!Number.isFinite(v) || v <= 0) {
+      throw new Error(`energy_per_mt.csv: missing or bad Energy_Content_GJ_Per_MT for ${grade}`);
+    }
+    gjPerMt[grade] = v;
+  }
+  return gjPerMt;
+}
+
+// --- Alternative ECA-compliance fuels, on small subsets -------------------
+
+/**
+ * The ECA-compliance tank does not have to be MGO. Anything that isn't
+ * VLSFO/HSFO clears the 0.10% cap — distillates, gas, biofuel, methanol.
+ * This fleet models three alternatives, each on a real vessel subset,
+ * because each is the only grade with a real priced market in this dataset
+ * to stem it against. Inventing a price at a port with no assessed or
+ * modelled column, the way this dataset never does for conventional grades
+ * either (see CLAUDE.md "Most price columns are modelled"), would be worse
+ * than not modelling it at all.
+ *
+ * Each grade started as a 2-vessel pilot on a single service (KCI/methanol,
+ * CVI/LNG, NCI/B40) and was widened in two later passes, first across
+ * every intra-Asia service whose own rotation touches that grade's supply
+ * port(s), then onto a handful of Asia-Europe services too. B40 stayed
+ * intra-Asia-only throughout — Jakarta/Surabaya are the only B40-priced
+ * ports anywhere in this dataset, and no Europe-touching service calls
+ * either.
+ *
+ * The Asia-Europe widening (MEOH/LNG only) needed more than just a
+ * qualifying port. Every alternative-fuel supply port sits in Asia, and the
+ * compliance tank only draws down inside an ECA window — fine on an
+ * intra-Asia loop, where the port that triggers the ECA switch is usually
+ * the supply port too. On an Asia-Europe loop the vessel fills once in Asia
+ * and then has to survive the entire Europe-side ECA exposure (North
+ * Sea/Channel, sometimes Mediterranean) with zero resupply chance before
+ * its next Asia call — an MGO-tanked vessel doesn't have this problem,
+ * since it can still buy MGO at almost any European port along the way
+ * (NO_MGO_PORTS is a short exclusion list). MEOH_MAX_RATIO/LNG_MAX_RATIO
+ * carry a x2.3 buffer on top of their base energy-density figure to cover
+ * this — raised empirically against checkInvariants, the same way
+ * MGO_MAX_RATIO itself went 0.2->0.4 for the same class of window, and
+ * large enough that it changed the *intra-Asia* vessels' tightest margin
+ * too (harmlessly — a bigger tank never hurts a vessel with frequent supply
+ * chances). Even at x2.3, a handful of Asia-Europe candidates still failed
+ * checkInvariants and were left on MGO rather than pushing the buffer
+ * further for their sake: KOTA OCEAN/AE6, KOTA SYDNEY/AE4 (AE4's only
+ * LNG-adjacent port, Shanghai, is touched once per 70-day loop — the
+ * weakest coverage of any candidate tried), and KOTA PUSAKA/MEDI (Singapore
+ * only at the loop's start/end). Each retested cleanly at a *lower* buffer
+ * value than a candidate that ultimately passed, then failed again at a
+ * higher one on a later attempt — the deficit does not move monotonically
+ * with the ratio (a bigger tank can mean the trigger check decides *not* to
+ * top up at the last safe port before the long Europe stretch, since it
+ * looks comfortably full relative to a bigger floor), so don't assume
+ * raising the buffer further would rescue them without retesting.
+ *
+ * - **Methanol** (MEOH) — KOTA SEGAR/KOTA SEJARAH (KCI, the original pilot:
+ *   Ningbo every 24-day loop), plus ASTERIOS (CVI, 35-day loop, 1 Ningbo
+ *   touch) — 3 vessels total, all intra-Asia. (Ningbo is MEOH's only supply
+ *   port in this dataset, so an Asia-Europe methanol candidate has just one
+ *   fill per loop to cover the entire round trip; the one tried, KOTA
+ *   LEKAS/EUROMED, failed checkInvariants even at the x2.3 buffer and was
+ *   left on MGO.)
+ * - **LNG** — KOTA NAGA/KOTA NALURI (CVI, the original pilot: 4 of the 5
+ *   LNG-priced ports on one 35-day loop, Shanghai/Ningbo being China-ECA
+ *   ports so the grade switch and the bunkering opportunity coincide), plus
+ *   every other intra-Asia service whose rotation both touches an LNG port
+ *   *and* actually enters an ECA (BD1, BD2, CAS, YGS never do — see "10 of
+ *   the 35 vessels never enter an ECA" in data/README.md — so a compliance
+ *   tank there would be functionally inert, always full, never stemmed;
+ *   tried on BD1/BD2/YGS first and swapped out once the flat ROB column
+ *   made that obvious) — KOTA SEJATI (NCI), KOTA JOHAN/KOTA NABIL (CVI's
+ *   3rd and 4th), KOTA GABUNG/KOTA GADANG/KOTA GANDING/KOTA GAYA (KCS, all
+ *   4 — 28-day loop touching 3 of the 5 LNG ports, the richest coverage of
+ *   any service here), KOTA SETIA (KCI's 4th), KOTA SABAS (NCI's 5th),
+ *   KOTA HANDAL/KOTA HARUM (VCS, both), KOTA RIA/KOTA RUKUN/KOTA RAKYAT
+ *   (CCS, all 3 — 1 Singapore touch/21-day loop, and Xiamen/Shekou are
+ *   China-ECA ports so the tank does draw down) — and 7 Asia-Europe vessels
+ *   once the x2.3 buffer covered their Europe-side exposure: KOTA EBONY
+ *   (AE1), KOTA ELAN (AE2), KOTA PLUMBAGO (AE3), KOTA PELANGI/KOTA PURI
+ *   (AE5, both — the 2nd confirmed the 1st wasn't a one-off), KOTA LEMBAH/
+ *   KOTA LAMBAI (EUROMED, both) — 23 vessels total.
+ * - **B40 biofuel** (60% MGO / 40% FAME — see data/emissions/energy_per_mt.csv;
+ *   B24, 76% VLSFO/24% FAME, is a residual-grade analog and not
+ *   ECA-compliant, so it is deliberately not modelled as a burned grade
+ *   here) — KOTA SAHABAT/KOTA SALAM (NCI, the original pilot: the only
+ *   service calling both B40-priced ports, Jakarta and Surabaya, 4 days
+ *   apart on a 35-day loop), plus KOTA SEMPENA (NCI's 3rd, same loop) and
+ *   KOTA SINGA (KCI, a single Jakarta touch per 28-day loop) — 4 vessels
+ *   total, all intra-Asia; no Europe-touching service calls either
+ *   B40-priced port.
+ *
+ * 30 of the fleet's 62 vessels now carry a non-MGO compliance tank; MGO
+ * remains the majority default on the rest, including most Asia-Europe/
+ * Med/EUROMED vessels (see above for the ones that aren't), every service
+ * with no qualifying alternative-fuel port at all (CAS, SCT, AE7), and BD1/
+ * BD2/YGS, which have a qualifying port (Singapore) but never enter an ECA
+ * at all, so any compliance grade there is inert — MGO is the harmless
+ * choice for a tank that never moves either way.
+ */
+const METHANOL_VESSELS = new Set(["KOTA SEGAR", "KOTA SEJARAH", "ASTERIOS"]);
+const LNG_VESSELS = new Set([
+  "KOTA NAGA",
+  "KOTA NALURI",
+  "KOTA SEJATI",
+  "KOTA GABUNG",
+  "KOTA GADANG",
+  "KOTA HANDAL",
+  "KOTA JOHAN",
+  "KOTA GANDING",
+  "KOTA GAYA",
+  "KOTA SETIA",
+  "KOTA SABAS",
+  "KOTA HARUM",
+  "KOTA RIA",
+  "KOTA RUKUN",
+  "KOTA RAKYAT",
+  "KOTA NABIL",
+  "KOTA EBONY",
+  "KOTA ELAN",
+  "KOTA PLUMBAGO",
+  "KOTA PELANGI",
+  "KOTA PURI",
+  "KOTA LEMBAH",
+  "KOTA LAMBAI",
+]);
+const B40_VESSELS = new Set(["KOTA SAHABAT", "KOTA SALAM", "KOTA SEMPENA", "KOTA SINGA"]);
+
+/**
+ * Vessel name -> compliance grade. Absent means the fleet-standard "MGO".
+ * The single source of truth for which vessel carries which alternative
+ * compliance tank; COMPLIANCE_RATIOS and hasComplianceMarketFor below key
+ * off the grade this resolves to.
+ */
+const COMPLIANCE_FUEL = new Map([
+  ...[...METHANOL_VESSELS].map((n) => [n, "MEOH"]),
+  ...[...LNG_VESSELS].map((n) => [n, "LNG"]),
+  ...[...B40_VESSELS].map((n) => [n, "B40"]),
+]);
+const complianceGradeFor = (name) => COMPLIANCE_FUEL.get(name) ?? "MGO";
+
+/**
+ * Each alternative tank's ratio of Max_ROB_MT — same role as MGO_MAX_RATIO,
+ * for whichever vessel carries that tank instead. For the same days of
+ * ECA-window autonomy as the MGO tank, each starts from
+ * MGO_MAX_RATIO x (42.7 / grade's own GJ/mt) — smaller than MGO's for a
+ * denser fuel (LNG, 48.0 GJ/mt), larger for a less-dense one (MEOH, 19.9;
+ * B40, 40.6, diluted by FAME).
+ *
+ * MEOH and LNG carry a further x2.3 on top of that base figure. Both grades
+ * were later widened onto a handful of Asia-Europe services (see
+ * METHANOL_VESSELS/LNG_VESSELS above), whose only supply calls are in Asia —
+ * so unlike MGO, which can buy fuel at almost any European port along the
+ * way, an Asia-Europe MEOH/LNG vessel fills once and must survive the whole
+ * Europe-side ECA exposure on that one fill. x2.3 was reached empirically
+ * against checkInvariants, the same way MGO_MAX_RATIO itself went 0.2->0.4
+ * for the same class of window — raised in steps (2x, 2.1x, 2.3x), watching
+ * which Asia-Europe candidate vessel failed and by how much at each step.
+ * The failure margin did not shrink monotonically with the ratio (a bigger
+ * tank can mean the trigger logic decides *not* to top up at the last safe
+ * port, since the tank looks comfortably full against a proportionally
+ * bigger floor) — three candidates (KOTA OCEAN/AE6, KOTA SYDNEY/AE4, KOTA
+ * PUSAKA/MEDI, plus methanol's KOTA LEKAS/EUROMED) still failed at x2.3 and
+ * were left on MGO rather than chasing the ratio further for their sake.
+ * B40 never needed this buffer — it stayed intra-Asia-only, since no
+ * Europe-touching service calls a B40-priced port at all.
+ *
+ * Real cryogenic LNG tanks are physically bulkier than this mass-only ratio
+ * implies (Type-C tank insulation/pressure-vessel overhead) — this model
+ * tracks autonomy-days, not volume, the same simplification MEOH's larger
+ * ratio already documents in the opposite direction.
+ */
+const MEOH_MAX_RATIO = MGO_MAX_RATIO * (42.7 / 19.9) * 2.3;
+const LNG_MAX_RATIO = MGO_MAX_RATIO * (42.7 / 48.0) * 2.3;
+const B40_MAX_RATIO = MGO_MAX_RATIO * (42.7 / 40.6);
+
+/** Floor and trigger as fractions of each tank, mirroring MGO's. */
+const MEOH_MIN_RATIO = MGO_MIN_RATIO;
+const MEOH_TRIGGER_RATIO = MGO_TRIGGER_RATIO;
+const LNG_MIN_RATIO = MGO_MIN_RATIO;
+const LNG_TRIGGER_RATIO = MGO_TRIGGER_RATIO;
+const B40_MIN_RATIO = MGO_MIN_RATIO;
+const B40_TRIGGER_RATIO = MGO_TRIGGER_RATIO;
+
+const COMPLIANCE_GRADES = ["MGO", "MEOH", "LNG", "B40"];
+const COMPLIANCE_RATIOS = {
+  MGO: { max: MGO_MAX_RATIO, min: MGO_MIN_RATIO, trigger: MGO_TRIGGER_RATIO },
+  MEOH: { max: MEOH_MAX_RATIO, min: MEOH_MIN_RATIO, trigger: MEOH_TRIGGER_RATIO },
+  LNG: { max: LNG_MAX_RATIO, min: LNG_MIN_RATIO, trigger: LNG_TRIGGER_RATIO },
+  B40: { max: B40_MAX_RATIO, min: B40_MIN_RATIO, trigger: B40_TRIGGER_RATIO },
+};
+
+/**
+ * The ports in this dataset with a priced market for each alternative
+ * compliance grade (CLAUDE.md, "Beyond the fossil grades the sheet adds
+ * four fuels"). Inclusion-based, the opposite convention from NO_MGO_PORTS
+ * and its siblings: those exclude a handful of ports from an
+ * otherwise-universal market, but these grades have no market at all except
+ * at these ports, so listing what each *does* have is the honest shape of
+ * the data.
+ */
+const MEOH_SUPPLY_PORTS = new Set(["CNNGB"]);
+const LNG_SUPPLY_PORTS = new Set(["CNNGB", "CNSHA", "MYPKG", "SGSIN", "VNSGN"]);
+const B40_SUPPLY_PORTS = new Set(["IDJKT", "IDSUB"]);
+
+/** Whether `grade`, as a vessel's compliance tank, can be stemmed at `port`. */
+const hasComplianceMarketFor = (grade, port) => {
+  if (grade === "MGO") return !NO_MGO_PORTS.has(port);
+  if (grade === "MEOH") return MEOH_SUPPLY_PORTS.has(port);
+  if (grade === "LNG") return LNG_SUPPLY_PORTS.has(port);
+  return B40_SUPPLY_PORTS.has(port);
+};
 
 // --- Helpers -------------------------------------------------------------
 
@@ -542,11 +862,23 @@ function buildTimetable(serviceCode, rows) {
 
   const body = dated.slice(0, -1);
   let cursor = 0;
+  // The leg into body[0] is split across the step-0 boundary: its tail lives
+  // at the end of this array (sailing toward the loop-closing call) and its
+  // head is body[0]'s own transit. Captured here so the two can be marked as
+  // one leg after the loop, instead of each being fraction-mapped as if it
+  // were the whole thing.
+  let body0Start = null;
 
   body.forEach((call, i) => {
     const code = cell(call, "Port_Code");
     const name = cell(call, "Port_Name");
     if (!code || !name) throw new Error(`${serviceCode} seq ${i + 1}: blank Port_Code or Port_Name`);
+
+    // The port this transit segment sails FROM, for the zone-profile lookup
+    // below. The rotation is cyclic, so the first body call's predecessor is
+    // the last one — the loop-closing row repeats the first port, so this is
+    // the same pairing PIL_Intra_Asia_Port_Calls.csv itself sails.
+    const fromCode = i === 0 ? cell(body[body.length - 1], "Port_Code") : cell(body[i - 1], "Port_Code");
 
     let berthStart = call.__eta * STEPS_PER_DAY;
 
@@ -580,6 +912,33 @@ function buildTimetable(serviceCode, rows) {
       phase[s] = "Berthed";
     }
 
+    // Position-based ECA: mark transit steps whose fraction along this leg
+    // falls inside a shaded zone, from the precomputed geometry profile — see
+    // ECA_ZONE_PROFILE above. Independent of, and additional to, the
+    // call-window marking below; both only ever set eca[s] true.
+    //
+    // i === 0 is deferred: its transit segment is only the head of the leg
+    // that wraps around the step-0 boundary (see body0Start above), and
+    // fraction-mapping it alone against the full-leg profile would be wrong.
+    if (i === 0) {
+      body0Start = berthStart;
+    } else if (fromCode !== code) {
+      const intervals = ECA_ZONE_PROFILE[`${fromCode}>${code}`];
+      if (intervals === undefined) {
+        throw new Error(
+          `${serviceCode} seq ${i + 1}: no zone profile for ${fromCode}>${code} — ` +
+            `re-run scripts/gen-eca-zone-profile.mjs`,
+        );
+      }
+      const segLen = berthStart - cursor;
+      if (segLen > 0 && intervals.length > 0) {
+        for (let s = cursor; s < berthStart; s++) {
+          const frac = (s - cursor) / segLen;
+          if (intervals.some(([a, b]) => frac >= a && frac < b)) eca[s] = true;
+        }
+      }
+    }
+
     // Ride the marker on the shifted berth start, not the published ETA: SCT
     // Bangkok moves from step 48 to 50 under the min-transit rule above.
     if (cell(call, "Bunker_Quantity_MT") !== "") {
@@ -607,6 +966,38 @@ function buildTimetable(serviceCode, rows) {
     phase[s] = "Transit";
   }
 
+  // The deferred wraparound leg (last body call -> body[0], split across the
+  // step-0 boundary: tail here, head at body0Start above). closeCode is the
+  // same port as body[0] by construction (the loop-closing row repeats the
+  // first port), so this is exactly the pair PIL_Intra_Asia_Port_Calls.csv
+  // sails between them.
+  {
+    const fromCode = cell(body[body.length - 1], "Port_Code");
+    const tailStart = cursor;
+    const tailLen = steps - tailStart;
+    const headLen = body0Start ?? 0;
+    const total = tailLen + headLen;
+    if (fromCode !== closeCode && total > 0) {
+      const intervals = ECA_ZONE_PROFILE[`${fromCode}>${closeCode}`];
+      if (intervals === undefined) {
+        throw new Error(
+          `${serviceCode}: no zone profile for ${fromCode}>${closeCode} — ` +
+            `re-run scripts/gen-eca-zone-profile.mjs`,
+        );
+      }
+      if (intervals.length > 0) {
+        for (let s = tailStart; s < steps; s++) {
+          const frac = (s - tailStart) / total;
+          if (intervals.some(([a, b]) => frac >= a && frac < b)) eca[s] = true;
+        }
+        for (let s = 0; s < headLen; s++) {
+          const frac = (tailLen + s) / total;
+          if (intervals.some(([a, b]) => frac >= a && frac < b)) eca[s] = true;
+        }
+      }
+    }
+  }
+
   if (portCode.some((c) => c === null)) {
     throw new Error(`${serviceCode}: timetable has an unfilled step`);
   }
@@ -619,13 +1010,13 @@ function buildTimetable(serviceCode, rows) {
 
 // --- The fleet -----------------------------------------------------------
 
-function buildRows(timetables, specByName) {
+function buildRows(timetables, specByName, gjPerMt) {
   const rows = [];
-  const stems = { VLSFO: 0, HSFO: 0, MGO: 0 };
+  const stems = { VLSFO: 0, HSFO: 0, MGO: 0, MEOH: 0, LNG: 0, B40: 0 };
   let clipped = 0;
   let ecaSwitches = 0;
   let tightestResidual = Infinity;
-  let tightestMgo = Infinity;
+  let tightestCompliance = Infinity;
 
   for (const [serviceCode, vessels] of ROSTER) {
     const tt = timetables.get(serviceCode);
@@ -645,59 +1036,84 @@ function buildRows(timetables, specByName) {
       const max = Number(cell(spec, "Max_ROB_MT"));
       const min = Number(cell(spec, "Min_ROB_MT"));
       const trigger = Number(cell(spec, "Bunkering_Trigger_MT"));
-      const burnTransit = Number(cell(spec, "Consumption_Transit_MT_Per_Day")) / STEPS_PER_DAY;
-      const burnBerth = Number(cell(spec, "Consumption_Berth_MT_Per_Day")) / STEPS_PER_DAY;
+      const dwt = Number(cell(spec, "DWT_MT"));
       for (const [label, v] of [
         ["Max_ROB_MT", max],
         ["Min_ROB_MT", min],
         ["Bunkering_Trigger_MT", trigger],
+        ["DWT_MT", dwt],
       ]) {
         if (!Number.isFinite(v) || v <= 0) throw new Error(`${name}: ${label} is "${v}"`);
       }
 
-      // The distillate tank, outside Max_ROB_MT. See MGO_MAX_RATIO.
-      const mgoMax = round3(max * MGO_MAX_RATIO);
-      const mgoMin = round3(mgoMax * MGO_MIN_RATIO);
-      const mgoTrigger = round3(mgoMax * MGO_TRIGGER_RATIO);
+      // Energy demand per step, by phase — see ENERGY_RATE_TRANSIT_GJ_PER_DWT_DAY.
+      // Converted to mass through whichever grade's own GJ/mt is actually being
+      // drawn, not a flat MT figure.
+      const energyTransit = (ENERGY_RATE_TRANSIT_GJ_PER_DWT_DAY * dwt) / STEPS_PER_DAY;
+      const energyBerth = (ENERGY_RATE_BERTH_GJ_PER_DWT_DAY * dwt) / STEPS_PER_DAY;
+
+      // The ECA-compliance tank, outside Max_ROB_MT. MGO for the fleet at
+      // large; MEOH/LNG/B40 for the small subsets in COMPLIANCE_FUEL instead
+      // — see COMPLIANCE_RATIOS above. A vessel carries exactly one grade.
+      const complianceGrade = complianceGradeFor(name);
+      const complianceGjPerMt = gjPerMt[complianceGrade];
+      const { max: complianceMaxRatio, min: complianceMinRatio, trigger: complianceTriggerRatio } =
+        COMPLIANCE_RATIOS[complianceGrade];
+      const complianceMax = round3(max * complianceMaxRatio);
+      const complianceMin = round3(complianceMax * complianceMinRatio);
+      const complianceTrigger = round3(complianceMax * complianceTriggerRatio);
+      // Whether a berth can supply this vessel's compliance grade.
+      const hasComplianceMarket = (port) => hasComplianceMarketFor(complianceGrade, port);
 
       // Sisters are spread around the rotation instead of moving in lockstep.
       const offset = Math.round((k * tt.steps) / vessels.length) % tt.steps;
-      const burnAt = (s) => (tt.phase[s] === "Berthed" ? burnBerth : burnTransit);
+      const energyAt = (s) => (tt.phase[s] === "Berthed" ? energyBerth : energyTransit);
+
+      // The grade the residual tank projection below converts through — the
+      // one a hull actually draws down first, so the projected mass isn't
+      // optimistic. A scrubber vessel burns HSFO first (lower GJ/mt than
+      // VLSFO, so more mass for the same energy); everyone else burns VLSFO
+      // from the first step, exactly matching the burn-down order.
+      const residualReferenceGjPerMt = scrubber ? gjPerMt.HSFO : gjPerMt.VLSFO;
 
       /**
        * Fuel needed to reach the next call that could stem, split by tank.
        *
        * Split because the two tanks drain in different places: an ECA stretch
        * spends MGO and no residual at all. Accumulated unrounded — a decision
-       * input, not an emitted value.
+       * input, not an emitted value. Energy is converted to a projected mass
+       * through each tank's reference grade (residualReferenceGjPerMt for
+       * residual, MGO for the distillate tank) — the same reference the
+       * burn-down below actually draws down first in each case.
        */
       const needFrom = (i) => {
         let residual = 0;
-        let mgo = 0;
+        let compliance = 0;
         // Separate, because a call can supply one tank and not the other:
         // Kolkata sells HSFO but no distillate, Haiphong the reverse. Stopping
         // at the first call publishing a quantity would have this hull believe
         // it can top up somewhere it cannot, which is the one thing the
         // second trigger clause below exists to prevent.
         let residualAt = null;
-        let mgoAt = null;
+        let complianceAt = null;
         for (let j = i + 1; j <= i + tt.steps; j++) {
           const at = (offset + j - 1) % tt.steps;
-          if (tt.eca[at]) mgo += burnAt(at);
-          else residual += burnAt(at);
+          if (tt.eca[at]) compliance += energyAt(at) / complianceGjPerMt;
+          else residual += energyAt(at) / residualReferenceGjPerMt;
 
           const s = (offset + j) % tt.steps;
           if (!tt.bunkerQty.has(s)) continue;
           const p = tt.portCode[s];
           if (residualAt === null && canStemResidual(p, scrubber)) residualAt = residual;
-          if (mgoAt === null && !NO_MGO_PORTS.has(p)) mgoAt = mgo;
-          if (residualAt !== null && mgoAt !== null) break;
+          if (complianceAt === null && hasComplianceMarket(p)) complianceAt = compliance;
+          if (residualAt !== null && complianceAt !== null) break;
         }
         return {
           residual: residualAt,
-          // A rotation with no distillate stop anywhere falls back to the whole
-          // loop's burn: conservative, and the MGO floor check is the arbiter.
-          mgo: mgoAt ?? mgo,
+          // A rotation with no compliance-grade stop anywhere falls back to
+          // the whole loop's burn: conservative, and the floor check below is
+          // the arbiter.
+          compliance: complianceAt ?? compliance,
           reachable: residualAt !== null,
         };
       };
@@ -708,7 +1124,7 @@ function buildRows(timetables, specByName) {
       const reserve = scrubber ? round3(max * VLSFO_RESERVE_RATIO) : max;
       let vlsfo = reserve;
       let hsfo = round3(max - reserve);
-      let mgo = mgoMax;
+      let compliance = complianceMax;
       let previousFuel = null;
 
       for (let i = 0; i < STEPS; i++) {
@@ -718,7 +1134,7 @@ function buildRows(timetables, specByName) {
 
         let stemV = 0;
         let stemH = 0;
-        let stemM = 0;
+        let stemC = 0;
         let note = i === 0 ? DEPLOYMENT_NOTES[serviceCode] : "";
         if (i === 0 && !note) throw new Error(`${serviceCode}: no deployment note`);
 
@@ -762,27 +1178,31 @@ function buildRows(timetables, specByName) {
             }
           }
 
-          // --- MGO. Same rule against its own tank, gated the same way on
-          // supply. Vessels on rotations that touch no ECA port never burn any,
-          // so this never fires for them.
-          if (!NO_MGO_PORTS.has(port) && (mgo <= mgoTrigger || mgo - need.mgo < mgoMin)) {
-            const lift = round3(Math.min(qty * MGO_STEM_RATIO, mgoMax - mgo));
+          // --- Compliance tank. Same rule against its own tank, gated the
+          // same way on supply. Vessels on rotations that touch no ECA port
+          // never burn any, so this never fires for them.
+          if (
+            hasComplianceMarket(port) &&
+            (compliance <= complianceTrigger || compliance - need.compliance < complianceMin)
+          ) {
+            const lift = round3(Math.min(qty, complianceMax - compliance));
             if (lift > 0) {
-              stemM = lift;
-              mgo = round3(mgo + lift);
-              stems.MGO++;
+              stemC = lift;
+              compliance = round3(compliance + lift);
+              stems[complianceGrade]++;
             }
           }
         }
 
-        if (i === 0 && (stemV > 0 || stemH > 0 || stemM > 0)) {
+        if (i === 0 && (stemV > 0 || stemH > 0 || stemC > 0)) {
           throw new Error(`${name}: stemmed at step 0, which would overwrite the deployment note`);
         }
 
         // What the main engine is on for this step. Recorded rather than left
         // to be inferred: a reader cannot tell a switch from a quiet tank by
-        // watching ROB alone, since MGO is flat on ECA-free rotations.
-        const activeFuel = inEca ? "MGO" : hsfo > 0 ? "HSFO" : "VLSFO";
+        // watching ROB alone, since the compliance tank is flat on ECA-free
+        // rotations.
+        const activeFuel = inEca ? complianceGrade : hsfo > 0 ? "HSFO" : "VLSFO";
         if (previousFuel !== null && previousFuel !== activeFuel) ecaSwitches++;
         previousFuel = activeFuel;
 
@@ -798,39 +1218,49 @@ function buildRows(timetables, specByName) {
           Active_Fuel: activeFuel,
           VLSFO_ROB_MT: fmt(vlsfo),
           HSFO_ROB_MT: fmt(hsfo),
-          MGO_ROB_MT: fmt(mgo),
+          MGO_ROB_MT: fmt(complianceGrade === "MGO" ? compliance : 0),
+          MEOH_ROB_MT: fmt(complianceGrade === "MEOH" ? compliance : 0),
+          LNG_ROB_MT: fmt(complianceGrade === "LNG" ? compliance : 0),
+          B40_ROB_MT: fmt(complianceGrade === "B40" ? compliance : 0),
           VLSFO_Bunkered_MT: fmt(stemV),
           HSFO_Bunkered_MT: fmt(stemH),
-          MGO_Bunkered_MT: fmt(stemM),
+          MGO_Bunkered_MT: fmt(complianceGrade === "MGO" ? stemC : 0),
+          MEOH_Bunkered_MT: fmt(complianceGrade === "MEOH" ? stemC : 0),
+          LNG_Bunkered_MT: fmt(complianceGrade === "LNG" ? stemC : 0),
+          B40_Bunkered_MT: fmt(complianceGrade === "B40" ? stemC : 0),
           Source_File: SOURCE_FILE,
           Data_Notes: note,
         });
 
         tightestResidual = Math.min(tightestResidual, round3(vlsfo + hsfo) - min);
-        tightestMgo = Math.min(tightestMgo, mgo - mgoMin);
+        tightestCompliance = Math.min(tightestCompliance, compliance - complianceMin);
 
         // Burn is charged after the row is written, so the emitted ROB is the
         // level at the start of the step (including anything lifted there).
-        const burn = burnAt(s);
+        // Charged as energy, converted through whichever tank actually
+        // supplies it — so the mass drawn down depends on the grade, not a
+        // flat MT figure. See ENERGY_RATE_TRANSIT_GJ_PER_DWT_DAY.
+        const energy = energyAt(s);
         if (inEca) {
-          mgo = round3(mgo - burn);
+          compliance = round3(compliance - energy / complianceGjPerMt);
         } else {
           // HSFO first — with a scrubber it is the cheaper fuel, so VLSFO is
           // held as the reserve it was lifted to be. The remainder spills to
-          // VLSFO on the one step where HSFO runs out mid-burn.
-          let left = burn;
+          // VLSFO on the one step where HSFO runs out mid-burn, each portion
+          // converted through its own grade's energy content.
+          let leftEnergy = energy;
           if (hsfo > 0) {
-            const take = Math.min(hsfo, left);
-            hsfo = round3(hsfo - take);
-            left -= take;
+            const takeEnergy = Math.min(hsfo * gjPerMt.HSFO, leftEnergy);
+            hsfo = round3(hsfo - takeEnergy / gjPerMt.HSFO);
+            leftEnergy -= takeEnergy;
           }
-          if (left > 0) vlsfo = round3(vlsfo - left);
+          if (leftEnergy > 0) vlsfo = round3(vlsfo - leftEnergy / gjPerMt.VLSFO);
         }
       }
     });
   }
 
-  return { rows, stems, clipped, ecaSwitches, tightestResidual, tightestMgo };
+  return { rows, stems, clipped, ecaSwitches, tightestResidual, tightestCompliance };
 }
 
 // --- Invariants ----------------------------------------------------------
@@ -902,20 +1332,27 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
     const scrubber = cell(spec, "Scrubber_Fitted") === "Yes";
     const min = Number(cell(spec, "Min_ROB_MT"));
     const max = Number(cell(spec, "Max_ROB_MT"));
-    const mgoMax = round3(max * MGO_MAX_RATIO);
-    const mgoMin = round3(mgoMax * MGO_MIN_RATIO);
+    const complianceGrade = complianceGradeFor(name);
+    const complianceMax = round3(max * COMPLIANCE_RATIOS[complianceGrade].max);
+    const complianceMin = round3(complianceMax * COMPLIANCE_RATIOS[complianceGrade].min);
     const services = new Set(vesselRows.map((r) => r.Service_Code));
     if (services.size !== 1) fail(`${name} appears under ${services.size} service codes`);
 
-    // A rotation with no ECA port must leave MGO untouched, and one with an
-    // ECA port must not: the switch either happened or it silently did not.
+    // A rotation with no ECA port must leave the compliance tank untouched,
+    // and one with an ECA port must not: the switch either happened or it
+    // silently did not.
     const serviceCode = vesselRows[0].Service_Code;
     const touchesEca = portCallsByService
       .get(serviceCode)
       .some((r) => ECA_PORTS.has(cell(r, "Port_Code")));
-    const mgoMoves = vesselRows.some((r) => r.MGO_ROB_MT !== vesselRows[0].MGO_ROB_MT);
-    if (touchesEca && !mgoMoves) fail(`${name}: ${serviceCode} calls an ECA port but MGO never moves`);
-    if (!touchesEca && mgoMoves) fail(`${name}: ${serviceCode} has no ECA port but MGO moves`);
+    const complianceCol = `${complianceGrade}_ROB_MT`;
+    const complianceMoves = vesselRows.some((r) => r[complianceCol] !== vesselRows[0][complianceCol]);
+    if (touchesEca && !complianceMoves) {
+      fail(`${name}: ${serviceCode} calls an ECA port but ${complianceGrade} never moves`);
+    }
+    if (!touchesEca && complianceMoves) {
+      fail(`${name}: ${serviceCode} has no ECA port but ${complianceGrade} moves`);
+    }
 
     // The point of the whole exercise: a scrubber vessel carries two residual
     // grades throughout, not one plus an occasional accident of supply. HSFO
@@ -936,9 +1373,20 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
       if (residual < min - 1e-9 || residual > max + 1e-9) {
         fail(`${where}: residual ROB ${residual} outside ${min}..${max}`);
       }
-      const mgo = Number(r.MGO_ROB_MT);
-      if (mgo < mgoMin - 1e-9 || mgo > mgoMax + 1e-9) {
-        fail(`${where}: MGO ROB ${mgo} outside ${mgoMin}..${mgoMax}`);
+      const compliance = Number(r[complianceCol]);
+      if (compliance < complianceMin - 1e-9 || compliance > complianceMax + 1e-9) {
+        fail(`${where}: ${complianceGrade} ROB ${compliance} outside ${complianceMin}..${complianceMax}`);
+      }
+      // Every compliance grade this vessel does NOT carry stays a true zero
+      // throughout — same convention as HSFO on a non-scrubber hull.
+      for (const otherGrade of COMPLIANCE_GRADES) {
+        if (otherGrade === complianceGrade) continue;
+        if (r[`${otherGrade}_ROB_MT`] !== "0") {
+          fail(`${where}: not ${otherGrade}-fuelled, but ${otherGrade} ROB is ${r[`${otherGrade}_ROB_MT`]}`);
+        }
+        if (r[`${otherGrade}_Bunkered_MT`] !== "0") {
+          fail(`${where}: not ${otherGrade}-fuelled, but stemmed ${r[`${otherGrade}_Bunkered_MT`]} MT of ${otherGrade}`);
+        }
       }
 
       // Compliance: high-sulphur fuel exists only on a scrubber-fitted hull.
@@ -964,12 +1412,24 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
       if (Number(r.HSFO_Bunkered_MT) > 0 && NO_HSFO_PORTS.has(r.Port_Code)) {
         fail(`${where}: stemmed HSFO at ${r.Port_Code}, which has no HSFO market`);
       }
+      if (Number(r.MEOH_Bunkered_MT) > 0 && !MEOH_SUPPLY_PORTS.has(r.Port_Code)) {
+        fail(`${where}: stemmed MEOH at ${r.Port_Code}, which has no methanol market`);
+      }
+      if (Number(r.LNG_Bunkered_MT) > 0 && !LNG_SUPPLY_PORTS.has(r.Port_Code)) {
+        fail(`${where}: stemmed LNG at ${r.Port_Code}, which has no LNG market`);
+      }
+      if (Number(r.B40_Bunkered_MT) > 0 && !B40_SUPPLY_PORTS.has(r.Port_Code)) {
+        fail(`${where}: stemmed B40 at ${r.Port_Code}, which has no B40 market`);
+      }
 
       // The active fuel must be one the vessel is actually holding.
-      if (!["VLSFO", "HSFO", "MGO"].includes(r.Active_Fuel)) {
+      if (!["VLSFO", "HSFO", ...COMPLIANCE_GRADES].includes(r.Active_Fuel)) {
         fail(`${where}: Active_Fuel is "${r.Active_Fuel}"`);
       }
       if (r.Active_Fuel === "HSFO" && !scrubber) fail(`${where}: burning HSFO with no scrubber`);
+      if (COMPLIANCE_GRADES.includes(r.Active_Fuel) && r.Active_Fuel !== complianceGrade) {
+        fail(`${where}: burning ${r.Active_Fuel} on a ${complianceGrade}-fuelled hull`);
+      }
       if (Number(r[`${r.Active_Fuel}_ROB_MT`]) <= 0) {
         fail(`${where}: burning ${r.Active_Fuel} with none onboard`);
       }
@@ -990,6 +1450,7 @@ function checkInvariants(rows, timetables, specByName, portCallsByService) {
 const portCalls = readCsv(PORT_CALLS);
 const specs = readCsv(SPECS);
 const specByName = new Map(specs.map((s) => [cell(s, "Vessel_Name"), s]));
+const gjPerMt = loadEnergyPerMt();
 
 const portCallsByService = new Map();
 for (const row of portCalls) {
@@ -1006,9 +1467,10 @@ for (const [serviceCode] of ROSTER) {
   timetables.set(serviceCode, buildTimetable(serviceCode, rows));
 }
 
-const { rows, stems, clipped, ecaSwitches, tightestResidual, tightestMgo } = buildRows(
+const { rows, stems, clipped, ecaSwitches, tightestResidual, tightestCompliance } = buildRows(
   timetables,
   specByName,
+  gjPerMt,
 );
 
 checkInvariants(rows, timetables, specByName, portCallsByService);
@@ -1021,14 +1483,15 @@ const unchanged = fs.existsSync(OUT) && fs.readFileSync(OUT, "utf8") === text;
 if (!unchanged) fs.writeFileSync(OUT, text, "utf8");
 
 const fleetSize = ROSTER.reduce((n, [, v]) => n + v.length, 0);
-const totalStems = stems.VLSFO + stems.HSFO + stems.MGO;
+const totalStems = stems.VLSFO + stems.HSFO + stems.MGO + stems.MEOH + stems.LNG + stems.B40;
 console.log(
   `${unchanged ? "unchanged" : "wrote"} ${path.relative(ROOT, OUT)}\n` +
     `  ${rows.length.toLocaleString()} rows, ${fleetSize} vessels x ${STEPS} steps\n` +
     `  ${timestampAt(0)} -> ${timestampAt(STEPS - 1)} ` +
     `(${STEPS / STEPS_PER_DAY} days, ${STEP_HOURS}-hour grid)\n` +
-    `  ${totalStems} stems (${stems.HSFO} HSFO, ${stems.VLSFO} VLSFO, ${stems.MGO} MGO), ` +
+    `  ${totalStems} stems (${stems.HSFO} HSFO, ${stems.VLSFO} VLSFO, ${stems.MGO} MGO, ` +
+    `${stems.MEOH} MEOH, ${stems.LNG} LNG, ${stems.B40} B40), ` +
     `${clipped} cut by tank capacity\n` +
     `  ${ecaSwitches} fuel switches, tightest margins: ` +
-    `residual ${fmt(tightestResidual)} MT, MGO ${fmt(tightestMgo)} MT`,
+    `residual ${fmt(tightestResidual)} MT, compliance ${fmt(tightestCompliance)} MT`,
 );

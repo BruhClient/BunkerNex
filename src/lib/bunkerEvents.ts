@@ -57,9 +57,9 @@ const LSMGO_PORTS: ReadonlySet<string> = new Set([
 /**
  * The price column a stem is valued against.
  *
- * The assessments quote high-sulphur fuel as IFO380; no column anywhere is
- * headed "HSFO". Mapping the two is the only way a scrubber-fitted vessel's
- * stem can be priced at all.
+ * `VesselGrade` and the pricing `Grade` both spell high-sulphur fuel "HSFO",
+ * so that leg is now an identity mapping — kept explicit here anyway, since
+ * this function's real job is the distillate tank below.
  *
  * The distillate tank resolves per port rather than to one fixed column. It is
  * the ECA compliance tank, so at a port selling the 0.10% grade that is what
@@ -69,7 +69,10 @@ const LSMGO_PORTS: ReadonlySet<string> = new Set([
  */
 export function priceSeriesFor(grade: VesselGrade, portCode: string): Grade {
   if (grade === "VLSFO") return "VLSFO";
-  if (grade === "HSFO") return "IFO380";
+  if (grade === "HSFO") return "HSFO";
+  if (grade === "MEOH") return "MEOH";
+  if (grade === "LNG") return "LNG";
+  if (grade === "B40") return "B40";
   return LSMGO_PORTS.has(portCode) ? "LSMGO" : "MGO";
 }
 
@@ -84,8 +87,11 @@ export function priceSeriesFor(grade: VesselGrade, portCode: string): Grade {
  */
 export const TANK_SERIES: Record<VesselGrade, Grade> = {
   VLSFO: "VLSFO",
-  HSFO: "IFO380",
+  HSFO: "HSFO",
   MGO: "MGO",
+  MEOH: "MEOH",
+  LNG: "LNG",
+  B40: "B40",
 };
 
 /** The latest real assessment for a port and grade, with its own date. */
@@ -99,7 +105,7 @@ export interface AssessedPrice {
    * The UI must show this date rather than implying a same-day quote.
    */
   date: string;
-  /** The column the figure came from, e.g. "IFO380" for an HSFO stem. */
+  /** The column the figure came from, e.g. "HSFO" for an HSFO stem. */
   series: Grade;
 }
 
@@ -145,6 +151,17 @@ export interface BunkerEvent {
    * anything showing this must carry the assessment date with it.
    */
   valueUsd: number | null;
+}
+
+/**
+ * The grade a stem should be *displayed* as, e.g. "LSMGO" rather than "MGO"
+ * at the 14 ports that actually sell the 0.10% distillate. `event.grade` is
+ * the tank (`VesselGrade`, port-independent — see TANK_SERIES); the resolved
+ * price series already carries the port-specific product name via
+ * priceSeriesFor, so prefer that wherever a stem is shown as text.
+ */
+export function stemDisplayGrade(event: BunkerEvent): Grade {
+  return event.price?.series ?? event.grade;
 }
 
 /**

@@ -38,8 +38,8 @@ const HUB_HEADER = {
   // Added with the Asia-Europe services: Rotterdam is the sole hub the five
   // new modelled European ports use (by decision, not proximity — see
   // bunker_basis.csv Rationale). Antwerp and Hamburg are not used as hubs
-  // here but are listed for completeness; Hamburg carries no assessed IFO380
-  // column, so it can never be an IFO380 hub regardless.
+  // here but are listed for completeness; Hamburg carries no assessed HSFO
+  // column, so it can never be an HSFO hub regardless.
   NLRTM: "ROTERDAM",
   BEANR: "ANTWERP",
   DEHAM: "HAMBURG",
@@ -108,7 +108,7 @@ const PORT_HEADER = {
  */
 const GRADE_FILE = {
   VLSFO: "VLSFO Prices.csv",
-  IFO380: "HSGO Prices.csv",
+  HSFO: "HSGO Prices.csv",
   LSMGO: "LSMGO_MGO Prices.csv",
   MGO: "LSMGO_MGO Prices.csv",
   MDO: "MDO Prices.csv",

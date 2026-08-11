@@ -15,7 +15,7 @@ import { GRADE_COLORS, THEME } from "@/lib/colors";
 import { formatMt } from "@/lib/format";
 import { TANK_SERIES } from "@/lib/bunkerEvents";
 import { activeGradeAt, stepTimestamp } from "@/lib/vesselPosition";
-import { MGO_TANK_RATIO } from "@/lib/types";
+import { COMPLIANCE_TANK_RATIO } from "@/lib/types";
 import type { VesselSpec, VesselTrack } from "@/lib/types";
 
 interface Props {
@@ -25,8 +25,12 @@ interface Props {
   onSeek: (step: number) => void;
 }
 
-/** One point per step, carrying all three tanks. */
-type Row = { step: number; HSFO: number; VLSFO: number; MGO: number };
+/**
+ * One point per step, carrying both residual tanks plus whichever compliance
+ * tank this vessel actually has (MGO or MEOH — never both, so `compliance`
+ * stands in for either, and which one it is comes from the parent track).
+ */
+type Row = { step: number; HSFO: number; VLSFO: number; compliance: number };
 
 /** "2026-05-05 00:00" -> "05 May". A 93-day window needs the day, not the year. */
 function axisLabel(track: VesselTrack, step: number): string {
@@ -48,15 +52,17 @@ function axisLabel(track: VesselTrack, step: number): string {
  * twelve times a second to redraw one vertical line.
  */
 function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
+  const complianceGrade = track.complianceGrade;
+
   const rows = useMemo<Row[]>(
     () =>
       track.robMt.VLSFO.map((_, step) => ({
         step,
         HSFO: track.robMt.HSFO[step],
         VLSFO: track.robMt.VLSFO[step],
-        MGO: track.robMt.MGO[step],
+        compliance: track.robMt[complianceGrade][step],
       })),
-    [track],
+    [track, complianceGrade],
   );
 
   const lastStep = rows.length - 1;
@@ -67,12 +73,15 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
   const yMax =
     spec.maxRobMt !== null && spec.maxRobMt > 0 ? spec.maxRobMt : "auto";
 
-  // MGO gets its own right-hand axis rather than sharing the residual one. Its
-  // tank is a fifth the size, so on a shared scale it would sit flat along the
-  // bottom and the ECA draw-downs — the thing worth seeing — would vanish.
-  const mgoMax =
+  // The compliance tank gets its own right-hand axis rather than sharing the
+  // residual one. It's a fraction of the residual tank's size — smaller for
+  // a denser fuel (LNG), larger for a less dense one (MEOH, B40) — so on a
+  // shared scale it would sit flat along the bottom and the ECA draw-downs —
+  // the thing worth seeing — would vanish.
+  const complianceTankRatio = COMPLIANCE_TANK_RATIO[complianceGrade];
+  const complianceMax =
     spec.maxRobMt !== null && spec.maxRobMt > 0
-      ? spec.maxRobMt * MGO_TANK_RATIO
+      ? spec.maxRobMt * complianceTankRatio
       : "auto";
 
   return (
@@ -121,10 +130,10 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               tickFormatter={(v: number) => Math.round(v).toString()}
             />
             <YAxis
-              yAxisId="mgo"
+              yAxisId="compliance"
               orientation="right"
               width={36}
-              domain={[0, mgoMax]}
+              domain={[0, complianceMax]}
               allowDataOverflow
               tickCount={3}
               tick={{ fill: THEME.faint, fontSize: 10 }}
@@ -184,10 +193,10 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
               isAnimationActive={false}
             />
             <Line
-              yAxisId="mgo"
+              yAxisId="compliance"
               type="linear"
-              dataKey="MGO"
-              stroke={GRADE_COLORS[TANK_SERIES.MGO]}
+              dataKey="compliance"
+              stroke={GRADE_COLORS[TANK_SERIES[complianceGrade]]}
               strokeWidth={1}
               strokeDasharray="4 3"
               dot={false}
@@ -211,9 +220,12 @@ function VesselRobChart({ track, spec, stepIndex, onSeek }: Props) {
         <span style={{ color: THEME.down }}>Red</span> marks the scrubbed
         moment; click the chart to seek. Dashed rules are the bunker trigger and
         safety minimum — both derived from deadweight, not measured.{" "}
-        <span style={{ color: GRADE_COLORS[TANK_SERIES.MGO] }}>MGO</span> is on
-        the right-hand scale: its tank is a fifth the size of the residual one,
-        and it draws down only through China and Korea ECA calls.
+        <span style={{ color: GRADE_COLORS[TANK_SERIES[complianceGrade]] }}>
+          {complianceGrade}
+        </span>{" "}
+        is on the right-hand scale, its own tank separate from the residual
+        one, and draws down wherever this hull's charted position sits inside
+        a shaded ECA/DECA zone.
       </p>
     </div>
   );
@@ -234,10 +246,12 @@ function RobTooltip({
   if (!active || !payload?.length || !Number.isFinite(step)) return null;
 
   const burning = activeGradeAt(track, step);
-  // Only the grades this hull can hold — an unfitted one has no HSFO row.
+  // Only the grades this hull can hold — an unfitted one has no HSFO row,
+  // and the compliance grade is whichever one this hull actually carries.
+  const complianceGrade = track.complianceGrade;
   const grades = track.scrubber
-    ? (["HSFO", "VLSFO", "MGO"] as const)
-    : (["VLSFO", "MGO"] as const);
+    ? (["HSFO", "VLSFO", complianceGrade] as const)
+    : (["VLSFO", complianceGrade] as const);
 
   return (
     <div className="rounded border border-line-strong bg-surface px-2.5 py-2 shadow-xl">

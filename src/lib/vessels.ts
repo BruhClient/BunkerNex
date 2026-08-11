@@ -6,6 +6,16 @@ import type { VesselGrade, VesselSizeClass, VesselSpec, VesselTrack } from "./ty
 const VESSEL_SPECS = "vessels/PIL_Fleet_Vessel_Specifications.csv";
 const VESSEL_MOVEMENT = "vessels/PIL_Fleet_Live_Movement.csv";
 
+/** Packed activeGrades encoding — see VesselTrack.activeGrades in types.ts. */
+const ACTIVE_FUEL_CHAR: Record<VesselGrade, string> = {
+  HSFO: "H",
+  VLSFO: "V",
+  MGO: "M",
+  MEOH: "E",
+  LNG: "N",
+  B40: "B",
+};
+
 /** The movement series is a uniform grid; see data/README.md. */
 const STEP_HOURS = 3;
 
@@ -79,20 +89,29 @@ export function loadVesselTracks(specs: VesselSpec[]): VesselTrack[] {
       (str(a, "Timestamp") ?? "").localeCompare(str(b, "Timestamp") ?? ""),
     );
 
-    // Every vessel now runs three tanks, so all three columns are read. The
-    // scrubber fitting no longer picks a column — it only says which residual
-    // grade the vessel is built around, and the generator has already applied
-    // the MARPOL Annex VI rule that keeps HSFO off an unfitted hull.
+    // Every vessel now runs six tank columns, so all six are read — the
+    // three alternative compliance grades stay a flat "0" for whichever
+    // vessels carry MGO instead, the same convention HSFO already uses for
+    // a non-scrubber hull. The scrubber fitting no longer picks a column —
+    // it only says which residual grade the vessel is built around, and the
+    // generator has already applied the MARPOL Annex VI rule that keeps
+    // HSFO off an unfitted hull.
     const portCodes: string[] = [];
     const robMt: Record<VesselGrade, number[]> = {
       VLSFO: [],
       HSFO: [],
       MGO: [],
+      MEOH: [],
+      LNG: [],
+      B40: [],
     };
     const bunkered: Record<VesselGrade, Record<number, number>> = {
       VLSFO: {},
       HSFO: {},
       MGO: {},
+      MEOH: {},
+      LNG: {},
+      B40: {},
     };
     let phases = "";
     let activeGrades = "";
@@ -115,7 +134,8 @@ export function loadVesselTracks(specs: VesselSpec[]): VesselTrack[] {
           `${VESSEL_MOVEMENT}: Active_Fuel "${active}" for ${name} at step ${i} is not a vessel grade`,
         );
       }
-      activeGrades += active[0];
+      // Not active[0]: "MGO" and "MEOH" both start with "M".
+      activeGrades += ACTIVE_FUEL_CHAR[active as VesselGrade];
 
       for (const grade of VESSEL_GRADES) {
         robMt[grade].push(num(row, `${grade}_ROB_MT`) ?? 0);
@@ -129,6 +149,14 @@ export function loadVesselTracks(specs: VesselSpec[]): VesselTrack[] {
       serviceCode: str(ordered[0], "Service_Code") ?? "",
       primaryGrade: spec.scrubber ? "HSFO" : "VLSFO",
       scrubber: spec.scrubber,
+      // Not a specifications-sheet column — an alternative compliance fuel
+      // is this dataset's own invented subset, so it's read off whichever
+      // tank the generator actually filled: a methanol/LNG/B40 hull opens
+      // with a full tank of its own grade, same as every MGO hull opens
+      // with a full MGO one.
+      complianceGrade: (["MEOH", "LNG", "B40"] as const).find(
+        (g) => (num(ordered[0], `${g}_ROB_MT`) ?? 0) > 0,
+      ) ?? "MGO",
       startTimestamp: str(ordered[0], "Timestamp") ?? "",
       stepHours: STEP_HOURS,
       portCodes,

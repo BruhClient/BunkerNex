@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { serviceColor } from "@/lib/colors";
 import { formatDate, formatMt, formatPrice } from "@/lib/format";
-import type { BunkerEvent } from "@/lib/bunkerEvents";
+import { stemDisplayGrade, type BunkerEvent } from "@/lib/bunkerEvents";
 
 interface Props {
   /** Every stem in the window, chronological. Filtered to services here. */
@@ -254,7 +254,9 @@ const LogRow = memo(function LogRow({
           {event.portCode}
         </span>
       </td>
-      <td className="whitespace-nowrap py-1 pr-3 text-muted">{event.grade}</td>
+      <td className="whitespace-nowrap py-1 pr-3 text-muted">
+        {stemDisplayGrade(event)}
+      </td>
       <td className="tnum whitespace-nowrap py-1 pr-3 text-right text-fg">
         {formatMt(event.quantityMt)}
       </td>

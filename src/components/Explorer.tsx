@@ -13,6 +13,7 @@ import SpotBunkerPanel, {
 import TimeScrubber from "./TimeScrubber";
 import VesselPanel from "./VesselPanel";
 import { allBunkerEvents } from "@/lib/bunkerEvents";
+import type { Co2eCostPoint, Co2eFactors } from "@/lib/emissions";
 import { formatDate } from "@/lib/format";
 import { stepTimestamp } from "@/lib/vesselPosition";
 import type { BunkerPriceSnapshot } from "@/lib/bunkerEvents";
@@ -35,6 +36,10 @@ interface Props {
   vesselTracks: VesselTrack[];
   /** Latest assessment per port and grade, for pricing a stem in the log. */
   bunkerPrices: BunkerPriceSnapshot;
+  /** Tank-to-wake t CO2e per t fuel, for the vessel panel's carbon charts. */
+  co2eFactors: Co2eFactors;
+  /** Daily EUA price plus per-grade $/mt cost, same charts. */
+  co2eCostSeries: Co2eCostPoint[];
   asOf: string | null;
   region: string;
 }
@@ -47,6 +52,8 @@ export default function Explorer({
   vesselSpecs,
   vesselTracks,
   bunkerPrices,
+  co2eFactors,
+  co2eCostSeries,
   asOf,
   region,
 }: Props) {
@@ -452,6 +459,8 @@ export default function Explorer({
               portCalls={portCalls}
               stepIndex={stepIndex}
               events={bunkerEvents}
+              co2eFactors={co2eFactors}
+              co2eCostSeries={co2eCostSeries}
               onSeek={seek}
               onEvaluateSpot={enterSpotMode}
               onClose={() => selectVessel(null)}

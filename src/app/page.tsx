@@ -1,4 +1,5 @@
 import Explorer from "@/components/Explorer";
+import { loadCo2eCostSeries, loadCo2eFactors } from "@/lib/emissions";
 import { bunkerPriceSnapshot, latestDataDate } from "@/lib/prices";
 import {
   buildPortIndex,
@@ -20,6 +21,12 @@ export default function Page() {
   // A few dozen numbers, so the arrival toasts can price a stem from props
   // rather than fetching per event.
   const bunkerPrices = bunkerPriceSnapshot();
+
+  // Reference tables for the vessel panel's CO2e/carbon-cost charts — a
+  // handful of grade factors plus a ~90-row daily series, negligible next to
+  // the vessel tracks already shipped as props.
+  const co2eFactors = loadCo2eFactors();
+  const co2eCostSeries = loadCo2eCostSeries();
 
   // Only 11 of the 109 vessels have a movement series, and only those can be
   // placed on the map — so ship the specs for those alone rather than the
@@ -53,6 +60,8 @@ export default function Page() {
       vesselSpecs={vesselSpecs}
       vesselTracks={vesselTracks}
       bunkerPrices={bunkerPrices}
+      co2eFactors={co2eFactors}
+      co2eCostSeries={co2eCostSeries}
       asOf={asOf}
       region={region}
     />

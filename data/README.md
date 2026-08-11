@@ -32,7 +32,7 @@ have the account activated with the service provider.
 |---|---|---|---|
 | `Brent Prices.csv` | `Brent`, `BrentPMT` | 1966 | 2019-01-02 → 2026-08-05 |
 | `VLSFO Prices.csv` | 48 columns: 25 assessed ports + **23 modelled** | 1973 | 2019-01-02 → 2026-08-05 |
-| `HSGO Prices.csv` | 33 columns: 12 assessed + **21 modelled**, `IFO380` | 1973 | 2019-01-02 → 2026-08-05 |
+| `HSGO Prices.csv` | 33 columns: 12 assessed + **21 modelled**, `HSFO` | 1973 | 2019-01-02 → 2026-08-05 |
 | `LSMGO_MGO Prices.csv` | 54 columns: 28 assessed + **15 modelled `LSMGO`** + **11 modelled `MGO`** | 1973 | 2019-01-02 → 2026-08-05 |
 | `MDO Prices.csv` | 2 columns, both modelled — Chittagong and Mongla | 1973 | 2019-01-02 → 2026-08-05 |
 | `LNG Prices.csv` | 5 columns: 1 **reconstructed** hub + 4 modelled — see below | 1973 | 2021-10-01 → 2026-08-05 |
@@ -100,7 +100,9 @@ which valued each China/Korea ECA switch at a 0.50% product's price.
 
 #### The four fuels the sheet added
 
-Confidence runs lowest at the bottom. All four are modelled; none is burned by the fleet.
+Confidence runs lowest at the bottom. All four are modelled. `MEOH` (Ningbo) and `B40` are
+now burned, each by a small intra-Asia vessel subset — see "Two more ECA-compliance grades:
+LNG and B40 biofuel" below; `MDO` and `B24` are not burned by any simulated vessel.
 
 | Grade | Ports | Hub | Anchor |
 |---|---|---|---|
@@ -196,7 +198,7 @@ Modelled ports, by hub:
 | Hub | Ports |
 |---|---|
 | `SINGAPORE` | Port Klang, Chittagong, Mongla, Kolkata, Chennai, Gangavaram, Yangon, Haiphong, Ho Chi Minh, Qui Nhon, Laem Chabang, Bangkok, Jakarta, Surabaya, Semarang |
-| `HONGKONG` | Shekou, Nansha, Xiamen, Qinzhou (+ all Chinese IFO380 — Shanghai has no IFO380 column) |
+| `HONGKONG` | Shekou, Nansha, Xiamen, Qinzhou (+ all Chinese HSFO — Shanghai has no HSFO column) |
 | `SHANGHAI` | Ningbo, Qingdao, Tianjin (VLSFO only) |
 | `BUSAN` | Incheon |
 | `ROTERDAM` | Le Havre, Southampton, Felixstowe, Port Said, Valencia — all judgment, no CE sheet coverage; by decision rather than proximity (see "AE1-AE7, MEDI, EUROMED" above) |
@@ -245,7 +247,7 @@ calibrated on 2024–25 deliberately.
   reads, so a stem at Chittagong is valued off Singapore plus a judgment differential
   and looks identical to a quoted one in the bunker log. Any total built from those
   values is part modelled.
-- **8 ports get no IFO380 column** — Nansha, Qinzhou, Shekou, Surabaya, Gangavaram,
+- **8 ports get no HSFO column** — Nansha, Qinzhou, Shekou, Surabaya, Gangavaram,
   Yangon, Haiphong, Qui Nhon. That list, and every other availability question below,
   now comes from the Chief Engineer's `TYPES OF FUEL.xlsx` (see *Fuel availability*).
   It replaced a 12-port list this file had researched independently and got wrong at
@@ -259,7 +261,7 @@ calibrated on 2024–25 deliberately.
   instead, and an invariant fails the run if an HSFO stem ever lands at one. Two
   further sets sit beside it now, `NO_VLSFO_PORTS` and `NO_MGO_PORTS`, each with its
   own invariant. Laem
-  Chabang was named here previously and should not have been: `LAEMCHABANG IFO380`
+  Chabang was named here previously and should not have been: `LAEMCHABANG HSFO`
   carries 1,715 values through 2026-08-05.
 - **Jakarta's column steps ~$143/mt on 2023-05-01.** Real: Pertamina moved to
   market-based pricing and exempted ocean-going vessels from 11% VAT, and the assessed
@@ -273,7 +275,7 @@ calibrated on 2024–25 deliberately.
 
 **`MGO` now prices stems.** It was originally extended for chart completeness only, but
 `PRICE_SERIES` in `src/lib/bunkerEvents.ts` maps `VLSFO`/`HSFO`/`MGO` to
-`VLSFO`/`IFO380`/`MGO`, so every one of the 116 MGO lifts recorded in
+`VLSFO`/`HSFO`/`MGO`, so every one of the 116 MGO lifts recorded in
 `PIL_Fleet_Live_Movement.csv` is valued off these columns. At 23 of the 26 ports that
 figure is modelled, and — unlike the VLSFO basis — it is entirely `inferred`/`judgment`
 confidence. Treat MGO stem values as the softest numbers in the app.
@@ -345,14 +347,14 @@ real spread in this dataset.
   displayed 3-decimal value (`413.472`). The workbook is the only source for that
   period. The gap is under 0.001 $/mt.
 - **Sparsity is real.** Only Brent and the 16 `SINGAPORE LSMGO` … `Norfork LSMGO`
-  columns span the whole file. IFO380 columns start 2019-08-21; most VLSFO columns
+  columns span the whole file. HSFO columns start 2019-08-21; most VLSFO columns
   start in late 2019 (Singapore 2019-07-04, Genoa not until 2020-02-13); the
   `FUJAIRAH MGO` block starts 2019-09-11. `trimNulls` in
   [`lib/series.ts`](../src/lib/series.ts) drops the leading nulls per series so charts
   begin at each column's first real quote.
-- **`SANTOS IFO380` stops in 2019.** 59 values, 2019-08-21 → 2019-11-14, recovered
+- **`SANTOS HSFO` stops in 2019.** 59 values, 2019-08-21 → 2019-11-14, recovered
   from the workbook's *Analysis -Old Ship & Bunker* sheet. The current sheet dropped
-  the column entirely, so Santos has no IFO380 quote after 2019.
+  the column entirely, so Santos has no HSFO quote after 2019.
 
 ### Deliberately excluded
 
@@ -368,7 +370,7 @@ Two sheets. Use the first; the second is a historical subset.
 | `Analysis Ship & Bunker` | 79 | 1973 | 2019-01-02 → 2026-08-05 |
 | `Analysis -Old Ship & Bunker` | 43 | 435 | 2019-01-02 → 2020-09-09 |
 
-The Old sheet is a strict subset except for `SANTOS IFO380`, and it names one column
+The Old sheet is a strict subset except for `SANTOS HSFO`, and it names one column
 `ANTWERP MGO` where the current sheet has `ANTWERP LSMGO`.
 
 ---
@@ -429,7 +431,10 @@ them (three per service, see `PIL_Fleet_Vessel_Specifications.csv` below) carry
 documented as reflecting a deep-sea mainline ship's larger bunker autonomy versus the
 regional-feeder ratio the standard figure was sourced from, not a change to the ratio
 itself. The other 15 Asia-Europe vessels (AE4, AE6, AE7, MEDI, EUROMED) sail the standard
-ratio; their longest legs (19-22 days) clear it, several with only a day or two of margin.
+ratio; their longest legs (19-22 days) clear it, several with only a day or two of margin —
+tight enough that two of them (AE7's KOTA MANZANILLO and KOTA SANTOS) needed the same
+widened-tank treatment once consumption became energy-based rather than a flat mass rate;
+see "Twelve vessels needed widened tanks" below.
 **This is a checkable constraint, not a modelling choice** — if you resize or reassign a
 vessel on any of the nine, re-derive its usable range against the service's longest
 `Transit_To_Next_Days` gap before running the generator, or it will throw a ROB-bounds
@@ -448,7 +453,7 @@ the stem renders with a null price in the bunker log.
 Valencia — all off Rotterdam as the hub, by decision rather than proximity (Rotterdam,
 Antwerp and Hamburg are the only assessed European hubs `gen-modelled-prices.mjs` can use;
 Algeciras/Piraeus/Malta are geographically closer to Port Said and Valencia but carry no
-assessed IFO380 column, so they can't serve as a hub for that grade regardless of
+assessed HSFO column, so they can't serve as a hub for that grade regardless of
 proximity). None of these five have Chief Engineer sheet coverage, so every basis figure
 in `bunker_basis.csv` for them is `Confidence=judgment` with no source — the softest
 priced columns in the app, softer even than B24-off-a-modelled-hub. Le Havre, Southampton
@@ -462,7 +467,7 @@ out of step and a stem at one of these ports prices off the wrong grade.
 **Algeciras, Piraeus and Malta joined `NO_HSFO_PORTS`** in both
 `scripts/gen-vessel-movement.mjs` and its client-safe duplicate `src/lib/eca.ts` — not a
 Chief Engineer finding like the rest of that set, but because none of the three carry an
-assessed IFO380 column (and this change doesn't add one). Without it a scrubber vessel
+assessed HSFO column (and this change doesn't add one). Without it a scrubber vessel
 routed through MEDI/EUROMED could stem HSFO at any of the three and the bunker log would
 render that stem with a null price, the exact silent gap this set exists to prevent.
 
@@ -470,17 +475,30 @@ render that stem with a null price, the exact silent gap this set exists to prev
 port. Kaohsiung deliberately did not — Taiwan isn't covered by the China/Korea rule this
 set encodes, and there's no evidence otherwise.
 
-**Deliberately out of scope: the real North Sea/Channel and Mediterranean SECAs.** In
-reality, Le Havre/Southampton/Felixstowe/Antwerp/Rotterdam/Hamburg sit in the North
-Sea/Channel SECA (0.10% S, since 2007) and Port Said/Valencia/Piraeus/Malta/Algeciras now
-sit in the Mediterranean SECA (since 2025-05-01). None of that is reflected in
-`ECA_PORTS` for this change. The fleet-wide MGO tank's autonomy is only ~4.4 days
-full-to-min (`MGO_MAX_RATIO=0.2`, `MGO_MIN_RATIO=1/3` of that, against the same
-DWT-proportional consumption rate), and ECA windows merge across consecutive calls — a
-Le Havre→Southampton→Felixstowe→Antwerp→Rotterdam→Hamburg run flagged as one continuous
-window would need its own sizing pass against the actual leg days, the same exercise the
-four widened-tank services above already needed for their residual tanks. Left for a
-follow-on change if taken on, not folded in silently here.
+**Later folded in: the real North Sea/Channel and Mediterranean SECAs.** In reality,
+Le Havre/Southampton/Felixstowe/Antwerp/Rotterdam/Hamburg sit in the North Sea/Channel
+SECA (0.10% S, since 2007) and Port Said/Valencia/Piraeus/Malta/Algeciras now sit in the
+Mediterranean SECA (since 2025-05-01). This change originally left both out of
+`ECA_PORTS`, on the reasoning directly below — the fleet-wide MGO tank's autonomy was
+only ~4.4 days full-to-min (`MGO_MAX_RATIO=0.2`), and ECA windows merge across
+consecutive calls, so a Le Havre→Southampton→Felixstowe→Antwerp→Rotterdam→Hamburg run
+flags as one continuous window that could exceed it.
+
+A follow-on change added all 11 of those ports to `ECA_PORTS` (in both
+`scripts/gen-vessel-movement.mjs` and `src/lib/eca.ts`) and raised `MGO_MAX_RATIO` from
+0.2 to 0.4 to fit — `checkInvariants` found the tightest case on MEDI's KOTA PUSAKA,
+breaching the MGO floor at Valencia under the original ratio. Two AE7 vessels
+(KOTA MANZANILLO, KOTA SANTOS) needed their *residual* tanks widened for an unrelated
+reason surfaced by the same change: see "Consumption became energy-based" below.
+
+**Later still: ECA detection moved from call proximity to charted position** — see
+"Position-based ECA detection replaced the call window" below. A user report caught
+what the call-window model missed: the zone polygons `src/lib/ecaZones.ts` draws are
+generous envelopes (the Mediterranean SOx ring alone spans Gibraltar to Port Said), so a
+vessel could sit inside a shaded zone on the map for days while `Active_Fuel` still read
+VLSFO/HSFO, because the `ECA_LEAD_STEPS`/`ECA_TRAIL_STEPS` window only covered the last
+day before a call. `MGO_MAX_RATIO` stayed at 0.4 through this change — the real fix
+was the MGO stem lift, not the tank ratio, below.
 
 **`Transit_Times.csv` was not extended** for these nine services — the source workbook has
 no independent pairwise transit matrix for them, only the adjacent-leg figures already
@@ -575,7 +593,7 @@ Working rules:
   it; the rest carry 4 or 5.
 - **Tier 3 is alternative fuels only** — methanol, B24 and B40. A certified renewable
   blend is not a like-for-like quote against a fossil grade, so those suppliers never
-  appear in a VLSFO or IFO380 panel. Widened from methanol alone when the CE sheet
+  appear in a VLSFO or HSFO panel. Widened from methanol alone when the CE sheet
   brought biofuel in as a real grade; the reasoning is unchanged. Asserted after
   generation.
 - **`MEOH_VLSFOe` and `MEOH_MGOe` get no offers.** They are the same physical methanol
@@ -700,7 +718,7 @@ vessel's first movement row states which in `Data_Notes`:
 | AE4 | KOTA SYDNEY, TEMA, VALPARAISO | derived — 7,092 TEU at the fleet-standard ratio, which clears this service's 22-day longest leg |
 | AE5 | KOTA PAHLAWAN, PELANGI, PURI | derived — 11,923 TEU; widened Max_ROB_MT to clear the 24-26 day Singapore/Le Havre crossings |
 | AE6 | KOTA OASIS, OCEAN, ODYSSEY | derived — 8,350 TEU at the fleet-standard ratio, which clears this service's 21-22 day longest legs |
-| AE7 | KOTA MANZANILLO, SANTOS, ORKID | derived — 8,350-8,533 TEU at the fleet-standard ratio, which clears this service's 22-day longest leg |
+| AE7 | KOTA MANZANILLO, SANTOS, ORKID | derived — 8,350-8,533 TEU; MANZANILLO and SANTOS (both scrubber-fitted) later widened `Max_ROB_MT` for the energy-based consumption model, ORKID stayed at the fleet-standard ratio — see "Twelve vessels needed widened tanks" below |
 | MEDI | KOTA PUSAKA, LIMA, LEGIT | derived — fleet-standard ratio; every leg on this rotation is ≤7 days |
 | EUROMED | KOTA LEKAS, LEMBAH, LAMBAI | derived — fleet-standard ratio; every leg on this rotation is ≤6 days |
 
@@ -750,6 +768,252 @@ or the tank a little more" before the run went clean.
 
 Still open: 47 of 109 vessels have no service, and `suppliers.ports` in `contracts/`
 remains empty.
+
+### Consumption became energy-based, and it widened two more tanks
+
+`Max_ROB_MT`, `Min_ROB_MT` and `Consumption_Transit_MT_Per_Day`/`Consumption_Berth_MT_Per_Day`
+are still the same fixed DWT percentages described above, but the generator no longer
+burns the consumption figure as a flat MT/day regardless of which grade is lit. Fuel
+grades differ in energy content (`data/emissions/energy_per_mt.csv`: HSFO 40.2 GJ/mt,
+VLSFO 41.7, MGO 42.7), and a tonne of MGO does more propulsive work than a tonne of HSFO —
+so burning them at the same mass rate wasn't physically consistent once MGO started
+covering real ECA distance rather than short port-proximity windows alone.
+
+The model is now `GJ/day = c × DWT_MT`, flat across the fleet under a constant-speed
+assumption, with `c` (`ENERGY_RATE_TRANSIT_GJ_PER_DWT_DAY` / `..._BERTH_...` in the
+generator) calibrated so a vessel burning VLSFO outside an ECA reproduces the old MT/day
+figures exactly: `0.0009 × 41.7` GJ/DWT-day for transit, `0.00015 × 41.7` for berth. Mass
+burned per step is energy ÷ that step's grade's own GJ/mt — HSFO first, then VLSFO once
+HSFO runs out mid-step, each portion converted through its own factor, and MGO drawn the
+same way inside an ECA window.
+
+The one behavioural change this introduces outside an ECA window: a scrubber vessel's
+HSFO now burns *more* mass per day than the VLSFO-calibrated baseline (40.2 vs 41.7 GJ/mt
+— same energy, denser fuel needed), about 3.7% more. That's what pushed KOTA MANZANILLO
+and KOTA SANTOS (AE7, both scrubber-fitted) over their residual floor on the
+Nhava Sheva→Karachi return leg — a leg that already ran with only "a day or two of
+margin" under the old flat rate (see above), and the 3.7% divergence was enough to tip it.
+Both had `Max_ROB_MT`/`Bunkering_Trigger_MT` raised (`Min_ROB_MT` untouched), the same
+per-vessel `Data_Notes` pattern as the twelve AE1/2/3/5 vessels above, though for a
+different reason: a burn-rate change, not a leg-length one. MGO gets the opposite effect
+inside an ECA window — it burns *less* mass per day than VLSFO would for the same work
+(42.7 vs 41.7 GJ/mt), which is part of why the North Sea/Channel and Mediterranean
+extension above needed less MGO-tank headroom than a naive flat-rate estimate would
+suggest.
+
+### Position-based ECA detection replaced the call window
+
+The call-window model (`ECA_LEAD_STEPS`/`ECA_TRAIL_STEPS`, ~1 day either side of a berth)
+was always an approximation for "in an ECA," made because the fleet has no continuous
+position — schematic arcs, no synthetic lat/lon. It worked while the shaded zones on the
+map were small relative to that window. Once the North Sea/Channel and Mediterranean SOx
+zones joined (above), it stopped working: those polygons are generous envelopes — the
+Mediterranean ring alone spans Gibraltar to Port Said — so a vessel crossing one could be
+inside it, visibly, on the map, for days on end while the call window still read
+VLSFO/HSFO everywhere but the last 24 hours. A user report caught this directly.
+
+The fix keeps the port list as ground truth for **berthed** steps (a vessel alongside
+Rotterdam is unconditionally on its compliance grade, independent of polygon precision)
+and decides **transit** steps from the vessel's actual charted position instead —
+computed from the same route geometry the map renders (`seaRoute` + `multiPointArc`,
+`src/lib/searoutes.ts` / `src/lib/geo.ts`), tested against the zone polygons
+(`src/lib/ecaZones.ts`).
+
+That geometry can't be imported into the `.mjs` generator (its internal imports omit
+file extensions, which Node's ESM resolver rejects even with `--experimental-strip-types`),
+so it's duplicated into a new script, `scripts/gen-eca-zone-profile.mjs` — one new
+hand-sync point, following the precedent `ECA_PORTS`/`MGO_TANK_RATIO` already set. For
+every port-pair leg any rotation actually sails, it builds the routed path, samples it at
+200 points, and writes the fraction-of-transit intervals during which the vessel is inside
+*any* zone to `data/derived/eca_zone_windows.json`. It also sanity-checks the result: no
+leg with a zone-overlap should have *both* endpoints outside `ECA_PORTS` — Kaohsiung, in
+particular, sits close enough to the China ribbon that this was worth checking rather than
+assuming. `gen-vessel-movement.mjs` reads that JSON and, in `buildTimetable`, maps each
+transit step to its fraction of its leg and ORs in `eca[s] = true` wherever the profile
+says so. **Re-run `gen-eca-zone-profile.mjs` before `gen-vessel-movement.mjs`** whenever
+`searoutes.ts`, `ports.ts` or `ecaZones.ts` change.
+
+The leg that wraps a rotation's loop closure (its last real call sailing to the
+loop-closing row, which repeats the first port) is handled as one leg split across the
+step-0 boundary, not two independent ones — fraction-mapping each half against the full
+profile separately would double-count it.
+
+**This alone would not have fixed the underlying data even with a correctly-sized tank**:
+`checkInvariants` immediately surfaced that some Europe/Mediterranean strings now need far
+more MGO across a loop than the old model implied — MEDI's KOTA PUSAKA burns roughly
+2,460 MT of MGO across its 42-day Algeciras→Le Havre→Antwerp→Rotterdam→Hamburg→Valencia
+chain. The generator used to cap each MGO stem at a fifth of the call's published
+`Bunker_Quantity_MT` (`MGO_STEM_RATIO=0.2`) — fine when total need per loop was small, a
+structural shortfall no `MGO_MAX_RATIO` increase could fix once it wasn't. Every stop on
+that chain publishes a quantity anyway (600-1,200 MT), so the fix was to lift the MGO stem
+the same way the residual one already does — up to the full published quantity, capped by
+tank room — not to keep raising the tank. `MGO_MAX_RATIO` stayed at 0.4; `checkInvariants`'
+tightest case moved to AE7's KOTA ORKID.
+
+### A second ECA-compliance grade: methanol
+
+"ECA-compliant" was never really synonymous with "MGO" — anything that isn't VLSFO/HSFO
+clears the 0.10% cap. This fleet models one alternative to prove the point: methanol
+(MEOH), starting on `KOTA SEGAR` and `KOTA SEJARAH` — 2 of KCI's 4 vessels, chosen so the
+service stays a mixed fleet the same way scrubber fitting already splits vessels within a
+service elsewhere — and later widened to a third, `ASTERIOS` on CVI (see "Widening
+compliance-fuel coverage" below). Every other vessel is unaffected and keeps MGO.
+
+The deployment is deliberately Intra-Asia only. Ningbo (CNNGB) is the only port in this
+dataset with a priced methanol market (`MEOH at Ningbo` — see "Beyond the fossil grades"
+in the pricing section), and KCI calls it every 24-day loop — the same refuel cadence MGO
+already gets elsewhere. An Asia-Europe string would touch Ningbo once per multi-week loop
+and then have nothing to stem methanol against for weeks of North Sea/Mediterranean
+crossing. Inventing a methanol price at a port with no assessed column, the way this
+dataset is careful never to do for conventional grades either (see "7 route ports carry no
+pricing at all" in the pricing section), would have been the wrong trade.
+
+Methanol carries under half MGO's energy per tonne (19.9 vs 42.7 GJ/mt,
+`data/emissions/energy_per_mt.csv`) — the reason real methanol-fuelled ships carry much
+larger fuel tanks for the same range, not an artefact of this model. `MEOH_MAX_RATIO` is
+`MGO_MAX_RATIO × (42.7 / 19.9)` ≈ 0.858 of `Max_ROB_MT`, for the same days of ECA-window
+autonomy; it passed `checkInvariants` at that figure without further tuning. Mirrored as
+`MEOH_TANK_RATIO` in `src/lib/types.ts`.
+
+Every vessel now carries both `MGO_ROB_MT`/`MGO_Bunkered_MT` and
+`MEOH_ROB_MT`/`MEOH_Bunkered_MT` columns (`PIL_Fleet_Live_Movement.csv` HEADER) — whichever
+one a vessel doesn't carry reads a flat `"0"` throughout, the same convention
+`HSFO_ROB_MT` already uses for a non-scrubber hull. `Active_Fuel` names the grade as text
+(`"MEOH"`, not a reused `"MGO"`); client-side, the packed single-character encoding
+(`src/lib/types.ts`, `VesselTrack.activeGrades`) uses `E` for methanol since `M` was
+already MGO's.
+
+The CE-desk spot-bunkering form (`src/lib/spotBunker.ts`) does not gain a methanol
+nomination path — its ISO 8217/viscosity/pour-point fields model conventional and
+distillate fuel, not the IGF-Code territory methanol falls under. On the rare draft opened
+while a methanol vessel is mid-ECA, `prefillSpotRequest` leaves the grade blank rather than
+guessing, and the CE picks one manually.
+
+### Two more ECA-compliance grades: LNG and B40 biofuel
+
+Methanol proved the point that "ECA-compliant" isn't synonymous with "MGO"; this pass adds
+the two other grades in this dataset with a real priced market to stem against, each on its
+own small vessel pair, generalizing the binary MGO/MEOH choice above into a
+`COMPLIANCE_FUEL` registry (`scripts/gen-vessel-movement.mjs`) keyed by vessel name.
+
+**LNG**, starting on `KOTA NAGA` (scrubber-fitted) and `KOTA NALURI` (not) — 2 of CVI's 5
+vessels, the same scrubber/non-scrubber mix as the methanol pair. LNG is priced at five ports in this
+dataset (Singapore, Ningbo, Shanghai, Port Klang, Ho Chi Minh — see "LNG — the one
+reconstructed series" above), and CVI's 35-day loop touches four of them — Shanghai and
+Ningbo are also China-DECA ports, so the ECA switch and an LNG bunkering opportunity
+coincide the same way KCI/Ningbo methanol's do. `LNG_MAX_RATIO` is `MGO_MAX_RATIO × (42.7 /
+48.0)` ≈ 0.356 of `Max_ROB_MT` — *smaller* than MGO's, the opposite direction from methanol,
+because LNG carries more energy per tonne (48.0 GJ/mt) than MGO (42.7). It passed
+`checkInvariants` at that figure without further tuning. Real cryogenic LNG tanks are
+physically bulkier per unit energy than this mass ratio implies (Type-C tank insulation and
+pressure-vessel overhead) — this model tracks autonomy-days, not volume, the same
+simplification the methanol tank already makes in reverse. Mirrored as `LNG_TANK_RATIO` in
+`src/lib/types.ts`.
+
+**B40 biofuel** (60% MGO / 40% FAME — see "The four fuels the sheet added" above), starting
+on `KOTA SAHABAT` and `KOTA SALAM` — NCI's own already-documented "deployment-derived, not
+PIL-published" pair (`DEPLOYMENT_NOTES.NCI`), the same 2-of-N split shape as the other two
+grades. B40 is priced only at Jakarta and Surabaya, and NCI is the only service calling
+both — day 17 and day 21 of a 35-day loop, 4 days apart. B24 (76% VLSFO / 24% FAME) is
+deliberately **not** modelled as a burned grade: it sits in the same ~0.5%S bracket as
+VLSFO, so it isn't ECA-compliant, and it doesn't fit the residual tank either without
+redesigning the HSFO/VLSFO exclusive choice into a three-way one — out of scope for this
+change, the same kind of deliberate boundary as the 7 unpriced route ports above. B24 stays
+exactly as it was: priced, charted, offered by suppliers, never stemmed by a simulated
+vessel. `B40_MAX_RATIO` is `MGO_MAX_RATIO × (42.7 / 40.6)` ≈ 0.421 of `Max_ROB_MT` —
+marginally larger than MGO's, since FAME dilution costs a little energy density. Mirrored as
+`B40_TANK_RATIO` in `src/lib/types.ts`.
+
+Every vessel now carries six tank columns (`VLSFO_ROB_MT`, `HSFO_ROB_MT`, `MGO_ROB_MT`,
+`MEOH_ROB_MT`, `LNG_ROB_MT`, `B40_ROB_MT`, each with a `_Bunkered_MT` counterpart) —
+whichever three of the four compliance columns a vessel doesn't carry read a flat `"0"`
+throughout, same convention as before. `Active_Fuel` now takes one of six values
+(`VLSFO`/`HSFO`/`MGO`/`MEOH`/`LNG`/`B40`); client-side, the packed single-character encoding
+(`VesselTrack.activeGrades`) adds `N` for LNG and `B` for B40 (`H`/`V`/`M`/`E` were already
+taken). `VesselTrack.methanolFueled` is gone, replaced by `VesselTrack.complianceGrade:
+VesselGrade` — a vessel carries exactly one compliance grade, never more than one, and
+reading which one off a boolean stopped scaling past two options.
+
+Neither LNG nor B40 gets a spot-desk nomination path, extending the same rationale as
+methanol: LNG is IGF-Code territory like methanol, and B40 has no comparable spot-desk
+lifting convention documented anywhere in this dataset either.
+
+### Widening compliance-fuel coverage to 30 vessels, Asia-Europe included
+
+Each grade above started as a 2-vessel pilot on one service. This pass widened
+`METHANOL_VESSELS`/`LNG_VESSELS`/`B40_VESSELS` (`scripts/gen-vessel-movement.mjs`) much
+further, in two stages, and pushed onto Asia-Europe services for the first time. Result:
+MEOH 2→3, LNG 2→23, B40 2→4 — **30 of 62 vessels (48%)** now carry a non-MGO compliance
+tank, up from 6 (10%) at the start of this widening. No new grade or tank column was
+needed — `VesselGrade`, `COMPLIANCE_TANK_RATIO` and the packed-char encoding already
+generalized over whatever the three vessel sets contained — but `MEOH_MAX_RATIO` and
+`LNG_MAX_RATIO` both needed a real increase to make the Asia-Europe half of this work (see
+below), mirrored in `src/lib/types.ts`.
+
+**Stage 1 — every intra-Asia service with a genuinely functional match.** "Functional"
+turned out to mean two things, not one: the rotation must touch the grade's supply port(s),
+*and* it must actually enter an ECA at all. `BD1`, `BD2` and `YGS` touch Singapore (an LNG
+port) but never enter an ECA — see "10 of the 35 vessels never enter an ECA" above — so a
+compliance tank there is permanently full and never stemmed, a real but pointless
+assignment. `KOTA ANGGUN`/`KOTA DAHLIA`/`KOTA HAKIM` were tried there first; the CSV's flat
+`LNG_ROB_MT` column made the mistake obvious, and they were swapped for `KOTA RUKUN`/
+`KOTA RAKYAT` (CCS's other two, alongside the already-tried `KOTA RIA` — CCS's loop touches
+both Singapore and two China-ECA ports, Xiamen and Shekou, so the tank genuinely moves) and
+`KOTA NABIL` (CVI's last untaken vessel). The full functional intra-Asia set: `KOTA JOHAN`/
+`KOTA NABIL` (CVI's 3rd/4th), `KOTA GABUNG`/`KOTA GADANG`/`KOTA GANDING`/`KOTA GAYA` (KCS,
+all 4 — 28-day loop touching 3 of the 5 LNG ports, the richest coverage in the fleet),
+`KOTA SETIA` (KCI's 4th), `KOTA SEJATI`/`KOTA SABAS` (NCI's 4th/5th), `KOTA HANDAL`/
+`KOTA HARUM` (VCS, both), `KOTA RIA`/`KOTA RUKUN`/`KOTA RAKYAT` (CCS, all 3) — 16 vessels,
+all LNG. (No further MEOH or B40 candidates existed: Ningbo is the only MEOH port and every
+service touching it was already assigned; Jakarta/Surabaya are the only B40 ports and NCI
+is the only service touching both.)
+
+**Stage 2 — Asia-Europe, which needed a bigger tank, not just a qualifying port.** Every
+alternative-fuel supply port sits in Asia (`MEOH_SUPPLY_PORTS`/`LNG_SUPPLY_PORTS`/
+`B40_SUPPLY_PORTS`, all defined above), and the compliance tank only draws down inside an
+ECA window — fine on an intra-Asia loop, where the port that triggers the ECA switch is
+usually the supply port too. It isn't fine on an Asia-Europe loop: the vessel fills once in
+Asia and must then survive the *entire* Europe-side ECA exposure (North Sea/Channel,
+sometimes Mediterranean) before its next Asia call, with zero resupply chance in between —
+unlike an MGO-tanked vessel, which can still buy MGO at almost any European port along the
+way (`NO_MGO_PORTS` is a short exclusion list).
+
+`MEOH_MAX_RATIO`/`LNG_MAX_RATIO` carry a **×2.3 buffer** on top of their base
+energy-density figure to cover this, raised empirically against `checkInvariants` in steps
+(2x → 2.1x → 2.3x) — the same lever, for the same reason, as `MGO_MAX_RATIO`'s own 0.2→0.4
+history above. The failure margin did **not** shrink monotonically with the ratio: a bigger
+tank can make the trigger logic decide *not* to top up at the last safe port before the
+long Europe stretch, since the tank looks comfortably full relative to a proportionally
+bigger floor — a 5% buffer tried first against one narrow miss (`KOTA ELAN`/AE2) made the
+deficit *worse* on re-check, which is what motivated jumping straight to a much larger
+multiplier instead of nudging incrementally. Even at ×2.3, four candidates still failed and
+stayed on MGO: `KOTA OCEAN` (AE6), `KOTA SYDNEY` (AE4 — its only near-qualifying port,
+Shanghai, is touched once per 70-day loop, the weakest coverage tried), `KOTA PUSAKA`
+(MEDI — Singapore only at the loop's start/end), and `KOTA LEKAS` (EUROMED, MEOH — Ningbo
+is MEOH's only supply port anywhere, so an Asia-Europe methanol candidate gets just one
+fill per loop to cover the whole round trip).
+
+The 7 that passed: `KOTA EBONY` (AE1), `KOTA ELAN` (AE2), `KOTA PLUMBAGO` (AE3),
+`KOTA PELANGI`/`KOTA PURI` (AE5, both — the 2nd was tried specifically to confirm the 1st
+wasn't a one-off pass), `KOTA LEMBAH`/`KOTA LAMBAI` (EUROMED, both) — all LNG. B40 never
+needed the buffer or an Asia-Europe attempt: Jakarta/Surabaya are its only priced ports and
+no Europe-touching service calls either.
+
+MGO remains the compliance grade on the rest of the Asia-Europe/Mediterranean/EUROMED
+fleet, the services with no qualifying alternative-fuel port at all (`CAS`, `SCT`, `AE7`),
+and `BD1`/`BD2`/`YGS` (qualifying port, but no ECA to trigger the tank at all — see Stage 1).
+
+### The bunker log now shows LSMGO, not just MGO
+
+A display-only fix, not a model change: LSMGO and MGO are numerically the same product in
+this dataset (42.7 GJ/mt, `data/emissions/energy_per_mt.csv`) and `priceSeriesFor`
+(`src/lib/bunkerEvents.ts`) already resolves a distillate stem to whichever the port
+actually sells (`LSMGO_PORTS`, 14 ports — see "LSMGO and MGO are different products" above).
+What never used that resolution was the UI: `BunkerLog.tsx` and `VesselStems.tsx` printed
+the raw tank name (`event.grade`, always `"MGO"`), so a stem at Ningbo or Busan displayed as
+"MGO" even though it priced as LSMGO. Both now render `stemDisplayGrade(event)` (`event.price
+?.series ?? event.grade`) instead — `Active_Fuel`, invariants and the packed char encoding
+are untouched, since the tank itself is still `"MGO"` regardless of which column priced it.
 
 ---
 
@@ -909,14 +1173,21 @@ not being burned.
 
 **MGO is now a series, not a constant** — burned and stemmed, 116 lifts. Its tank sits
 *outside* `Max_ROB_MT` (ASTERIOS opens at 683 MT of residual, exactly its `Max_ROB_MT`,
-and carries MGO on top) and is taken as **0.20 × `Max_ROB_MT`**, floor `÷3`, trigger `÷2`
-— recorded in `vessel_assumptions.csv`, mirrored in `MGO_TANK_RATIO` in
-`src/lib/types.ts` for the fuel bar. That ratio **supersedes the five hand-carried
-figures** from the Drive extract (ASTERIOS, KOTA ANGGUN, KOTA AZAM, KOTA DAHLIA,
-KOTA DUNIA), which had no derivable basis — 0.13 to 0.72 of `Min_ROB_MT` across 11
-vessels, a ratio of nothing. Three of the five land near 0.20 × `Max_ROB_MT`; two do not.
-Holding five hand figures beside thirty derived ones would have made the series
-inconsistent the moment MGO started moving.
+and carries MGO on top) and was taken as **0.20 × `Max_ROB_MT`** in this original
+26-port design, floor `÷3`, trigger `÷2` — recorded in `vessel_assumptions.csv`, mirrored
+in `MGO_TANK_RATIO` in `src/lib/types.ts` for the fuel bar. (Raised to **0.40** once the
+North Sea/Channel and Mediterranean SECAs joined `ECA_PORTS` — see "Consumption became
+energy-based" above — both files updated together. Held at 0.40 through the later move to
+position-based ECA detection, whose real fix was the MGO stem lift — see "Position-based
+ECA detection replaced the call window" below. Alternative compliance grades — methanol,
+LNG, B40 — were added on a growing vessel subset afterward, `ASTERIOS` among them; see "A
+second ECA-compliance grade" and "Widening compliance-fuel coverage" below. Every other
+vessel here is still MGO exactly as described in this section.) That ratio **supersedes the five
+hand-carried figures** from the Drive extract (ASTERIOS, KOTA ANGGUN, KOTA AZAM,
+KOTA DAHLIA, KOTA DUNIA), which had no derivable basis — 0.13 to 0.72 of `Min_ROB_MT`
+across 11 vessels, a ratio of nothing. Three of the five land near 0.20 × `Max_ROB_MT`;
+two do not. Holding five hand figures beside thirty derived ones would have made the
+series inconsistent the moment MGO started moving.
 
 **10 of the 35 vessels never enter an ECA** — BD1 ×2, BD2 ×2, CAS ×4, YGS ×2, whose
 rotations run Singapore/Bangladesh/Kolkata/Yangon. Their `MGO_ROB_MT` is flat all window
@@ -1003,3 +1274,52 @@ change lands right at it. The 55-vessel-or-longer-window ceiling this note used 
 about has now been crossed (by vessel count, not window length) — accepted for this
 change, but **moving `PIL_Fleet_Live_Movement.csv` behind an API route, on the pricing
 route's own pattern, is the next thing to do here**, not a future hypothetical.
+
+---
+
+## `emissions/` — CO2e and carbon-cost reference data
+
+Four files, none of them read anywhere in `src/`. They are hand-researched reference
+tables (like `bunker_basis.csv`, not like a priced sheet), kept here so a figure only
+needs deriving once.
+
+| File | What it is |
+|---|---|
+| `energy_per_mt.csv` | LCV/NCV (GJ/mt) per grade, mostly from IMO MEPC.364(79) |
+| `CO2_per_mt.csv` | tank-to-wake CO2 and CO2e (t/t) per grade, IMO Cf plus EU MRV/FuelEU CH4+N2O defaults |
+| `eua_carbon_price_anchors.csv` | published EUA (EU ETS allowance) prices — **not a cost sheet**, the anchors behind the one below |
+| `co2e_cost_per_mt.csv` | $/mt cost of each grade's CO2e liability, generated from the two above |
+
+### `co2e_cost_per_mt.csv` — EU ETS carbon cost per grade
+
+[`scripts/gen-co2e-cost.mjs`](../scripts/gen-co2e-cost.mjs) multiplies an EUA (EU
+Allowance — the traded EU ETS permit) price by each grade's `CO2e_TtW_MT_Per_MT` from
+`CO2_per_mt.csv`:
+
+```
+cost($/mt fuel) = eua_price($/t CO2) x CO2e_TtW_MT_Per_MT(grade)
+```
+
+One row per date on the fleet's own window (2026-05-05 → 2026-08-05, borrowed from
+`VLSFO Prices.csv`'s `Date` column — same "spine" approach `gen-lng-prices.mjs` uses),
+one column per grade in `CO2_per_mt.csv` (the blank-`Grade` `FAME_B100` reference row is
+skipped — it isn't a priced grade in this app either).
+
+**This is not a reconstruction, unlike the LNG hub below** — `eua_carbon_price_anchors.csv`
+holds real published EUA prices (IndexBox and Trading Economics, all `sourced`), linearly
+interpolated between four anchors that bracket the window on both ends, so nothing is
+extrapolated. EUA settles in EUR; conversion to USD uses a single fixed, documented rate
+(`EUR/USD = 1.1550`, Trading Economics/MTFX 2026-08-10) rather than a second anchor
+series — the same class of flat simplification `CO2_per_mt.csv` already applies for its
++0.049 t/t CH4+N2O uplift.
+
+**Flat, unscoped cost — not a modelled compliance liability.** Real EU ETS shipping rules
+only count 100% of a voyage's emissions if both port calls are in the EU/EEA, 50% if only
+one is, and 0% if neither is. Nothing in this codebase classifies a port call as EU vs
+non-EU, so every column here is the un-scoped, 100%-of-emissions figure — read it as the
+ceiling a stem could owe, not what it actually would. The 2024/25/26 EU ETS phase-in
+(40%/70%/100% of calculated liability) is not modelled either, but is moot for this
+window regardless: it is already at 100% throughout 2026.
+
+Re-run `node scripts/gen-co2e-cost.mjs` after refreshing the anchors or the pricing spine.
+It is idempotent.

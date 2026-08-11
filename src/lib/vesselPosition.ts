@@ -1,6 +1,7 @@
+import type { Co2eCostPoint, Co2eFactors } from "./emissions";
 import { greatCircleArc, multiPointArc, pointAlong, type LonLat } from "./geo";
 import { seaRoute } from "./searoutes";
-import type { VesselGrade, VesselTrack } from "./types";
+import { VESSEL_GRADES, type VesselGrade, type VesselTrack } from "./types";
 
 /**
  * A block of consecutive steps sharing one destination port: the transit
@@ -79,6 +80,12 @@ export function activeGradeAt(track: VesselTrack, step: number): VesselGrade {
       return "HSFO";
     case "M":
       return "MGO";
+    case "E":
+      return "MEOH";
+    case "N":
+      return "LNG";
+    case "B":
+      return "B40";
     default:
       return "VLSFO";
   }
@@ -236,4 +243,121 @@ export function stepTimestamp(track: VesselTrack, step: number): string {
     `${at.getUTCFullYear()}-${p2(at.getUTCMonth() + 1)}-${p2(at.getUTCDate())}` +
     ` ${p2(at.getUTCHours())}:${p2(at.getUTCMinutes())}`
   );
+}
+
+/**
+ * "2026-05-05 00:00" -> "05 May". A 93-day window needs the day, not the
+ * year. Shared by every chart in the vessel panel that plots against a
+ * numeric step axis.
+ */
+export function stepAxisLabel(track: VesselTrack, step: number): string {
+  const [date] = stepTimestamp(track, step).split(" ");
+  const d = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * Mass of `grade` actually consumed at `step`, derived from the ROB delta —
+ * nothing in VesselTrack stores burned mass directly, only ROB and sparse
+ * lifted amounts. A lift is added back into opening stock before diffing, so
+ * a step that both bunkers and burns the same grade doesn't read as negative
+ * consumption. Works uniformly across all six tanks: only the grade actually
+ * being burned that step (activeGradeAt) will ever show a positive result.
+ */
+export function burnedMtAt(
+  track: VesselTrack,
+  grade: VesselGrade,
+  step: number,
+): number {
+  if (step === 0) return 0;
+  const opening = track.robMt[grade][step - 1];
+  const lifted = track.bunkered[grade][step] ?? 0;
+  const closing = track.robMt[grade][step];
+  return Math.max(0, opening + lifted - closing);
+}
+
+export interface Co2eSeriesPoint {
+  step: number;
+  cumulativeT: number;
+}
+
+/**
+ * Running total of CO2e emitted, in tonnes, across the whole window. Sums
+ * every tank's burn at each step against that grade's own factor, so a
+ * scrubber vessel's HSFO and VLSFO both count, not just its active grade.
+ */
+export function vesselCo2eSeries(
+  track: VesselTrack,
+  factors: Co2eFactors,
+): Co2eSeriesPoint[] {
+  const stepCount = track.robMt.VLSFO.length;
+  let cumulativeT = 0;
+  const rows: Co2eSeriesPoint[] = new Array(stepCount);
+  for (let step = 0; step < stepCount; step++) {
+    for (const grade of VESSEL_GRADES) {
+      cumulativeT += burnedMtAt(track, grade, step) * factors[grade];
+    }
+    rows[step] = { step, cumulativeT };
+  }
+  return rows;
+}
+
+export interface Co2eCostSeriesPoint {
+  step: number;
+  cumulativeUsd: number;
+}
+
+/**
+ * Running total of estimated CO2e cost, in USD, across the whole window.
+ * `costSeries` (data/emissions/co2e_cost_per_mt.csv) has an irregular,
+ * business-day-like cadence rather than one row per step, so this walks a
+ * pointer forward and holds the latest known row across any gap — the same
+ * "latest known point" rule bunkerPriceSnapshot() already applies to prices.
+ * Valid because the cost series' window (2026-05-05 to 2026-08-05) exactly
+ * brackets every track's window, so the pointer always starts in range.
+ */
+export function vesselCo2eCostSeries(
+  track: VesselTrack,
+  costSeries: Co2eCostPoint[],
+): Co2eCostSeriesPoint[] {
+  const stepCount = track.robMt.VLSFO.length;
+  let cumulativeUsd = 0;
+  let pointer = 0;
+  const rows: Co2eCostSeriesPoint[] = new Array(stepCount);
+  for (let step = 0; step < stepCount; step++) {
+    const date = stepTimestamp(track, step).slice(0, 10);
+    while (
+      pointer + 1 < costSeries.length &&
+      costSeries[pointer + 1].date <= date
+    ) {
+      pointer++;
+    }
+    const cost = costSeries[pointer]?.costUsdPerMt;
+    if (cost) {
+      for (const grade of VESSEL_GRADES) {
+        cumulativeUsd += burnedMtAt(track, grade, step) * cost[grade];
+      }
+    }
+    rows[step] = { step, cumulativeUsd };
+  }
+  return rows;
+}
+
+/**
+ * Step number nearest a YYYY-MM-DD date, against a track's own timeline.
+ * Inverse of stepTimestamp — used to place the fleet-wide EUA price series
+ * (dated, not step-indexed) onto the same numeric step axis every other
+ * chart in the panel uses, so a single ReferenceLine convention works
+ * everywhere.
+ */
+export function dateToStep(track: VesselTrack, date: string): number {
+  const start = new Date(`${track.startTimestamp.replace(" ", "T")}Z`);
+  const at = new Date(`${date}T00:00:00Z`);
+  const hours = (at.getTime() - start.getTime()) / 3600_000;
+  return Math.round(hours / track.stepHours);
 }

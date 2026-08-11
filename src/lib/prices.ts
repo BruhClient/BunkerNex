@@ -45,7 +45,7 @@ const GRADE_SUFFIXES: Array<[string, Grade]> = [
   ["MEOH VLSFOE", "MEOH_VLSFOe"],
   ["MEOH MGOE", "MEOH_MGOe"],
   ["MEOH", "MEOH"],
-  ["IFO380", "IFO380"],
+  ["HSFO", "HSFO"],
   ["VLSFO", "VLSFO"],
   ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
@@ -61,7 +61,7 @@ let indexCache: PriceIndex | null = null;
 
 /**
  * Split a pricing column header into its port and grade, e.g.
- * "LA LongBeach IFO380" -> { portKey: "USLGB", grade: "IFO380" }.
+ * "LA LongBeach HSFO" -> { portKey: "USLGB", grade: "HSFO" }.
  * Returns null for headers whose port is not in the alias table.
  */
 function parseHeader(header: string): { portKey: string; grade: Grade } | null {
@@ -173,7 +173,7 @@ export function getBrentSeries(): PricePoint[] {
  * Gaps are still gaps: a port absent here means no figure at all, never zero.
  * As of the current movement file every stem does resolve, because the
  * generator now picks its stem grade by what the port can supply — Shanghai
- * has no IFO380 column and no longer receives HSFO stems. That is a property
+ * has no HSFO column and no longer receives HSFO stems. That is a property
  * of the data, not a guarantee of this function.
  */
 export function bunkerPriceSnapshot(): BunkerPriceSnapshot {

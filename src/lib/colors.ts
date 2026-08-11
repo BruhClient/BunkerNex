@@ -76,7 +76,7 @@ export function serviceColor(code: string): string {
  */
 export const GRADE_COLORS: Record<Grade, string> = {
   VLSFO: "#38BDF8",
-  IFO380: "#F59E0B",
+  HSFO: "#F59E0B",
   LSMGO: "#34D399",
   MGO: "#A3E635",
   MDO: "#84CC16",
@@ -92,7 +92,7 @@ export const GRADE_COLORS: Record<Grade, string> = {
 /** Display labels — the raw CSV suffixes are not presentable as-is. */
 export const GRADE_LABELS: Record<Grade, string> = {
   VLSFO: "VLSFO",
-  IFO380: "IFO380",
+  HSFO: "HSFO",
   LSMGO: "LSMGO",
   MGO: "MGO",
   MDO: "MDO",
@@ -110,7 +110,7 @@ export const GRADE_LABELS: Record<Grade, string> = {
 /** Order grades appear in tiles, legend and chart. */
 export const GRADE_ORDER: Grade[] = [
   "VLSFO",
-  "IFO380",
+  "HSFO",
   "LSMGO",
   "MGO",
   "MDO",

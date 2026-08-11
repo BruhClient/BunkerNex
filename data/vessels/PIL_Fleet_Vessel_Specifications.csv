@@ -49,7 +49,7 @@ KOTA LUMBA,9439761,"HONG KONG SAR,CHINA",50604,39906,24504,4253,VLSFO; HSFO; MGO
 KOTA MACHAN,9632777,SINGAPORE,45361,37304,13856,3566,VLSFO; HSFO; MGO,No,1361,454,40.82,6.8,680.415,Vessel Specifications,
 KOTA MAKMUR,9632753,"HONG KONG SAR,CHINA",45349,37373,13856,3566,VLSFO; HSFO; MGO,No,1360,453,40.81,6.8,680.235,Vessel Specifications,
 KOTA MANIS,9632741,SINGAPORE,45349,37304,13856,3566,VLSFO; HSFO; MGO,Yes,1360,453,40.81,6.8,680.235,Vessel Specifications,
-KOTA MANZANILLO,9305465,LIBERIA,103378,91649,56693,8533,VLSFO; HSFO; MGO,Yes,3101,1034,93.04,15.51,1550.67,Vessel Specifications,
+KOTA MANZANILLO,9305465,LIBERIA,103378,91649,56693,8533,VLSFO; HSFO; MGO,Yes,3251,1034,93.04,15.51,1625.5,Vessel Specifications,"Max_ROB_MT and Bunkering_Trigger_MT raised above the fleet-standard 3%-of-DWT ratio (Min_ROB_MT and consumption rates unchanged) so this AE7 vessel clears its Nhava Sheva-Karachi return leg under the energy-based consumption model (see CLAUDE.md): a scrubber hull's HSFO burn rate is higher in mass terms than the fleet-standard VLSFO-calibrated rate (same energy, lower GJ/mt), which the flat mass-rate model this replaced did not capture."
 KOTA MEGAH,9632765,SINGAPORE,45349,37373,13856,3566,VLSFO; HSFO; MGO,No,1360,453,40.81,6.8,680.235,Vessel Specifications,
 KOTA NABIL,9356830,SINGAPORE,25985,20902,9119,1810,VLSFO; HSFO; MGO,Yes,780,260,23.39,3.9,389.775,Vessel Specifications,
 KOTA NAGA,9362310,SINGAPORE,25985,20902,9121,1810,VLSFO; HSFO; MGO,Yes,780,260,23.39,3.9,389.775,Vessel Specifications,
@@ -87,7 +87,7 @@ KOTA RUKUN,9167459,SINGAPORE,13058,9422,4537,777,VLSFO; HSFO; MGO,No,392,131,11.
 KOTA SABAS,9645451,SINGAPORE,51739,41706,22321,3889,VLSFO; HSFO; MGO,Yes,1552,517,46.57,7.76,776.085,Vessel Specifications,
 KOTA SAHABAT,9645463,SINGAPORE,51739,41706,22321,3889,VLSFO; HSFO; MGO,Yes,1552,517,46.57,7.76,776.085,Vessel Specifications,
 KOTA SALAM,9645475,SINGAPORE,51739,41706,22321,3889,VLSFO; HSFO; MGO,Yes,1552,517,46.57,7.76,776.085,Vessel Specifications,
-KOTA SANTOS,9293765,LIBERIA,106936,90449,59328,8463,VLSFO; HSFO; MGO,Yes,3208,1069,96.24,16.04,1604.04,Vessel Specifications,
+KOTA SANTOS,9293765,LIBERIA,106936,90449,59328,8463,VLSFO; HSFO; MGO,Yes,3358,1069,96.24,16.04,1679,Vessel Specifications,"Max_ROB_MT and Bunkering_Trigger_MT raised above the fleet-standard 3%-of-DWT ratio (Min_ROB_MT and consumption rates unchanged) so this AE7 vessel clears its Nhava Sheva-Karachi return leg under the energy-based consumption model (see CLAUDE.md): a scrubber hull's HSFO burn rate is higher in mass terms than the fleet-standard VLSFO-calibrated rate (same energy, lower GJ/mt), which the flat mass-rate model this replaced did not capture."
 KOTA SATRIA,9645487,SINGAPORE,51755,41706,22321,3889,VLSFO; HSFO; MGO,Yes,1553,518,46.58,7.76,776.325,Vessel Specifications,
 KOTA SEGAR,9681235,SINGAPORE,51739,41706,22321,3889,VLSFO; HSFO; MGO,Yes,1552,517,46.57,7.76,776.085,Vessel Specifications,
 KOTA SEJARAH,9681247,SINGAPORE,51755,41706,22321,3889,VLSFO; HSFO; MGO,No,1553,518,46.58,7.76,776.325,Vessel Specifications,

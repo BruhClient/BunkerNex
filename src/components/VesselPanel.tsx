@@ -1,18 +1,25 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { serviceColor } from "@/lib/colors";
+import { serviceColor, THEME } from "@/lib/colors";
+import type { Co2eCostPoint, Co2eFactors } from "@/lib/emissions";
+import { formatMt } from "@/lib/format";
 import {
   activeGradeAt,
   buildLegs,
   robState,
   stepTimestamp,
+  vesselCo2eCostSeries,
+  vesselCo2eSeries,
 } from "@/lib/vesselPosition";
+import Co2ePriceChart from "./Co2ePriceChart";
+import VesselCo2eChart from "./VesselCo2eChart";
+import VesselCo2eCostChart from "./VesselCo2eCostChart";
 import VesselFuelBar from "./VesselFuelBar";
 import VesselRobChart from "./VesselRobChart";
 import VesselStems from "./VesselStems";
 import type { BunkerEvent } from "@/lib/bunkerEvents";
-import { MGO_TANK_MIN_RATIO, MGO_TANK_RATIO } from "@/lib/types";
+import { COMPLIANCE_TANK_MIN_RATIO, COMPLIANCE_TANK_RATIO } from "@/lib/types";
 import type {
   PortCall,
   Service,
@@ -22,6 +29,25 @@ import type {
   VesselTrack,
 } from "@/lib/types";
 
+/** What each compliance grade means for this hull, in the descriptive copy. */
+const COMPLIANCE_FUEL_NOTE: Record<VesselGrade, string> = {
+  MGO: "MGO is its ECA-compliance tank, burned through its ECA calls.",
+  MEOH:
+    "This is one of the fleet's two methanol dual-fuel vessels: MEOH is " +
+    "its ECA-compliance tank in place of MGO, stemmed at Ningbo — the " +
+    "only port in this dataset with a priced methanol market.",
+  LNG:
+    "This is one of the fleet's two LNG dual-fuel vessels: LNG is its " +
+    "ECA-compliance tank in place of MGO, stemmed at Ningbo, Shanghai, " +
+    "Singapore or Port Klang.",
+  B40:
+    "This is one of the fleet's two B40 biofuel vessels: B40 (60% MGO / " +
+    "40% FAME) is its ECA-compliance tank in place of plain MGO, stemmed " +
+    "at Jakarta or Surabaya.",
+  VLSFO: "",
+  HSFO: "",
+};
+
 interface Props {
   spec: VesselSpec | null;
   track: VesselTrack | null;
@@ -30,6 +56,8 @@ interface Props {
   stepIndex: number;
   /** Every stem in the window. Filtered to this vessel here. */
   events: BunkerEvent[];
+  co2eFactors: Co2eFactors;
+  co2eCostSeries: Co2eCostPoint[];
   onSeek: (step: number) => void;
   /**
    * Opens the spot bunker requirement form. Only offered while the vessel is in
@@ -77,6 +105,8 @@ export default function VesselPanel({
   portCalls,
   stepIndex,
   events,
+  co2eFactors,
+  co2eCostSeries,
   onSeek,
   onEvaluateSpot,
   onClose,
@@ -120,6 +150,15 @@ export default function VesselPanel({
     return { rotation: calls, skipped: missing };
   }, [service, portCalls, legs]);
 
+  const co2eSeries = useMemo(
+    () => (track ? vesselCo2eSeries(track, co2eFactors) : []),
+    [track, co2eFactors],
+  );
+  const co2eCostSeriesForVessel = useMemo(
+    () => (track ? vesselCo2eCostSeries(track, co2eCostSeries) : []),
+    [track, co2eCostSeries],
+  );
+
   if (!spec || !track) return null;
 
   const color = serviceColor(track.serviceCode);
@@ -134,16 +173,27 @@ export default function VesselPanel({
     HSFO: track.robMt.HSFO[stepIndex] ?? 0,
     VLSFO: track.robMt.VLSFO[stepIndex] ?? 0,
     MGO: track.robMt.MGO[stepIndex] ?? 0,
+    MEOH: track.robMt.MEOH[stepIndex] ?? 0,
+    LNG: track.robMt.LNG[stepIndex] ?? 0,
+    B40: track.robMt.B40[stepIndex] ?? 0,
   };
   const activeGrade = activeGradeAt(track, stepIndex);
   const lifted = track.bunkered[activeGrade][stepIndex] ?? null;
 
+  // The ECA-compliance tank: MGO on the fleet at large, MEOH/LNG/B40 on the
+  // small subsets that carry one of those instead.
+  const complianceGrade = track.complianceGrade;
+  const complianceTankRatio = COMPLIANCE_TANK_RATIO[complianceGrade];
+  const complianceTankMinRatio = COMPLIANCE_TANK_MIN_RATIO[complianceGrade];
+
   // Thresholds are measured against the residual pair together, since that is
-  // the capacity they were derived from. MGO has its own, smaller tank.
+  // the capacity they were derived from. The compliance tank has its own,
+  // separate tank.
   const residualRob = robMt.HSFO + robMt.VLSFO;
-  const mgoMaxMt =
-    spec.maxRobMt === null ? null : spec.maxRobMt * MGO_TANK_RATIO;
-  const mgoMinMt = mgoMaxMt === null ? null : mgoMaxMt * MGO_TANK_MIN_RATIO;
+  const complianceMaxMt =
+    spec.maxRobMt === null ? null : spec.maxRobMt * complianceTankRatio;
+  const complianceMinMt =
+    complianceMaxMt === null ? null : complianceMaxMt * complianceTankMinRatio;
 
   // Both thresholds are enforced by scripts/gen-vessel-movement.mjs, which
   // asserts Min_ROB_MT ≤ HSFO + VLSFO ≤ Max_ROB_MT across all 26,040 rows
@@ -152,12 +202,13 @@ export default function VesselPanel({
   // crossing the trigger is the generator working, not failing.
   const state = robState(residualRob, spec.minRobMt, spec.bunkeringTriggerMt);
 
-  // The stem this vessel is heading for, once it is under the trigger. MGO is
-  // excluded: it stems against its own tank on its own trigger, so an ECA lift
-  // two days out says nothing about when the residual pair is topped up.
+  // The stem this vessel is heading for, once it is under the trigger. The
+  // compliance grade is excluded: it stems against its own tank on its own
+  // trigger, so an ECA lift two days out says nothing about when the residual
+  // pair is topped up.
   const nextStem =
     state === "due"
-      ? (stems.find((e) => e.step >= stepIndex && e.grade !== "MGO") ?? null)
+      ? (stems.find((e) => e.step >= stepIndex && e.grade !== complianceGrade) ?? null)
       : null;
   const stemDays =
     nextStem === null
@@ -245,8 +296,9 @@ export default function VesselPanel({
               minRobMt={spec.minRobMt}
               triggerMt={spec.bunkeringTriggerMt}
               state={state}
-              mgoMaxMt={mgoMaxMt}
-              mgoMinMt={mgoMinMt}
+              complianceGrade={complianceGrade}
+              complianceMaxMt={complianceMaxMt}
+              complianceMinMt={complianceMinMt}
             />
           </div>
 
@@ -330,6 +382,63 @@ export default function VesselPanel({
           />
         </section>
 
+        {/* --- Emissions and carbon cost, derived from the same burn --- */}
+        <section className="mt-4 border-t border-line pt-3.5">
+          <div className="px-4 pb-2">
+            <span className="label">CO2e generated · cumulative</span>
+          </div>
+          <Row
+            label="Emitted so far"
+            value={`${formatMt(co2eSeries[stepIndex]?.cumulativeT ?? 0)} t CO2e`}
+          />
+          <VesselCo2eChart
+            track={track}
+            factors={co2eFactors}
+            stepIndex={stepIndex}
+            onSeek={onSeek}
+          />
+
+          <div className="mt-3 px-4 pb-2">
+            <span className="label">Estimated CO2e cost · cumulative</span>
+          </div>
+          <Row
+            label="Estimated cost so far"
+            value={`$${Math.round(
+              co2eCostSeriesForVessel[stepIndex]?.cumulativeUsd ?? 0,
+            ).toLocaleString()}`}
+          />
+          <VesselCo2eCostChart
+            track={track}
+            costSeries={co2eCostSeries}
+            stepIndex={stepIndex}
+            onSeek={onSeek}
+          />
+
+          <div className="mt-3 px-4 pb-2">
+            <span className="label">Market CO2e price · EUA, USD/t CO2</span>
+          </div>
+          <Co2ePriceChart
+            track={track}
+            costSeries={co2eCostSeries}
+            stepIndex={stepIndex}
+            onSeek={onSeek}
+          />
+
+          <p className="mt-1 px-4 text-[10px] leading-relaxed text-faint">
+            Derived from this hull&apos;s own fuel burn ×{" "}
+            <code className="font-mono">CO2_per_mt.csv</code>&apos;s
+            tank-to-wake factors, priced against{" "}
+            <code className="font-mono">co2e_cost_per_mt.csv</code>&apos;s
+            daily EUA carbon price. An unscoped ceiling, not a modelled
+            liability — real EU ETS rules count a voyage&apos;s emissions at
+            100%/50%/0% depending on whether both, one, or neither port call
+            is in the EU/EEA, which nothing here classifies. Read these
+            figures as what a stem could owe, not what it does.{" "}
+            <span style={{ color: THEME.down }}>Red</span> marks the scrubbed
+            moment on all three charts; click any of them to seek.
+          </p>
+        </section>
+
         {/* --- Every stem, relative to where the scrubber sits --- */}
         <section className="mt-4 border-t border-line pt-3.5">
           <div className="px-4 pb-2">
@@ -366,7 +475,8 @@ export default function VesselPanel({
           <Row
             label="Carries"
             value={
-              track.scrubber ? "HSFO + VLSFO + MGO" : "VLSFO + MGO"
+              (track.scrubber ? "HSFO + VLSFO + " : "VLSFO + ") +
+              complianceGrade
             }
           />
 
@@ -391,8 +501,7 @@ export default function VesselPanel({
                 "VLSFO its compliant reserve."
               : "Without a scrubber, HSFO is not compliant on this hull, so " +
                 "VLSFO is its only residual grade."}{" "}
-            MGO is carried by every vessel and burned through China and Korea
-            ECA calls.
+            {COMPLIANCE_FUEL_NOTE[complianceGrade]}
           </p>
         </section>
 

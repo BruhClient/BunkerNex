@@ -56,7 +56,7 @@ const GRADE_SUFFIXES = [
   ["MEOH VLSFOE", "MEOH_VLSFOe"],
   ["MEOH MGOE", "MEOH_MGOe"],
   ["MEOH", "MEOH"],
-  ["IFO380", "IFO380"],
+  ["HSFO", "HSFO"],
   ["VLSFO", "VLSFO"],
   ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
@@ -73,10 +73,10 @@ const GRADE_SUFFIXES = [
  * methanol restated in VLSFO- and MGO-equivalent energy terms, so quoting them
  * as separate fuel types would triple-count one market.
  */
-const OFFER_GRADES = ["VLSFO", "IFO380", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
+const OFFER_GRADES = ["VLSFO", "HSFO", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
 
 /** Display order, matching GRADE_ORDER in src/lib/colors.ts. */
-const GRADE_ORDER = ["VLSFO", "IFO380", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
+const GRADE_ORDER = ["VLSFO", "HSFO", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
 
 /**
  * The alternative fuels, which tier 3 is scoped to.

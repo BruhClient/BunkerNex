@@ -1,7 +1,7 @@
 "use client";
 
 import { formatMt, formatPrice } from "@/lib/format";
-import type { BunkerEvent } from "@/lib/bunkerEvents";
+import { stemDisplayGrade, type BunkerEvent } from "@/lib/bunkerEvents";
 
 interface Props {
   /** This vessel's stems only, chronological. Filtered by the parent. */
@@ -80,7 +80,7 @@ export default function VesselStems({ events, stepIndex, onSeek }: Props) {
                 </span>
                 <span className="mt-0.5 flex items-baseline justify-between gap-3 text-[10px]">
                   <span className="tnum text-faint" title={event.portName}>
-                    {event.portCode} · {event.grade}
+                    {event.portCode} · {stemDisplayGrade(event)}
                   </span>
                   <span className="tnum">
                     {event.price ? (
