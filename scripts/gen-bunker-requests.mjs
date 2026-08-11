@@ -49,21 +49,13 @@ const FORWARD_LEGS = 3;
 /** How many requests to raise. Enough to fill an inbox, not to bury it. */
 const TARGET_REQUESTS = 18;
 
-/** Ports whose distillate market is 0.10% LSMGO. Mirrors src/lib/bunkerEvents.ts. */
-const LSMGO_PORTS = new Set([
-  "CNNGB", "CNNSA", "CNSHA", "CNSHK", "CNTAO", "CNTSN", "CNXMN", "CNYTN",
-  "IDSUB", "KRINC", "KRPUS", "MYPKG", "SGSIN", "VNUIH",
-  "NLRTM", "BEANR", "DEHAM", "FRLEH", "GBSOU", "GBFXT",
-]);
-
 const TANK_COLUMNS = [
   ["VLSFO_Bunkered_MT", "VLSFO", "VLSFO_ROB_MT"],
   ["HSFO_Bunkered_MT", "HSFO", "HSFO_ROB_MT"],
   ["MGO_Bunkered_MT", "MGO", "MGO_ROB_MT"],
 ];
 
-function priceSeriesFor(tank, portCode) {
-  if (tank === "MGO") return LSMGO_PORTS.has(portCode) ? "LSMGO" : "MGO";
+function priceSeriesFor(tank, _portCode) {
   return tank;
 }
 

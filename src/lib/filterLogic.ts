@@ -66,15 +66,8 @@ export function vesselCanBurn(track: VesselTrack, grade: VesselGrade): boolean {
   return false;
 }
 
-/**
- * MGO and LSMGO are different priced products split on the ECA line (see
- * priceSeriesFor in bunkerEvents.ts) but the same vessel tank — a port
- * selling only LSMGO still counts as an MGO-capable port for this filter.
- */
 export function portHasGrade(port: Port, grade: VesselGrade): boolean {
-  if (port.grades.includes(grade)) return true;
-  if (grade === "MGO" && port.grades.includes("LSMGO")) return true;
-  return false;
+  return port.grades.includes(grade);
 }
 
 export interface FilterState {

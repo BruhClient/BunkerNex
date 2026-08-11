@@ -27,7 +27,7 @@ export const BRENT_KEY = "__BRENT";
 const PRICE_FILES = [
   "pricing/VLSFO Prices.csv",
   "pricing/HSGO Prices.csv",
-  "pricing/LSMGO_MGO Prices.csv",
+  "pricing/MGO Prices.csv",
   "pricing/MDO Prices.csv",
   "pricing/LNG Prices.csv",
   "pricing/Biofuel Prices.csv",
@@ -37,9 +37,6 @@ const PRICE_FILES = [
 /**
  * Grade suffixes, longest first so "MEOH VLSFOe" is matched before "MEOH"
  * and never mistaken for a plain VLSFO column.
- *
- * "LSMGO" must stay ahead of "MGO" for the same reason: the two are distinct
- * products on the Chief Engineer's sheet, and "<PORT> LSMGO" ends in "MGO".
  */
 const GRADE_SUFFIXES: Array<[string, Grade]> = [
   ["MEOH VLSFOE", "MEOH_VLSFOe"],
@@ -47,7 +44,6 @@ const GRADE_SUFFIXES: Array<[string, Grade]> = [
   ["MEOH", "MEOH"],
   ["HSFO", "HSFO"],
   ["VLSFO", "VLSFO"],
-  ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
   ["MDO", "MDO"],
   ["LNG", "LNG"],
@@ -183,8 +179,6 @@ export function bunkerPriceSnapshot(): BunkerPriceSnapshot {
     if (portKey === BRENT_KEY) continue;
 
     for (const vesselGrade of VESSEL_GRADES) {
-      // Which column values this tank depends on the port: the distillate tank
-      // is priced as LSMGO where the port sells the 0.10% grade, MGO elsewhere.
       const series = priceSeriesFor(vesselGrade, portKey);
       const points = byGrade.get(series);
       if (!points) continue;

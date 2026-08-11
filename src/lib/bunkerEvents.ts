@@ -12,68 +12,18 @@ import type { Grade, VesselGrade, VesselTrack } from "./types";
  */
 
 /**
- * Ports whose distillate market is the 0.10% LSMGO rather than plain MGO.
- *
- * Straight off the Chief Engineer's `TYPES OF FUEL.xlsx`, and the split is not
- * arbitrary — it falls on the ECA line. China and Korea cap sulphur at 0.10% at
- * berth, so what is sold there is the 0.10% distillate; Southeast Asia, India
- * and the Bay of Bengal sell plain MGO. Surabaya and Qui Nhon sit on the LSMGO
- * side because the sheet puts them there.
- *
- * Duplicated from data/pricing/bunker_basis.csv, where the split is reasoned
- * about, for the same reason ECA_PORTS is duplicated in lib/eca.ts: this module
- * is client-safe and must never reach for the CSV reader.
- */
-const LSMGO_PORTS: ReadonlySet<string> = new Set([
-  "CNNGB", // Ningbo
-  "CNNSA", // Nansha
-  "CNSHA", // Shanghai
-  "CNSHK", // Shekou
-  "CNTAO", // Qingdao
-  "CNTSN", // Tianjin
-  "CNXMN", // Xiamen
-  "CNYTN", // Yantian
-  "IDSUB", // Surabaya
-  "KRINC", // Incheon
-  "KRPUS", // Busan
-  "MYPKG", // Port Klang
-  "SGSIN", // Singapore
-  "VNUIH", // Qui Nhon
-
-  // Added with the Asia-Europe services. Rotterdam/Antwerp/Hamburg are
-  // assessed with an LSMGO column (not MGO) in the source data; Le Havre/
-  // Southampton/Felixstowe are modelled to match, per the North Sea/Channel
-  // cluster convention. Port Said and Valencia are modelled as plain MGO
-  // instead, matching Algeciras/Piraeus/Malta's Mediterranean convention —
-  // deliberately not listed here.
-  "NLRTM", // Rotterdam
-  "BEANR", // Antwerp
-  "DEHAM", // Hamburg
-  "FRLEH", // Le Havre
-  "GBSOU", // Southampton
-  "GBFXT", // Felixstowe
-]);
-
-/**
  * The price column a stem is valued against.
  *
- * `VesselGrade` and the pricing `Grade` both spell high-sulphur fuel "HSFO",
- * so that leg is now an identity mapping — kept explicit here anyway, since
- * this function's real job is the distillate tank below.
- *
- * The distillate tank resolves per port rather than to one fixed column. It is
- * the ECA compliance tank, so at a port selling the 0.10% grade that is what
- * goes into it — and most of this fleet's distillate stems are ECA switches into
- * China and Korea. Pricing those off a plain `MGO` column, as this did before
- * the sheet was reconciled, valued a 0.10% lift at a 0.50% product's price.
+ * `VesselGrade` and the pricing `Grade` both spell every grade the same way
+ * now, so this is an identity mapping — kept as a function anyway, since
+ * `stemDisplayGrade` and every caller already go through it, and the Chief
+ * Engineer's sheet's LSMGO/MGO split (reconciled into one "MGO" grade — see
+ * data/README.md) is exactly the kind of per-port distinction this function
+ * used to carry. If a future grade needs port-specific resolution again, this
+ * is where it goes.
  */
-export function priceSeriesFor(grade: VesselGrade, portCode: string): Grade {
-  if (grade === "VLSFO") return "VLSFO";
-  if (grade === "HSFO") return "HSFO";
-  if (grade === "MEOH") return "MEOH";
-  if (grade === "LNG") return "LNG";
-  if (grade === "B40") return "B40";
-  return LSMGO_PORTS.has(portCode) ? "LSMGO" : "MGO";
+export function priceSeriesFor(grade: VesselGrade, _portCode: string): Grade {
+  return grade;
 }
 
 /**
@@ -154,11 +104,10 @@ export interface BunkerEvent {
 }
 
 /**
- * The grade a stem should be *displayed* as, e.g. "LSMGO" rather than "MGO"
- * at the 14 ports that actually sell the 0.10% distillate. `event.grade` is
- * the tank (`VesselGrade`, port-independent — see TANK_SERIES); the resolved
- * price series already carries the port-specific product name via
- * priceSeriesFor, so prefer that wherever a stem is shown as text.
+ * The grade a stem should be *displayed* as. `event.grade` is the tank
+ * (`VesselGrade`, port-independent — see TANK_SERIES); this prefers the
+ * resolved price series via priceSeriesFor instead, so a stem's display name
+ * never silently drifts from what it was actually priced against.
  */
 export function stemDisplayGrade(event: BunkerEvent): Grade {
   return event.price?.series ?? event.grade;

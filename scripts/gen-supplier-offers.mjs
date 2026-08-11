@@ -45,7 +45,7 @@ const MIN_OFFERS = 3;
 const PRICE_FILES = [
   "VLSFO Prices.csv",
   "HSGO Prices.csv",
-  "LSMGO_MGO Prices.csv",
+  "MGO Prices.csv",
   "MDO Prices.csv",
   "LNG Prices.csv",
   "Biofuel Prices.csv",
@@ -58,7 +58,6 @@ const GRADE_SUFFIXES = [
   ["MEOH", "MEOH"],
   ["HSFO", "HSFO"],
   ["VLSFO", "VLSFO"],
-  ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
   ["MDO", "MDO"],
   ["LNG", "LNG"],
@@ -73,10 +72,10 @@ const GRADE_SUFFIXES = [
  * methanol restated in VLSFO- and MGO-equivalent energy terms, so quoting them
  * as separate fuel types would triple-count one market.
  */
-const OFFER_GRADES = ["VLSFO", "HSFO", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
+const OFFER_GRADES = ["VLSFO", "HSFO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
 
 /** Display order, matching GRADE_ORDER in src/lib/colors.ts. */
-const GRADE_ORDER = ["VLSFO", "HSFO", "LSMGO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
+const GRADE_ORDER = ["VLSFO", "HSFO", "MGO", "MDO", "LNG", "B24", "B40", "MEOH"];
 
 /**
  * The alternative fuels, which tier 3 is scoped to.

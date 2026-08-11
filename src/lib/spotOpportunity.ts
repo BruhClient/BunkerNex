@@ -12,7 +12,7 @@ import type { PortMarket } from "./types";
  */
 export interface OpportunisticTopUp {
   grade: SpotFuelGrade;
-  /** Residual tank headroom at evaluation time — a ceiling, not a quote. */
+  /** Residual tank headroom projected on arrival — a ceiling, not a quote. */
   suggestedQuantityMt: number;
   trend: TrendSignal;
   /** Full ranked result for the synthetic ask, reusing matchSpotRequest verbatim. */
@@ -33,8 +33,8 @@ function rationaleFor(grade: SpotFuelGrade, headroomMt: number, trend: TrendSign
 
 /**
  * Evaluates 0–2 opportunistic residual top-ups alongside a compliance-grade
- * (MGO/LSMGO) nomination inside an ECA. Reuses matchSpotRequest unmodified
- * for the ranking itself — this only decides whether to ask, not how to rank.
+ * (MGO) nomination inside an ECA. Reuses matchSpotRequest unmodified for the
+ * ranking itself — this only decides whether to ask, not how to rank.
  */
 export function evaluateOpportunisticTopUps(params: {
   request: SpotBunkerRequest;
@@ -46,7 +46,7 @@ export function evaluateOpportunisticTopUps(params: {
 }): OpportunisticTopUp[] {
   const { request, ctx, candidateGrades, trendFor, marketFor, emissionsCostFor } = params;
 
-  if (request.grade !== "MGO" && request.grade !== "LSMGO") return [];
+  if (request.grade !== "MGO") return [];
   if (!ctx.isEcaDestination) return [];
   if (ctx.residualHeadroomMt === null || ctx.residualHeadroomMt <= MIN_HEADROOM_MT) {
     return [];

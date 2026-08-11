@@ -15,17 +15,10 @@
 
 import { hasMarketFor, isEcaPort } from "./eca";
 
-/**
- * How each grade's market is named in a supply warning.
- *
- * Both distillates say "distillate": a port that sells neither LSMGO nor MGO
- * sells no distillate at all, and naming the specific grade would imply the
- * other one is available.
- */
+/** How each grade's market is named in a supply warning. */
 const GRADE_MARKET_LABEL: Record<SpotFuelGrade, string> = {
   HSFO: "high-sulphur",
   VLSFO: "VLSFO",
-  LSMGO: "distillate",
   MGO: "distillate",
 };
 import { portMeta } from "./ports";
@@ -37,15 +30,12 @@ import {
 } from "./types";
 import { activeGradeAt, buildLegs, stepTimestamp } from "./vesselPosition";
 
-/**
- * Grades the desk can be asked for.
- *
- * Wider than VesselGrade: a chief engineer distinguishes LSMGO from MGO — the
- * doc notes Pusan quotes LSMGO competitively — while the movement series models
- * a single distillate tank. `tankFor` collapses the pair back for anything
- * reading ROB off a track.
- */
-export type SpotFuelGrade = "HSFO" | "VLSFO" | "LSMGO" | "MGO";
+/** Grades the desk can be asked for — the tank set the movement series models. */
+export type SpotFuelGrade = "HSFO" | "VLSFO" | "MGO";
+
+function isSpotFuelGrade(grade: VesselGrade): grade is SpotFuelGrade {
+  return grade === "HSFO" || grade === "VLSFO" || grade === "MGO";
+}
 
 /** ISO 8217 editions the desk will accept. 2017 is the working standard. */
 export type IsoSpecVersion = "2024" | "2017" | "2012" | "2010";
@@ -65,12 +55,7 @@ export function isResidual(grade: SpotFuelGrade | null): boolean {
   return grade !== null && RESIDUAL_GRADES.has(grade);
 }
 
-/**
- * Which modelled tank a nominated grade draws on.
- *
- * LSMGO and MGO are one tank in the movement series — the source carries a
- * single distillate ROB column and no low-sulphur split.
- */
+/** Which modelled tank a nominated grade draws on. */
 export function tankFor(grade: SpotFuelGrade): VesselGrade {
   if (grade === "HSFO") return "HSFO";
   if (grade === "VLSFO") return "VLSFO";
@@ -90,7 +75,7 @@ export interface SpotBunkerRequest {
   // --- 2. Confirmed quantity and ROB calculations --------------------------
   /** Metric tonnes. Null until entered; 0 is an error, not a blank. */
   nominationMt: number | null;
-  /** The CE's own ROB reading. Prefilled from the track, then his to correct. */
+  /** Read-only: the movement series' ROB for the nominated tank, not CE-typed. */
   robMt: number | null;
   /** Burn to delivery. Derived from an assumed daily rate, not measured. */
   projectedConsumptionMt: number | null;
@@ -179,10 +164,22 @@ export interface SpotContext {
   daysToArrival: number | null;
   portStayDays: number | null;
   robByGrade: Record<VesselGrade, number>;
-  /** HSFO + VLSFO: both draw on the one Max_ROB_MT figure. */
+  /** HSFO + VLSFO, both at stepIndex: both draw on the one Max_ROB_MT figure. */
   residualRobMt: number;
+  /**
+   * Headroom projected for arrivalStep, not stepIndex — a stem lands in the
+   * tank on delivery at the port, after the vessel has burned down whatever
+   * it holds now over the transit. Reading straight off the current step
+   * understates how much room will actually be there: the movement series
+   * already simulated the burn for every step between here and arrival, so
+   * this reads that future ROB directly rather than re-deriving it from
+   * projectedBurnToArrivalMt's flat DWT-based rate.
+   */
   residualHeadroomMt: number | null;
-  /** MGO sits outside Max_ROB_MT and has its own, smaller tank. */
+  /**
+   * Same arrival-step basis as residualHeadroomMt. MGO sits outside
+   * Max_ROB_MT and has its own, smaller tank.
+   */
   mgoHeadroomMt: number | null;
   projectedBurnToArrivalMt: number | null;
   activeGrade: VesselGrade;
@@ -194,6 +191,17 @@ export interface SpotContext {
    * can sell HSFO and no VLSFO, or nothing at all.
    */
   markets: Record<VesselGrade, boolean>;
+  /**
+   * Grades this specific hull can physically lift, independent of what the
+   * destination port can supply. HSFO only on a scrubber-fitted hull; VLSFO
+   * always; MGO only when the vessel's ECA-compliance tank is actually MGO —
+   * a METHANOL_VESSELS/LNG_VESSELS/B40_VESSELS hull (VesselTrack.complianceGrade
+   * MEOH/LNG/B40) carries none of this form's three tanks at all, per
+   * CLAUDE.md's "A vessel carries exactly one compliance grade" note. The
+   * dropdown filters to this set so the desk cannot draft a lift the hull has
+   * no tank for; validateSpotRequest's grade check is the backstop.
+   */
+  carriedGrades: ReadonlySet<SpotFuelGrade>;
 }
 
 const HOURS_PER_DAY = 24;
@@ -295,14 +303,28 @@ export function deriveSpotContext(
   };
   const residualRobMt = robByGrade.HSFO + robByGrade.VLSFO;
 
+  // A nomination is delivered on arrival, not now, so headroom has to be
+  // measured against ROB at arrivalStep — the tank keeps burning down between
+  // stepIndex and then. The movement series already simulated that burn for
+  // every step in between (grade switches, ECA windows and all), so this
+  // reads the future figure straight off it rather than approximating one
+  // from projectedBurnToArrivalMt's flat, ungraded rate. Falls back to
+  // stepIndex when no leg was found (arrivalStep null) — nothing to project.
+  const arrivalRobStep = arrivalStep ?? stepIndex;
+  const residualRobAtArrivalMt =
+    (track.robMt.HSFO[arrivalRobStep] ?? 0) + (track.robMt.VLSFO[arrivalRobStep] ?? 0);
+  const mgoRobAtArrivalMt = track.robMt.MGO[arrivalRobStep] ?? 0;
+
   // Max_ROB_MT is 3% of deadweight — derived, not a measured tank. Headroom off
   // it is an estimate and can only ever warn.
   const residualHeadroomMt =
-    spec.maxRobMt === null ? null : Math.max(spec.maxRobMt - residualRobMt, 0);
+    spec.maxRobMt === null
+      ? null
+      : Math.max(spec.maxRobMt - residualRobAtArrivalMt, 0);
   const mgoHeadroomMt =
     spec.maxRobMt === null
       ? null
-      : Math.max(spec.maxRobMt * MGO_TANK_RATIO - robByGrade.MGO, 0);
+      : Math.max(spec.maxRobMt * MGO_TANK_RATIO - mgoRobAtArrivalMt, 0);
 
   const projectedBurnToArrivalMt =
     spec.consumptionTransitMtPerDay === null || daysToArrival === null
@@ -336,6 +358,11 @@ export function deriveSpotContext(
       LNG: false,
       B40: false,
     },
+    carriedGrades: new Set<SpotFuelGrade>([
+      ...(track.scrubber ? (["HSFO"] as const) : []),
+      "VLSFO",
+      ...(track.complianceGrade === "MGO" ? (["MGO"] as const) : []),
+    ]),
   };
 }
 
@@ -345,17 +372,25 @@ export function deriveSpotContext(
  * Only figures the data genuinely supports are filled.
  */
 export function prefillSpotRequest(ctx: SpotContext): SpotBunkerRequest {
-  // What the engine is burning now, not the hull's primary grade — those differ
-  // through every ECA call. Null when it's an alternative compliance fuel
-  // (methanol, LNG or B40): this form's ISO 8217/viscosity/pour-point fields
-  // model conventional and distillate fuel, not the IGF-Code territory
+  // A request bound for a port ECA needs the vessel's ECA-compliance grade, not
+  // whatever `ctx.activeGrade` reports it is burning right now — that figure
+  // lags the real switch until ECA_LEAD_STEPS out (see CLAUDE.md's ECA_PORTS
+  // section). This fleet gives scrubber-fitted hulls no exception inside an
+  // ECA: every vessel is on a compliance grade before it enters one. Only
+  // default to MGO if this hull actually carries that tank — a
+  // METHANOL_VESSELS/LNG_VESSELS/B40_VESSELS hull has no MGO tank at all (see
+  // ctx.carriedGrades) and gets no prefill while mid-ECA, same as it gets no
+  // prefill outside one below: this form's ISO 8217/viscosity/pour-point
+  // fields model conventional and distillate fuel, not the IGF-Code territory
   // methanol/LNG fall under or the biofuel-lifting convention B40 would need,
-  // so those vessels get no prefill while mid-ECA and the CE picks a grade
-  // manually.
-  const SPOT_FUEL_GRADES = new Set<VesselGrade>(["HSFO", "VLSFO", "MGO"]);
-  const grade: SpotFuelGrade | null = SPOT_FUEL_GRADES.has(ctx.activeGrade)
-    ? (ctx.activeGrade as SpotFuelGrade)
-    : null;
+  // so the CE picks a grade manually.
+  const grade: SpotFuelGrade | null = ctx.isEcaDestination
+    ? ctx.carriedGrades.has("MGO")
+      ? "MGO"
+      : null
+    : isSpotFuelGrade(ctx.activeGrade) && ctx.carriedGrades.has(ctx.activeGrade)
+      ? ctx.activeGrade
+      : null;
 
   return {
     grade,
@@ -372,7 +407,13 @@ export function prefillSpotRequest(ctx: SpotContext): SpotBunkerRequest {
     residualViscosityGrade: isResidual(grade) ? "380" : null,
     heaterConfirmedFor500Cst: false,
 
-    maxSulphurPct: ctx.isEcaDestination ? 0.1 : 0.5,
+    // HSFO has no real-world 0.50% spec ceiling — that's VLSFO's, not HSFO's —
+    // so defaulting to it produced a draft that failed the HSFO validation
+    // rule below before the engineer touched a field. ISO 8217 RMG grades run
+    // up to roughly 3.50%. `grade` can never be "HSFO" here when the
+    // destination is inside an ECA (see above), so this is a plain grade
+    // check, not a second ECA branch.
+    maxSulphurPct: ctx.isEcaDestination ? 0.1 : grade === "HSFO" ? 3.5 : 0.5,
     minFlashPointC: 70,
     supplierFlashDeclarationRequired: true,
 
@@ -434,25 +475,25 @@ export function validateSpotRequest(
 
   const { grade } = draft;
   const residual = isResidual(grade);
-  const distillate = grade === "MGO" || grade === "LSMGO";
+  const distillate = grade === "MGO";
 
   // --- 1. Grade and ISO ----------------------------------------------------
   if (grade === null) {
     err("grade", "Nominate a grade.");
-  } else if (grade === "HSFO") {
-    // Unreachable through the UI, which disables the segment. Guards a draft
-    // mutated any other way.
-    if (!ctx.scrubberFitted) {
-      err(
-        "grade",
-        "No scrubber fitted — HSFO is not a lawful lift for this hull.",
-      );
-    } else if (!draft.scrubberOperational) {
-      err(
-        "scrubberOperational",
-        "Confirm the scrubber is fully operational. The specifications sheet records a fitting, not an operating state.",
-      );
-    }
+  } else if (!ctx.carriedGrades.has(grade)) {
+    // Unreachable through the UI, which disables any segment the hull does
+    // not carry. Guards a draft mutated any other way.
+    err(
+      "grade",
+      grade === "HSFO"
+        ? "No scrubber fitted — HSFO is not a lawful lift for this hull."
+        : "This hull's ECA-compliance tank is not MGO — it has no MGO to lift.",
+    );
+  } else if (grade === "HSFO" && !draft.scrubberOperational) {
+    err(
+      "scrubberOperational",
+      "Confirm the scrubber is fully operational. The specifications sheet records a fitting, not an operating state.",
+    );
   }
 
   // Supply, for whichever grade is actually selected. Every grade has ports
@@ -484,7 +525,7 @@ export function validateSpotRequest(
     if (headroom !== null && draft.nominationMt > headroom) {
       warn(
         "nominationMt",
-        `${Math.round(draft.nominationMt)} MT exceeds the ${Math.round(headroom)} MT headroom. Capacity is a percentage of deadweight — a derived figure, not a measured tank.`,
+        `${Math.round(draft.nominationMt)} MT exceeds the ${Math.round(headroom)} MT headroom projected on arrival. Capacity is a percentage of deadweight — a derived figure, not a measured tank.`,
       );
     }
   }
@@ -528,8 +569,11 @@ export function validateSpotRequest(
         `${ctx.portName ?? ctx.portCode} caps sulphur at 0.10%.`,
       );
     }
-    if (grade === "HSFO" && sulphur <= 0.5) {
-      err("maxSulphurPct", "HSFO cannot meet a 0.50% cap.");
+    if (grade === "HSFO" && sulphur <= 0.5 && !draft.scrubberOperational) {
+      err(
+        "maxSulphurPct",
+        "HSFO cannot meet a 0.50% cap without an operational scrubber — an exhaust gas cleaning system is IMO's recognised equivalent compliance method for the global sulphur cap.",
+      );
     }
     if (grade === "VLSFO" && sulphur > 0.5) {
       warn("maxSulphurPct", "VLSFO is a 0.50% grade.");
@@ -575,6 +619,10 @@ export function validateSpotRequest(
       err("bargePairingGrade", "Name the second grade on the barge.");
     } else if (draft.bargePairingGrade === grade) {
       err("bargePairingGrade", "A dual-grade barge needs two different grades.");
+    } else if (!ctx.carriedGrades.has(draft.bargePairingGrade)) {
+      // Same backstop as the primary grade check above — unreachable through
+      // the UI once its options are filtered to ctx.carriedGrades too.
+      err("bargePairingGrade", "This hull does not carry that grade.");
     }
   }
 

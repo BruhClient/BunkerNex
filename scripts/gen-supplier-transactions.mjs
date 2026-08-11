@@ -82,13 +82,6 @@ const TIER_NEGOTIABILITY = {
   4: [0.004, 0.018],
 };
 
-/** Ports whose distillate market is 0.10% LSMGO. Mirrors src/lib/bunkerEvents.ts. */
-const LSMGO_PORTS = new Set([
-  "CNNGB", "CNNSA", "CNSHA", "CNSHK", "CNTAO", "CNTSN", "CNXMN", "CNYTN",
-  "IDSUB", "KRINC", "KRPUS", "MYPKG", "SGSIN", "VNUIH",
-  "NLRTM", "BEANR", "DEHAM", "FRLEH", "GBSOU", "GBFXT",
-]);
-
 /** Movement-sheet tank column -> the tank it represents. */
 const TANK_COLUMNS = [
   ["VLSFO_Bunkered_MT", "VLSFO"],
@@ -100,8 +93,7 @@ const TANK_COLUMNS = [
 ];
 
 /** The price column a tank's stem is valued against. Mirrors priceSeriesFor(). */
-function priceSeriesFor(tank, portCode) {
-  if (tank === "MGO") return LSMGO_PORTS.has(portCode) ? "LSMGO" : "MGO";
+function priceSeriesFor(tank, _portCode) {
   return tank;
 }
 

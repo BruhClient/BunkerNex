@@ -89,12 +89,7 @@ export const NO_VLSFO_PORTS: ReadonlySet<string> = new Set([
   "MMRGN", // Yangon
 ]);
 
-/**
- * The 5 ports with no distillate market of either grade.
- *
- * LSMGO and MGO are one market for this purpose — which of the two a port sells
- * changes the price column, never whether the tank can be filled.
- */
+/** The 5 ports with no distillate market at all. */
 export const NO_MGO_PORTS: ReadonlySet<string> = new Set([
   "CNQZH", // Qinzhou
   "INCCU", // Kolkata

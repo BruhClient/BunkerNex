@@ -1,6 +1,6 @@
 import { isResidual, shiftTimestamp, type SpotBunkerRequest, type SpotContext } from "./spotBunker";
 import type { RankedOffer } from "./spotMatch";
-import type { VesselSpec } from "./types";
+import { MGO_TANK_RATIO, type VesselSpec } from "./types";
 
 /**
  * Cost breakdown + ROB trajectory for the winning offer, computed server-side
@@ -71,9 +71,15 @@ export function simulateBunkering(
   const robAtArrival = Math.max(robNow - burnToArrival, 0);
   const robAfterDelivery = robAtArrival + nominationMt;
 
-  const headroom =
-    grade !== null && isResidual(grade) ? ctx.residualHeadroomMt : ctx.mgoHeadroomMt;
-  const capacityMt = headroom !== null ? robAtArrival + headroom : null;
+  // The tank's fixed size, not robAtArrival + headroom: ctx's headroom is
+  // itself already projected onto arrival off the simulated movement series,
+  // so adding it to this function's own, separately-estimated robAtArrival
+  // (built from the CE-editable robMt/projectedConsumptionMt fields, not the
+  // simulation) would double-count the burn-to-arrival instead of cancelling
+  // it out.
+  const residual = grade !== null && isResidual(grade);
+  const capacityMt =
+    spec.maxRobMt === null ? null : residual ? spec.maxRobMt : spec.maxRobMt * MGO_TANK_RATIO;
   const headroomExceeded = capacityMt !== null && robAfterDelivery > capacityMt;
 
   const berthRate = spec.consumptionBerthMtPerDay ?? 0;

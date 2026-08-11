@@ -452,6 +452,24 @@ export default function SpotBunkerPanel({
     });
   }, []);
 
+  // A wrong default should never rely on the engineer finding a shut section to
+  // discover why the submit button won't enable. Any section that already
+  // carries an error on the very first paint — the field's default was wrong,
+  // not something the engineer typed — opens automatically. Mount-only: once
+  // open, a section stays exactly where the engineer leaves it, even if a
+  // later edit clears or introduces an error, so it does not fight a manual
+  // toggle.
+  useEffect(() => {
+    setOpenSections((prev) => {
+      const withErrors = SECTION_ORDER.filter((id) =>
+        (bySection.get(id) ?? []).some((i) => i.level === "error"),
+      );
+      if (withErrors.every((id) => prev.has(id))) return prev;
+      return new Set([...prev, ...withErrors]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const sectionEls = useRef(new Map<SectionId, HTMLElement>());
   const registerSection = useCallback(
     (id: SectionId, el: HTMLElement | null) => {
@@ -475,6 +493,8 @@ export default function SpotBunkerPanel({
     etaTo: useFieldId("etat"),
     etdFrom: useFieldId("etdf"),
     etdTo: useFieldId("etdt"),
+    port: useFieldId("port"),
+    headroom: useFieldId("headroom"),
     delivery: useFieldId("del"),
     pairGrade: useFieldId("pair"),
     surveyor: useFieldId("surv"),
@@ -528,36 +548,43 @@ export default function SpotBunkerPanel({
   };
 
   const residual = isResidual(value.grade);
-  const distillate = value.grade === "MGO" || value.grade === "LSMGO";
+  const distillate = value.grade === "MGO";
 
+  // Only the grades this specific hull actually carries are selectable —
+  // ctx.carriedGrades (src/lib/spotBunker.ts) accounts for scrubber fitting
+  // and, separately, whether this hull's one ECA-compliance tank is MGO at
+  // all (a METHANOL_VESSELS/LNG_VESSELS/B40_VESSELS hull carries none of
+  // this form's three tanks). validateSpotRequest enforces the same set as a
+  // backstop if a draft is ever mutated some other way.
   const gradeOptions: ReadonlyArray<Option<SpotFuelGrade>> = [
     {
       value: "HSFO",
       label: "HSFO",
-      disabled: !ctx.scrubberFitted,
-      disabledReason: ctx.scrubberFitted
+      disabled: !ctx.carriedGrades.has("HSFO"),
+      disabledReason: ctx.carriedGrades.has("HSFO")
         ? undefined
         : "No scrubber fitted — HSFO is not a lawful lift for this hull.",
     },
     { value: "VLSFO", label: "VLSFO" },
-    { value: "LSMGO", label: "LSMGO" },
-    { value: "MGO", label: "MGO" },
+    {
+      value: "MGO",
+      label: "MGO",
+      disabled: !ctx.carriedGrades.has("MGO"),
+      disabledReason: ctx.carriedGrades.has("MGO")
+        ? undefined
+        : "This hull's ECA-compliance tank is not MGO — it has no MGO to lift.",
+    },
   ];
 
   /**
-   * Changing grade moves the ROB reading to the new tank — but only when the
-   * engineer has not corrected it. Comparing against what prefill would have
-   * produced for the outgoing grade keeps that stateless, so it survives the
-   * panel unmounting when he steps back to the vessel.
+   * Changing grade moves the ROB reading to the new tank. Current ROB is a
+   * read-only figure off the movement series, not a CE-typed one, so this
+   * always re-syncs it rather than only when the engineer hasn't touched it.
    */
   const selectGrade = (next: SpotFuelGrade) => {
-    const prevTank = value.grade ? tankFor(value.grade) : null;
-    const robUntouched =
-      prevTank !== null && value.robMt === ctx.robByGrade[prevTank];
-
     patch({
       grade: next,
-      robMt: robUntouched ? ctx.robByGrade[tankFor(next)] : value.robMt,
+      robMt: ctx.robByGrade[tankFor(next)],
       // A distillate has no 380/500 choice; a residual defaults to 380.
       residualViscosityGrade: isResidual(next)
         ? (value.residualViscosityGrade ?? "380")
@@ -647,9 +674,10 @@ export default function SpotBunkerPanel({
           <Field
             label="Required grade"
             hint={
-              ctx.scrubberFitted
-                ? "Scrubber fitted, so HSFO is available to this hull."
-                : "No scrubber fitted, so HSFO is struck out — it is not a lawful lift here."
+              gradeOptions
+                .filter((o) => o.disabled && o.disabledReason)
+                .map((o) => o.disabledReason)
+                .join(" ") || "Every grade below is a lawful lift for this hull."
             }
             error={err("grade")}
           >
@@ -692,11 +720,7 @@ export default function SpotBunkerPanel({
           <Field
             label="Nomination"
             htmlFor={ids.nomination}
-            hint={
-              headroom === null
-                ? "No capacity figure exists for this vessel."
-                : `About ${formatMt(headroom)} MT of headroom in the ${residual ? "residual" : "distillate"} tank.`
-            }
+            hint="See headroom on arrival below before nominating a quantity."
             error={err("nominationMt")}
           >
             <NumberInput
@@ -714,15 +738,16 @@ export default function SpotBunkerPanel({
             <Field
               label="Current ROB"
               htmlFor={ids.rob}
-              hint="From the movement series."
+              hint="Read off the movement series — not typed."
               error={err("robMt")}
             >
               <NumberInput
                 id={ids.rob}
                 value={value.robMt}
-                onChange={(v) => patch({ robMt: v })}
+                onChange={() => {}}
                 unit="MT"
                 step={1}
+                disabled
               />
             </Field>
             <Field
@@ -740,6 +765,26 @@ export default function SpotBunkerPanel({
               />
             </Field>
           </FieldRow>
+
+          <Field
+            label="Headroom on arrival"
+            htmlFor={ids.headroom}
+            hint={
+              headroom === null
+                ? "No capacity figure exists for this vessel."
+                : headroom === 0
+                  ? `Tank projected full on arrival at ${ctx.portName ?? ctx.portCode ?? "port"} — no room for a top-up until it burns down.`
+                  : `Room left in the ${residual ? "residual" : "distillate"} tank once the vessel reaches ${ctx.portName ?? ctx.portCode ?? "port"} — Current ROB minus the burn already simulated for the leg, not today's figure.`
+            }
+          >
+            <NumberInput
+              id={ids.headroom}
+              value={headroom}
+              onChange={() => {}}
+              unit="MT"
+              disabled
+            />
+          </Field>
 
           <FieldRow>
             <Field label="Port stay" htmlFor={ids.stay}>
@@ -827,7 +872,11 @@ export default function SpotBunkerPanel({
             hint={
               ctx.isEcaDestination
                 ? `${ctx.portName ?? ctx.portCode} sits inside a port ECA: 0.10% maximum.`
-                : "0.50% is the global cap; a port ECA cuts it to 0.10%."
+                : value.grade === "HSFO"
+                  ? value.scrubberOperational
+                    ? "With the scrubber confirmed operational, HSFO meets the 0.50% global cap through equivalent compliance — ISO 8217 RMG grades still run up to roughly 3.50%."
+                    : "HSFO has no 0.50% spec — that's VLSFO's ceiling. ISO 8217 RMG grades run up to roughly 3.50%, unless an operational scrubber is confirmed above."
+                  : "0.50% is the global cap; a port ECA cuts it to 0.10%."
             }
             error={err("maxSulphurPct")}
           >
@@ -919,6 +968,19 @@ export default function SpotBunkerPanel({
 
           <Field
             label="Bunkering location"
+            htmlFor={ids.port}
+            hint="Always the vessel's next port on this leg — read-only here, set from its current position."
+          >
+            <TextInput
+              id={ids.port}
+              value={ctx.portName ?? ctx.portCode}
+              onChange={() => {}}
+              disabled
+            />
+          </Field>
+
+          <Field
+            label="Bunkering Method"
             htmlFor={ids.delivery}
             error={err("deliveryLocation")}
           >

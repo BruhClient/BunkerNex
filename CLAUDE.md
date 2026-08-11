@@ -61,7 +61,7 @@ Each tank ratio (`MEOH_MAX_RATIO`/`LNG_MAX_RATIO`/`B40_MAX_RATIO`, mirrored as `
 
 `Active_Fuel` (column 9) names the burning grade per row. **Read it; do not infer it** — a tank standing still is indistinguishable from a tank not being burned, and the compliance tank is flat all window for the vessels on ECA-free rotations (BD1, BD2, CAS, YGS). `activeGradeAt` in `src/lib/vesselPosition.ts` is the only decoder; client-side, the packed `activeGrades` char is `H`/`V`/`M`/`E`/`N`/`B` (HSFO/VLSFO/MGO/MEOH/LNG/B40) — not the string's first letter, since `"MGO"` and `"MEOH"` collide there.
 
-**The bunker log displays LSMGO where a stem actually priced as LSMGO, not just MGO.** LSMGO and MGO are the same product in this model (identical 42.7 GJ/mt) and `priceSeriesFor()` already resolves a distillate stem to whichever the port sells — the gap was purely that `BunkerLog.tsx`/`VesselStems.tsx` printed the raw tank name instead of that resolution. Both now call `stemDisplayGrade()` (`src/lib/bunkerEvents.ts`) instead of reading `event.grade` directly. `Active_Fuel` and the packed char encoding are unaffected — the tank itself is still `"MGO"`.
+**The bunker log resolves a stem's display grade through `stemDisplayGrade()`** (`src/lib/bunkerEvents.ts`), not by reading `event.grade` directly — `BunkerLog.tsx`/`VesselStems.tsx` both call it. This predates the LSMGO/MGO merge above, when the two were still separate priced products; now that `priceSeriesFor()` is an identity mapping the distinction is moot, but the indirection stays as the correct place a future grade split would go. `Active_Fuel` and the packed char encoding are unaffected — the tank itself is still `"MGO"`.
 
 Twelve of the 27 Asia-Europe vessels (deployed on AE1, AE2, AE3 and AE5) carry `Max_ROB_MT`/`Min_ROB_MT`/`Bunkering_Trigger_MT` raised above the fleet-standard 3%/1%-of-DWT ratio, documented per-vessel in `PIL_Fleet_Vessel_Specifications.csv` `Data_Notes`. Every vessel in this fleet has an *identical* unrefuelled residual-tank range regardless of size — `Max_ROB_MT`, `Min_ROB_MT` and `Consumption_Transit_MT_Per_Day` are all fixed percentages of `DWT_MT`, so the ratios cancel to a flat ~22.2 days for any ship — and those four services each have a single leg (23-26 days, no intermediate call) that no vessel at the standard ratio can sail without bunkering mid-ocean. This is a real, checkable constraint, not a modelling gap: if you resize a vessel on one of these four services, re-derive against its longest `Transit_To_Next_Days` gap.
 
@@ -93,7 +93,7 @@ Adding a pricing port needs both an alias entry and a `PORT_COORDS` entry, or th
 
 ### Most price columns are modelled, and nothing marks them
 
-Only 10 of the 45 ports this fleet stems at are assessed — Singapore, Busan, Shanghai, Rotterdam, Antwerp, Hamburg, Algeciras, Piraeus, Malta and Colombo. 28 more carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `LSMGO_MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
+Only 10 of the 45 ports this fleet stems at are assessed — Singapore, Busan, Shanghai, Rotterdam, Antwerp, Hamburg, Algeciras, Piraeus, Malta and Colombo. 28 more carry **modelled** columns: an assessed hub series plus a documented basis differential, generated from `data/pricing/bunker_basis.csv` by `scripts/gen-modelled-prices.mjs` and written into `VLSFO Prices.csv`, `HSGO Prices.csv` and `MGO Prices.csv` under the ordinary `<PORT> <GRADE>` convention.
 
 **7 route ports carry no pricing at all** — Cai Mep, Kaohsiung, Yantian, Karachi, Hazira, Mundra, Nhava Sheva, added with the Asia-Europe services. Every prior route port had some pricing coverage (assessed or modelled); these are the first that don't. A vessel still stems its published `Bunker_Quantity_MT` there in the fleet movement simulation — that logic doesn't consult pricing at all — but `bunkerPriceSnapshot()` has nothing to resolve the stem's value against, so it renders with a null price rather than a number. This is a deliberate scope boundary, not a bug: these 7 were never in scope for the modelled-pricing pass (only the 5 Europe ports with zero coverage were), and adding real pricing for them would mean inventing a basis with no CE-sheet or assessed-market anchor at all, unlike even the softest existing modelled columns.
 
@@ -103,10 +103,10 @@ Only 10 of the 45 ports this fleet stems at are assessed — Singapore, Busan, S
 
 Two things the sheet does **not** get the last word on, both deliberate:
 
-- **Assessed columns are never deleted.** The sheet lists only LSMGO at Busan and Shanghai, but `BUSAN MGO` and `SHANGHAI MGO` are real assessments in the source workbook. They stay; the sheet governs modelled columns and stem routing, so no stem prices off them.
+- **Assessed columns are never deleted.** The sheet lists only the 0.10% distillate at Busan and Shanghai, but `BUSAN MGO` and `SHANGHAI MGO` are real assessments in the source workbook. Since the LSMGO/MGO merge (see below) they are exactly what stems price off — the modelled LSMGO-labelled column that used to win at both ports was retired in favour of the assessed one.
 - **Bangladesh VLSFO.** The sheet omits it at Chittagong and Mongla while PORTLAND advertises VLSFO 0.50% at all three Bangladeshi seaports. The sheet wins by decision, with the contrary source recorded in the blanked rows' `Data_Notes`.
 
-**`LSMGO` and `MGO` are different products, and the split falls on the ECA line.** China, Korea, Port Klang, Singapore, Surabaya and Qui Nhon sell the 0.10% distillate; Southeast Asia, India and the Bay of Bengal sell plain MGO. So `PRICE_SERIES` is gone — `priceSeriesFor(grade, portCode)` in `src/lib/bunkerEvents.ts` resolves a vessel's distillate tank to whichever column its port actually sells. Pricing an ECA switch off a plain `MGO` column, as this did before, valued a 0.10% lift at a 0.50% product's price. Use `TANK_SERIES` for colours and labels: a tank's colour must not change with the berth.
+**`LSMGO` and `MGO` are treated as one product, `MGO`.** The Chief Engineer's sheet lists them separately and splits them on the ECA line — China, Korea, Port Klang, Singapore, Surabaya and Qui Nhon sold the 0.10% distillate; Southeast Asia, India and the Bay of Bengal sold plain MGO — but both are the same 42.7 GJ/mt distillate base, and this app now prices, labels and burns them as a single grade. `priceSeriesFor(grade, portCode)` in `src/lib/bunkerEvents.ts` is consequently an identity mapping; `data/pricing/MGO Prices.csv` (renamed from `LSMGO_MGO Prices.csv`) carries one column per port. Four ports had two independently priced series before the merge and needed a resolution rule, recorded in `data/README.md`: assessed data wins over modelled, and where both sides were the same tier the value already used for stem pricing (the former LSMGO side) survived. `TANK_SERIES` is unaffected — a tank's colour was already port-independent.
 
 Beyond the fossil grades the sheet adds four fuels, all modelled from the hubs beside them:
 
@@ -195,7 +195,7 @@ Unlike every other CSV under `data/`, this one has no generator script and no ru
 consumer — no page, API route, or `src/lib` module parses it. It's a hand-researched
 lookup of lower calorific value (LCV/NCV), in GJ/mt (numerically the same as MJ/kg),
 for every fossil, biofuel and alternative grade the app tracks: `HSFO`, `VLSFO`,
-`LSMGO`, `MGO`, `MDO`, `LNG`, `MEOH`, `B24`, `B40`, plus a reference-only `FAME_B100`
+`MGO`, `MDO`, `LNG`, `MEOH`, `B24`, `B40`, plus a reference-only `FAME_B100`
 row that the B24/B40 blend figures are calculated from (76/24 and 60/40 splits against
 VLSFO and MGO respectively). Primary source is IMO Resolution MEPC.364(79)'s LCV table;
 VLSFO uses an Integr8/Ship & Bunker ISO 8217 assessed average instead, since the IMO

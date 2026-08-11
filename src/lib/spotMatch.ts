@@ -85,12 +85,13 @@ export function matchSpotRequest(inputs: MatchInputs): SpotMatchResult {
     return empty(`No supplier offers quoted for ${grade} at ${portLabel}.`);
   }
 
-  // Tank headroom mirrors validateSpotRequest()'s own treatment: a derived
-  // figure, not a measured tank, so it can only ever warn — never disqualify.
+  // Tank headroom mirrors validateSpotRequest()'s own treatment: projected on
+  // arrival, a derived figure rather than a measured tank, so it can only
+  // ever warn — never disqualify.
   const headroom = isResidual(grade) ? ctx.residualHeadroomMt : ctx.mgoHeadroomMt;
   if (headroom !== null && nominationMt > headroom) {
     warnings.push(
-      `${Math.round(nominationMt)} MT exceeds the ${Math.round(headroom)} MT estimated tank headroom.`,
+      `${Math.round(nominationMt)} MT exceeds the ${Math.round(headroom)} MT estimated tank headroom on arrival.`,
     );
   }
 

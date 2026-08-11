@@ -12,9 +12,9 @@ export type Co2eFactors = Record<VesselGrade, number>;
 
 /**
  * Reads data/emissions/CO2_per_mt.csv and picks out the six grades this
- * fleet actually burns (VESSEL_GRADES) by their Grade column. LSMGO, MDO,
- * B24 and the blank-Grade FAME_B100 reference row are ignored — none of
- * them is a tank this fleet carries.
+ * fleet actually burns (VESSEL_GRADES) by their Grade column. MDO, B24 and
+ * the blank-Grade FAME_B100 reference row are ignored — none of them is a
+ * tank this fleet carries.
  */
 export function loadCo2eFactors(): Co2eFactors {
   const { rows } = readCsv("emissions/CO2_per_mt.csv");
@@ -48,13 +48,7 @@ export interface Co2eCostPoint {
   costUsdPerMt: Record<VesselGrade, number>;
 }
 
-/**
- * Reads data/emissions/co2e_cost_per_mt.csv. The CSV carries both an MGO
- * and an LSMGO column with numerically identical values (they share one
- * CO2e factor) — the MGO column is read here, matching the standing rule
- * that a tank's identity is always "MGO" regardless of which priced
- * product it resolves to (src/lib/bunkerEvents.ts, stemDisplayGrade()).
- */
+/** Reads data/emissions/co2e_cost_per_mt.csv. */
 export function loadCo2eCostSeries(): Co2eCostPoint[] {
   const { rows } = readCsv("emissions/co2e_cost_per_mt.csv");
 

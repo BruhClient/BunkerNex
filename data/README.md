@@ -33,13 +33,13 @@ have the account activated with the service provider.
 | `Brent Prices.csv` | `Brent`, `BrentPMT` | 1966 | 2019-01-02 → 2026-08-05 |
 | `VLSFO Prices.csv` | 48 columns: 25 assessed ports + **23 modelled** | 1973 | 2019-01-02 → 2026-08-05 |
 | `HSGO Prices.csv` | 33 columns: 12 assessed + **21 modelled**, `HSFO` | 1973 | 2019-01-02 → 2026-08-05 |
-| `LSMGO_MGO Prices.csv` | 54 columns: 28 assessed + **15 modelled `LSMGO`** + **11 modelled `MGO`** | 1973 | 2019-01-02 → 2026-08-05 |
+| `MGO Prices.csv` | 49 columns, all `MGO` — 26 assessed + **23 modelled** | 1973 | 2019-01-02 → 2026-08-05 |
 | `MDO Prices.csv` | 2 columns, both modelled — Chittagong and Mongla | 1973 | 2019-01-02 → 2026-08-05 |
 | `LNG Prices.csv` | 5 columns: 1 **reconstructed** hub + 4 modelled — see below | 1973 | 2021-10-01 → 2026-08-05 |
 | `lng_anchors.csv` | published JKM and premium anchors behind the LNG hub — **not a price sheet** | 10 | anchors from 2021-09-30 |
 | `Biofuel Prices.csv` | 7 columns, all modelled — 5 × `B24`, 2 × `B40` | 1973 | 2019-01-02 → 2026-08-05 |
 | `Methanol Prices.csv` | 13 columns, `MEOH` + `VLSFOe`/`MGOe` equivalents + **1 modelled** (Ningbo) | 188 | 2022-12-16 → 2026-08-03 |
-| `bunker_basis.csv` | provenance for the modelled columns — **not a price sheet**, and not read by the app | 284 | segments from 2019-01-02 |
+| `bunker_basis.csv` | provenance for the modelled columns — **not a price sheet**, and not read by the app | 263 | segments from 2019-01-02 |
 
 `MDO Prices.csv` and `Biofuel Prices.csv` carry no assessed columns at all: every value
 in them is modelled. They share the date spine of the three fossil sheets.
@@ -81,22 +81,50 @@ existed.
 **Two places the sheet does not get the last word,** both stated rather than quietly
 resolved:
 
-- **Assessed columns are never deleted.** The sheet lists only LSMGO at Busan and
-  Shanghai, but `BUSAN MGO` and `SHANGHAI MGO` are real assessments in the source
-  workbook. Deleting sourced data to match a summary sheet would destroy provenance.
-  Both stay; the sheet governs modelled columns and stem routing, so nothing prices
-  off them.
+- **Assessed columns are never deleted.** The sheet lists only the 0.10% distillate at
+  Busan and Shanghai, but `BUSAN MGO` and `SHANGHAI MGO` are real assessments in the
+  source workbook. Deleting sourced data to match a summary sheet would destroy
+  provenance. Both stayed, and since the LSMGO/MGO merge (below) they are exactly what
+  stems price off — the modelled LSMGO-labelled column that used to win at both ports
+  was retired in the assessed column's favour.
 - **Bangladesh VLSFO.** PORTLAND (plibd.com) advertises VLSFO 0.50% across all three
   Bangladeshi seaports, and BunkaOil supplies IFO 380/180 and MGO at Chittagong and
   Mongla. The sheet omits VLSFO there. It wins by decision, and the contrary source is
   recorded in the `Data_Notes` of the blanked rows.
 
-**LSMGO and MGO are different products, and the split falls on the ECA line.** China,
-Korea, Port Klang, Singapore, Surabaya and Qui Nhon sell the 0.10% distillate; Southeast
-Asia, India and the Bay of Bengal sell plain MGO. `priceSeriesFor()` in
-`src/lib/bunkerEvents.ts` resolves a vessel's distillate tank per port accordingly.
+**LSMGO and MGO are treated as one product, `MGO`.** The sheet lists them separately
+and splits them on the ECA line — China, Korea, Port Klang, Singapore, Surabaya and Qui
+Nhon sold the 0.10% distillate; Southeast Asia, India and the Bay of Bengal sold plain
+MGO — but this app now prices, labels and burns them as a single grade: same 42.7 GJ/mt
+distillate base, same tank, and no operational reason for a chief engineer to treat a
+0.10%-vs-0.50% spec difference as two different fuels for planning purposes.
+`priceSeriesFor()` in `src/lib/bunkerEvents.ts` is now an identity mapping.
+
+`data/pricing/LSMGO_MGO Prices.csv` was renamed to `MGO Prices.csv`, with one merged
+column per port. Four ports carried two independently priced series and needed a
+resolution rule when the merge collapsed them into one column — recorded here since
+nothing at runtime can reconstruct the choice:
+
+- **Singapore and Rotterdam:** both series were assessed. Kept the LSMGO side's values
+  (continuity with what stems already priced against — see below), dropped the MGO side.
+- **Busan and Shanghai:** `BUSAN MGO`/`SHANGHAI MGO` were assessed; the LSMGO side at
+  both was modelled off the Singapore LSMGO hub via `bunker_basis.csv`. Assessed data
+  wins over modelled — kept the MGO side, retired the modelled LSMGO row-sets from
+  `bunker_basis.csv` entirely (`KRPUS`/`CNSHA` no longer appear there for this grade).
+- **Port Klang:** both sides were modelled, off different bases (LSMGO off the Singapore
+  LSMGO hub, MGO off the Singapore MGO hub) with no assessed anchor to prefer. Kept the
+  LSMGO side for the same stem-pricing continuity as Singapore/Rotterdam above.
+
+Every other conflicted port (the China/Korea/Southeast Asia cluster, Antwerp, Hamburg,
+Felixstowe, Southampton, Le Havre) had real data on only one side — the other was either
+absent entirely or a blank `no_market` placeholder in `bunker_basis.csv` — so those were
+a pure rename, no value in the app changed.
+
 Before this reconciliation every distillate stem priced off a plain `MGO` column,
-which valued each China/Korea ECA switch at a 0.50% product's price.
+which valued each China/Korea ECA switch at a 0.50% product's price; that fix (the
+LSMGO/MGO split existing at all) predates this merge and is retained in spirit — a
+0.10% ECA lift is still a different priced moment from a 0.50%-market MGO lift, it is
+simply no longer a different *grade* in this dataset.
 
 #### The four fuels the sheet added
 
@@ -296,7 +324,7 @@ regional convention — Busan, Hong Kong and Shanghai are already labelled `MGO`
 `LSMGO` shows up mostly at Japan/Europe/Americas ports.
 
 The basis itself reads across the assessed `HONGKONG MGO`, `SHANGHAI MGO` and
-`BUSAN MGO` minus `SINGAPORE MGO` spreads already in `LSMGO_MGO Prices.csv`. That
+`BUSAN MGO` minus `SINGAPORE MGO` spreads already in `MGO Prices.csv`. That
 spread is considerably noisier than VLSFO's — `SHANGHAI MGO − SINGAPORE MGO` swings
 from a 2019 mean of −385 (sd 318, almost certainly thin-liquidity days rather than a
 real signal) to a 2022 mean of +98 — so Singapore-hub ports are bracketed against the
@@ -457,12 +485,13 @@ assessed HSFO column, so they can't serve as a hub for that grade regardless of
 proximity). None of these five have Chief Engineer sheet coverage, so every basis figure
 in `bunker_basis.csv` for them is `Confidence=judgment` with no source — the softest
 priced columns in the app, softer even than B24-off-a-modelled-hub. Le Havre, Southampton
-and Felixstowe are modelled as LSMGO (matching the Rotterdam/Antwerp/Hamburg North
-Sea-Channel cluster, which is assessed with an LSMGO column, not MGO); Port Said and
-Valencia are modelled as plain MGO (matching the Algeciras/Piraeus/Malta Mediterranean
-cluster). `LSMGO_PORTS` in `src/lib/bunkerEvents.ts` — the client-safe duplicate that
-resolves which price column a distillate stem reads — was updated to match; get the two
-out of step and a stem at one of these ports prices off the wrong grade.
+and Felixstowe were modelled off the North Sea/Channel cluster's basis segments (what was
+labelled LSMGO before the LSMGO/MGO merge, above); Port Said and Valencia off the
+Algeciras/Piraeus/Malta Mediterranean cluster (always plain MGO). Both land in the same
+merged `MGO` column today, so this distinction no longer routes a stem to a different
+price column the way it did before the merge — but it is still why these five ports'
+basis figures sit where they do, and matters again if the two products are ever split
+back apart.
 
 **Algeciras, Piraeus and Malta joined `NO_HSFO_PORTS`** in both
 `scripts/gen-vessel-movement.mjs` and its client-safe duplicate `src/lib/eca.ts` — not a
@@ -1162,17 +1191,18 @@ MGO remains the compliance grade on the rest of the Asia-Europe/Mediterranean/EU
 fleet, the services with no qualifying alternative-fuel port at all (`CAS`, `SCT`, `AE7`),
 and `BD1`/`BD2`/`YGS` (qualifying port, but no ECA to trigger the tank at all — see Stage 1).
 
-### The bunker log now shows LSMGO, not just MGO
+### The bunker log resolves a stem's displayed grade through `stemDisplayGrade()`
 
-A display-only fix, not a model change: LSMGO and MGO are numerically the same product in
-this dataset (42.7 GJ/mt, `data/emissions/energy_per_mt.csv`) and `priceSeriesFor`
-(`src/lib/bunkerEvents.ts`) already resolves a distillate stem to whichever the port
-actually sells (`LSMGO_PORTS`, 14 ports — see "LSMGO and MGO are different products" above).
-What never used that resolution was the UI: `BunkerLog.tsx` and `VesselStems.tsx` printed
-the raw tank name (`event.grade`, always `"MGO"`), so a stem at Ningbo or Busan displayed as
-"MGO" even though it priced as LSMGO. Both now render `stemDisplayGrade(event)` (`event.price
-?.series ?? event.grade`) instead — `Active_Fuel`, invariants and the packed char encoding
-are untouched, since the tank itself is still `"MGO"` regardless of which column priced it.
+`BunkerLog.tsx` and `VesselStems.tsx` render `stemDisplayGrade(event)` (`event.price
+?.series ?? event.grade`) rather than reading `event.grade` directly. This dates from
+when LSMGO and MGO were still two separately priced products (see "LSMGO and MGO are
+treated as one product" above) and a stem's tank name (`event.grade`, always `"MGO"`)
+disagreed with what it actually priced against at a 0.10%-market port. Since the LSMGO/
+MGO merge, `priceSeriesFor()` is an identity mapping and `event.price.series` always
+equals `event.grade`, so the indirection is currently a no-op — kept as the correct
+place a future grade split would go, rather than removed and re-added if one ever
+returns. `Active_Fuel`, invariants and the packed char encoding are untouched, since the
+tank itself is still `"MGO"` regardless of which column priced it.
 
 ---
 

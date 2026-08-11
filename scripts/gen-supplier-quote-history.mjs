@@ -77,7 +77,7 @@ const MAX_EXCLUDED_MARKETS = 4;
 const PRICE_FILES = [
   "VLSFO Prices.csv",
   "HSGO Prices.csv",
-  "LSMGO_MGO Prices.csv",
+  "MGO Prices.csv",
   "MDO Prices.csv",
   "LNG Prices.csv",
   "Biofuel Prices.csv",
@@ -90,7 +90,6 @@ const GRADE_SUFFIXES = [
   ["MEOH", "MEOH"],
   ["HSFO", "HSFO"],
   ["VLSFO", "VLSFO"],
-  ["LSMGO", "LSMGO"],
   ["MGO", "MGO"],
   ["MDO", "MDO"],
   ["LNG", "LNG"],

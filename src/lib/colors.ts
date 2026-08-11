@@ -77,7 +77,6 @@ export function serviceColor(code: string): string {
 export const GRADE_COLORS: Record<Grade, string> = {
   VLSFO: "#38BDF8",
   HSFO: "#F59E0B",
-  LSMGO: "#34D399",
   MGO: "#A3E635",
   MDO: "#84CC16",
   LNG: "#22D3EE",
@@ -93,7 +92,6 @@ export const GRADE_COLORS: Record<Grade, string> = {
 export const GRADE_LABELS: Record<Grade, string> = {
   VLSFO: "VLSFO",
   HSFO: "HSFO",
-  LSMGO: "LSMGO",
   MGO: "MGO",
   MDO: "MDO",
   LNG: "LNG",
@@ -111,7 +109,6 @@ export const GRADE_LABELS: Record<Grade, string> = {
 export const GRADE_ORDER: Grade[] = [
   "VLSFO",
   "HSFO",
-  "LSMGO",
   "MGO",
   "MDO",
   "LNG",

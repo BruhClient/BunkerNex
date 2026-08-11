@@ -102,7 +102,7 @@ export const PORT_COORDS: Record<string, PortMeta> = {
  * Maps the port prefix of a pricing CSV column header to a PORT_COORDS key.
  *
  * Keys are the raw prefixes upper-cased. The source spells several ports
- * inconsistently across files (ROTERDAM in VLSFO/HSGO/LSMGO vs ROTTERDAM in
+ * inconsistently across files (ROTERDAM in VLSFO/HSGO/MGO vs ROTTERDAM in
  * Methanol) and misspells others (Norfork, STPETERS) — every variant is listed
  * here so they collapse onto one port.
  *

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import BunkerLog from "./BunkerLog";
 import FilterSidebar from "./FilterSidebar";
@@ -495,6 +496,19 @@ export default function Explorer({
             Bunker<span className="text-accent">Nex</span>
           </span>
           <span className="hidden text-xs text-muted sm:inline">{region}</span>
+          {/* The only entry point to the HQ desk's supplier comparison — that
+              page has no other link back to itself from the running app.
+              Hidden in focus mode alongside the sidebar toggle: navigating
+              away mid-form would drop the in-progress spot bunker draft,
+              which Explorer holds only in memory. */}
+          {!spotFocus && (
+            <Link
+              href="/hq"
+              className="hidden items-center rounded border border-line px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-fg sm:inline-flex"
+            >
+              Supplier HQ
+            </Link>
+          )}
         </div>
         {/* The map key lives in the sidebar footer, where there is room to
             explain route lines and vessels rather than only port markers. */}

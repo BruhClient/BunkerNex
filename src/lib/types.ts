@@ -1,10 +1,12 @@
 /**
  * Fuel grades, keyed exactly as the pricing CSV column suffixes name them.
  *
- * The set is the Chief Engineer's `TYPES OF FUEL.xlsx` availability sheet, which
- * names nine distinct products across the fleet's twenty-six ports. LSMGO and
- * MGO are separate here because they are separate on that sheet, and the split
- * falls on the ECA line — see PRICE_SERIES in bunkerEvents.ts.
+ * The set is the Chief Engineer's `TYPES OF FUEL.xlsx` availability sheet.
+ * The sheet lists LSMGO and MGO as separate products, split on the ECA line,
+ * but this app treats them as the same product — same 42.7 GJ/mt distillate,
+ * same tank — and prices, labels and burns them as one grade, "MGO". See
+ * data/README.md for the merge and how the two source price series were
+ * reconciled where a port had both.
  *
  * MDO, LNG, B24 and B40 are priced but never burned: `VesselGrade` is the
  * narrower set the fleet actually moves.
@@ -12,7 +14,6 @@
 export type Grade =
   | "VLSFO"
   | "HSFO"
-  | "LSMGO"
   | "MGO"
   | "MDO"
   | "LNG"

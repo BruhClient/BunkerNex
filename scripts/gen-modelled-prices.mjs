@@ -53,12 +53,13 @@ const HUB_HEADER = {
  * src/lib/ports.ts, or the column is silently dropped at read time.
  */
 const PORT_HEADER = {
-  // Three assessment hubs also carry modelled columns now: the sheet gives
-  // Shanghai an HSFO market the assessment has no column for, LSMGO at Shanghai
-  // and Busan, and biofuel at Singapore. A hub port appearing in this table is
-  // exactly why `owned` has to be computed per grade — see the comment there.
+  // Two assessment hubs also carry modelled columns: the sheet gives Shanghai
+  // an HSFO market the assessment has no column for, and biofuel at
+  // Singapore. A hub port appearing in this table is exactly why `owned` has
+  // to be computed per grade — see the comment there. Busan has no modelled
+  // grade of its own (its LSMGO row-set was retired into the assessed MGO
+  // column it now shares — see data/README.md) and so carries no entry here.
   SGSIN: "SINGAPORE",
-  KRPUS: "BUSAN",
   CNSHA: "SHANGHAI",
   MYPKG: "PORTKLANG",
   BDCGP: "CHITTAGONG",
@@ -98,19 +99,17 @@ const PORT_HEADER = {
 /**
  * Which file carries each grade's modelled columns.
  *
- * The grade set is the Chief Engineer's `TYPES OF FUEL.xlsx`. LSMGO and MGO are
- * separate products there, and the split falls on the ECA line — China and Korea
- * sell the 0.10% distillate, Southeast Asia and the Bay of Bengal sell plain
- * MGO. Both reach bunkerPriceSnapshot(): PRICE_SERIES resolves a vessel's MGO
- * tank to whichever of the two its port actually sells.
+ * The grade set is the Chief Engineer's `TYPES OF FUEL.xlsx`. The sheet lists
+ * LSMGO and MGO as separate products split on the ECA line, but this app
+ * treats them as one grade, "MGO" — see data/README.md for how the two
+ * source series were reconciled at the ports that had both.
  *
  * MDO, B24 and B40 are priced but never burned by this fleet.
  */
 const GRADE_FILE = {
   VLSFO: "VLSFO Prices.csv",
   HSFO: "HSGO Prices.csv",
-  LSMGO: "LSMGO_MGO Prices.csv",
-  MGO: "LSMGO_MGO Prices.csv",
+  MGO: "MGO Prices.csv",
   MDO: "MDO Prices.csv",
   LNG: "LNG Prices.csv",
   B24: "Biofuel Prices.csv",

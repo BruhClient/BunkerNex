@@ -290,6 +290,19 @@ body {
   filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.75));
 }
 
+/* A red ring marks whichever vessel is open in the side panel — distinct
+   from the cyan accent glow above, which every hovered/selected map element
+   already shares. ::before, not ::after: is-bunkering below owns ::after,
+   and a vessel can be both selected and mid-stem at once. */
+.bn-vessel.is-selected::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--color-down);
+  pointer-events: none;
+}
+
 /* A stem in progress — the 26 bunker events across the whole series. */
 .bn-vessel.is-bunkering::after {
   content: "";
