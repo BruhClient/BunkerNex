@@ -191,7 +191,7 @@ export default function PortPanel({
               <span className="text-[10px] text-faint">cheapest first</span>
             </div>
 
-            <SupplierOffers markets={data.markets} />
+            <SupplierOffers markets={data.markets} portKey={port.key} />
           </section>
         )}
 

@@ -1,6 +1,8 @@
 "use client";
 import {
   CartesianGrid,
+  Cell,
+  LabelList,
   ReferenceLine,
   ResponsiveContainer,
   Scatter,
@@ -10,6 +12,7 @@ import {
   YAxis,
   ZAxis,
 } from "recharts";
+import { supplierColor } from "./SupplierPriceHistory";
 import { THEME } from "@/lib/colors";
 import { formatMt, formatPrice } from "@/lib/format";
 import type { SupplierFleet } from "@/lib/supplierAnalytics";
@@ -27,6 +30,13 @@ import type { PortMarket, SupplierOffer } from "@/lib/types";
  * Y is Delivery_Capacity_MT_Per_Day, NOT barge tonnage. 51 of the 317 fleet
  * rows are shore-supplied with zero barges, and plotting tonnage would pin all
  * of them to the axis as though they had no capability at all.
+ *
+ * Bubble colour reuses supplierColor() from SupplierPriceHistory — the same
+ * validated 5-hue ramp, keyed the same alphabetical way — so a supplier is
+ * the same colour in every chart on this page, not just internally
+ * consistent within this one. Colour always means identity; selection is
+ * shown by dimming the rest and ringing the chosen bubble, never by
+ * recolouring it.
  */
 
 interface Row {
@@ -52,16 +62,25 @@ function median(values: number[]): number {
     : sorted[mid];
 }
 
+/** Full name in the legend and tooltip; the on-chart label stays short so it
+ * doesn't collide with its neighbours at typical bubble spacing. */
+function shortLabel(name: string): string {
+  return name.length > 14 ? `${name.slice(0, 13)}…` : name;
+}
+
 export default function SupplierScatter({
   market,
   fleet,
+  suppliers,
   selected,
   onSelect,
 }: {
   market: PortMarket;
   fleet: SupplierFleet[];
+  /** Alphabetical — the colour order shared with the history chart. */
+  suppliers: string[];
   selected: string | null;
-  onSelect: (supplier: string) => void;
+  onSelect: (supplier: string | null) => void;
 }) {
   const bySupplier = new Map(fleet.map((f) => [f.supplier, f]));
 
@@ -98,104 +117,190 @@ export default function SupplierScatter({
   const baseline = market.baseline?.value ?? null;
   const medianCapacity = median(rows.map((r) => r.capacity));
 
-  // Split the panel so the selected point can be drawn on top in the accent —
-  // Recharts paints Scatter series in order, and a single series cannot put one
-  // point above its siblings.
+  const toggle = (supplier: string) =>
+    onSelect(selected === supplier ? null : supplier);
+
+  // Split the panel so the selected point can be drawn on top with a ring —
+  // Recharts paints Scatter series in order, and a single series cannot put
+  // one point above its siblings.
   const others = rows.filter((r) => r.supplier !== selected);
   const chosen = rows.filter((r) => r.supplier === selected);
+  const dimmed = selected !== null;
 
   return (
-    <div>
-      <div className="h-[260px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid stroke={THEME.line} strokeDasharray="2 4" />
-            <XAxis
-              type="number"
-              dataKey="price"
-              name="Quote"
-              unit=""
-              domain={["dataMin - 6", "dataMax + 6"]}
-              tick={{ fill: THEME.faint, fontSize: 10 }}
-              axisLine={{ stroke: THEME.line }}
-              tickLine={false}
-              tickFormatter={(v: number) => Math.round(v).toString()}
-            />
-            <YAxis
-              type="number"
-              dataKey="capacity"
-              name="Capacity"
-              width={52}
-              domain={[0, "dataMax + 4000"]}
-              tick={{ fill: THEME.faint, fontSize: 10 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
-            />
-            <ZAxis type="number" dataKey="maxMt" range={[60, 420]} />
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="min-w-0 flex-1">
+        {/* Legend first: identity must never rest on colour alone, and this
+            doubles as the supplier selector, same as the history chart. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 pb-2">
+          {suppliers.map((supplier) => {
+            const on = selected === null || selected === supplier;
+            return (
+              <button
+                key={supplier}
+                type="button"
+                onClick={() => toggle(supplier)}
+                aria-pressed={selected === supplier}
+                className="flex items-center gap-1.5 rounded px-1 py-0.5 text-[10px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                style={{ opacity: on ? 1 : 0.4 }}
+              >
+                <span
+                  aria-hidden
+                  className="size-2 rounded-full"
+                  style={{ background: supplierColor(supplier, suppliers) }}
+                />
+                {supplier}
+              </button>
+            );
+          })}
+        </div>
 
-            {/* The assessment, and the middle of the panel's capability. Read
-                the crosshair as: cheaper than the market, and able to lift. */}
-            {baseline !== null && (
+        <div className="h-[260px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+              <CartesianGrid stroke={THEME.line} strokeDasharray="2 4" />
+              <XAxis
+                type="number"
+                dataKey="price"
+                name="Quote"
+                unit=""
+                domain={["dataMin - 6", "dataMax + 6"]}
+                tick={{ fill: THEME.faint, fontSize: 10 }}
+                axisLine={{ stroke: THEME.line }}
+                tickLine={false}
+                tickFormatter={(v: number) => Math.round(v).toString()}
+              />
+              <YAxis
+                type="number"
+                dataKey="capacity"
+                name="Capacity"
+                width={52}
+                domain={[0, "dataMax + 4000"]}
+                tick={{ fill: THEME.faint, fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+              />
+              <ZAxis type="number" dataKey="maxMt" range={[60, 420]} />
+
+              {/* The assessment, and the middle of the panel's capability. Read
+                  the crosshair as: cheaper than the market, and able to lift. */}
+              {baseline !== null && (
+                <ReferenceLine
+                  x={baseline}
+                  stroke={THEME.lineStrong}
+                  strokeDasharray="3 3"
+                  label={{
+                    value: "benchmark",
+                    position: "top",
+                    fill: THEME.faint,
+                    fontSize: 9,
+                  }}
+                />
+              )}
               <ReferenceLine
-                x={baseline}
+                y={medianCapacity}
                 stroke={THEME.lineStrong}
                 strokeDasharray="3 3"
                 label={{
-                  value: "benchmark",
-                  position: "top",
+                  value: "median capacity",
+                  position: "insideBottomRight",
                   fill: THEME.faint,
                   fontSize: 9,
                 }}
               />
-            )}
-            <ReferenceLine
-              y={medianCapacity}
-              stroke={THEME.lineStrong}
-              strokeDasharray="3 3"
-            />
 
-            <Tooltip
-              content={<ScatterTooltip />}
-              cursor={{ stroke: THEME.lineStrong, strokeDasharray: "3 3" }}
-            />
+              <Tooltip
+                content={<ScatterTooltip />}
+                cursor={{ stroke: THEME.lineStrong, strokeDasharray: "3 3" }}
+              />
 
-            <Scatter
-              data={others}
-              fill={THEME.muted}
-              fillOpacity={0.55}
-              stroke={THEME.bg}
-              strokeWidth={1}
-              isAnimationActive={false}
-              onClick={(point: unknown) => {
-                const row = point as Row | undefined;
-                if (row?.supplier) onSelect(row.supplier);
-              }}
-              className="cursor-pointer"
-            />
-            <Scatter
-              data={chosen}
-              fill={THEME.accent}
-              stroke={THEME.bg}
-              strokeWidth={1.5}
-              isAnimationActive={false}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
+              <Scatter
+                data={others}
+                isAnimationActive={false}
+                onClick={(point: unknown) => {
+                  const row = point as Row | undefined;
+                  if (row?.supplier) toggle(row.supplier);
+                }}
+                className="cursor-pointer"
+              >
+                {others.map((row) => (
+                  <Cell
+                    key={row.supplier}
+                    fill={supplierColor(row.supplier, suppliers)}
+                    fillOpacity={dimmed ? 0.32 : 0.85}
+                    stroke={THEME.bg}
+                    strokeWidth={1}
+                  />
+                ))}
+                <LabelList
+                  dataKey="supplier"
+                  position="top"
+                  formatter={(v: unknown) => shortLabel(String(v))}
+                  style={{
+                    fill: THEME.faint,
+                    fontSize: 9,
+                    opacity: dimmed ? 0.35 : 1,
+                  }}
+                />
+              </Scatter>
+              <Scatter data={chosen} isAnimationActive={false}>
+                {chosen.map((row) => (
+                  <Cell
+                    key={row.supplier}
+                    fill={supplierColor(row.supplier, suppliers)}
+                    fillOpacity={0.9}
+                    stroke={THEME.accent}
+                    strokeWidth={2}
+                  />
+                ))}
+                <LabelList
+                  dataKey="supplier"
+                  position="top"
+                  formatter={(v: unknown) => shortLabel(String(v))}
+                  style={{ fill: THEME.fg, fontSize: 9, fontWeight: 600 }}
+                />
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 pt-1">
-        <p className="text-[10px] leading-relaxed text-faint">
-          Bubble size is the largest parcel quoted. Click a supplier to load its
-          record below.
-        </p>
-        {missing > 0 && (
-          <p className="text-[10px] leading-relaxed text-warn">
-            {missing} quoting supplier{missing === 1 ? "" : "s"} without a
-            delivery profile, not shown
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 pt-1">
+          <p className="text-[10px] leading-relaxed text-faint">
+            Bubble size is the largest parcel quoted. Click a bubble or a
+            legend name to load that supplier&apos;s record below.
           </p>
-        )}
+          {missing > 0 && (
+            <p className="text-[10px] leading-relaxed text-warn">
+              {missing} quoting supplier{missing === 1 ? "" : "s"} without a
+              delivery profile, not shown
+            </p>
+          )}
+        </div>
       </div>
+
+      <aside className="shrink-0 rounded border border-line bg-surface-2 px-3.5 py-3 text-[11px] leading-relaxed text-muted lg:w-[220px]">
+        <p className="label mb-1.5">Reading this chart</p>
+        <p>
+          Each bubble is one supplier: <span className="text-fg">left–right</span>{" "}
+          is their current quote, <span className="text-fg">up–down</span> is
+          how much they can deliver per day, and{" "}
+          <span className="text-fg">bubble size</span> is the largest single
+          parcel they&apos;ll quote.
+        </p>
+        <p className="mt-2">
+          The dashed lines mark the port&apos;s benchmark price and the
+          panel&apos;s median capacity — a bubble in the{" "}
+          <span className="text-fg">bottom-right</span> is cheaper than the
+          market and above-median on delivery, the quadrant worth a closer
+          look first.
+        </p>
+        <p className="mt-2">
+          Click a bubble, a legend name, or a row in the record below to
+          select a supplier — the choice stays in sync across every chart on
+          this page.
+        </p>
+      </aside>
     </div>
   );
 }

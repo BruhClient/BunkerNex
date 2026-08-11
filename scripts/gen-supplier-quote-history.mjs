@@ -20,22 +20,56 @@
  * suppliers cross each other, open and close gaps to the benchmark, and can be
  * read as more or less aggressive over the year.
  *
+ * DEVIATION AMPLITUDE IS SCALED PER MARKET, NOT A FLAT $ RANGE. A flat
+ * ~$0.8-5/mt wander (the original figure) is invisible against a benchmark
+ * that swings hundreds of dollars over a year — the chart reads as flat lines
+ * even though the underlying differential genuinely moves. `targetSpreadFor()`
+ * sizes each market's amplitude off two things: 5% of that market's own
+ * trailing-year benchmark range (so it scales with how volatile the commodity
+ * actually is), floored and capped at a multiple of the supplier's TIER_BAND
+ * width (so a Tier 1 major doesn't get scaled into swinging like a trader).
+ * Both bounds matter — for the volatile grades (VLSFO/HSFO/MGO) the tier cap
+ * binds, since 5% of their range would dwarf what a tier-bounded differential
+ * can plausibly do; for calmer/thinner markets the tier floor binds, keeping
+ * suppliers visibly distinct even off a quiet benchmark. `scale` (applied to
+ * shockScale/swingAmp/yearSlope only — persistence/swingCycles/swingPhase are
+ * shape, not amplitude) is `targetSpread / 10`, where 10 $/mt is the
+ * approximate midpoint of the original flat-range output — a calibration
+ * constant so `scale ≈ 1` reproduces roughly the old behaviour, not a value
+ * anything else depends on.
+ *
  * deviation(t) is normalised to be EXACTLY ZERO on the last date, so the final
  * row of this file reconciles to the live offer in supplier_offers.csv. That is
  * asserted below. Without it the chart's right-hand edge would disagree with
  * the price the port panel quotes, two screens apart.
+ *
+ * THIS FILE ALSO CARRIES FORWARD-LOOKING ROWS, tagged
+ * `Source_Basis = "simulated-forecast"`. The HQ desk's chart forecasts each
+ * supplier's own line 10-30 days out; without per-supplier future data the
+ * chart could only add the live benchmark forecast to a flat static offset,
+ * which draws every supplier as a parallel copy of the same curve. Each
+ * market gets FORECAST_DAYS daily rows continuing from the live offer
+ * (`dailyForecastSeries`) — a gentler, slower-reverting daily walk than the
+ * historical weekly one, so it still looks like a real (if quiet) forward
+ * path rather than noise. `Benchmark_USD_Per_MT` on these rows is a simple
+ * linear extension of the trailing benchmark slope (`projectBenchmark`) —
+ * it exists only so `Quote = Benchmark + Diff` stays internally consistent in
+ * the raw file, and deliberately does not try to match
+ * `computeSeasonalForecast` (src/lib/priceForecast.ts), which is what the
+ * live chart's own benchmark forecast line actually uses.
  *
  * NONE OF THIS IS SOURCED. No supplier price history exists in any source
  * document. Only the benchmark column underneath is real — and at the 28
  * modelled ports even that is a hub plus a judgment differential, not an
  * assessment. Anything presenting these figures must say so.
  *
- * Randomness is seeded on `Port_Code|Grade|Supplier`, so the output is stable
- * and reviewable in git. Idempotent.
+ * Randomness is seeded on `Port_Code|Grade|Supplier` (forecast rows additionally
+ * on `|forecast`), so the output is stable and reviewable in git. Idempotent.
  *
  * Run order: after gen-supplier-offers.mjs and after any price refresh —
  * the benchmark column is copied in here, so it goes stale exactly the way a
- * modelled price column does.
+ * modelled price column does. gen-supplier-transactions.mjs runs after this
+ * and ignores the `simulated-forecast` rows (filters on Source_Basis).
  */
 
 import fs from "node:fs";
@@ -49,6 +83,32 @@ const OUT = path.join(DATA, "contracts", "supplier_quote_history.csv");
 
 /** Weeks of history. One trading year. */
 const WEEKS = 52;
+
+/**
+ * Days of forward-looking rows appended after the historical window, per
+ * supplier-market. Must stay >= the largest forecast horizon HqDesk.tsx
+ * offers (currently 30) — nothing at runtime enforces that coupling, so if
+ * the app ever adds a longer horizon this needs to grow too.
+ */
+const FORECAST_DAYS = 30;
+
+/**
+ * A copy of TIER_BAND in gen-supplier-offers.mjs — the flat $/mt range each
+ * tier's static differential is drawn from. Used here only for its WIDTH, to
+ * bound how far a supplier's weekly/daily wander is allowed to scale: a
+ * Tier 1 major anchored around an $11-wide band shouldn't swing like a
+ * Tier 3 renewable specialist just because the underlying commodity is
+ * volatile. Duplicated rather than imported for the same reason every other
+ * cross-script constant here is — .mjs cannot import the TS source, and
+ * gen-supplier-offers.mjs is itself a script, not a shared module.
+ */
+const TIER_BAND_WIDTH = { 1: 11, 2: 12, 3: 45, 4: 11 };
+
+/**
+ * scale ≈ 1 reproduces roughly the pre-amplitude-fix output. Not load-bearing
+ * anywhere else — see targetSpreadFor() and the file header.
+ */
+const REFERENCE_SPREAD = 10;
 
 /**
  * Below this many weekly buckets inside the window there is nothing to read a
@@ -244,6 +304,7 @@ function readOffers() {
     const grade = (row.Grade ?? "").trim();
     const supplier = (row.Supplier ?? "").trim();
     const raw = (row.Offer_Basis_USD_Per_MT ?? "").trim();
+    const tier = Number((row.Tier ?? "").trim());
 
     // A blank differential is not parity, and Number("") is 0. Same rule
     // src/lib/suppliers.ts applies at read time.
@@ -254,8 +315,11 @@ function readOffers() {
     if (!Number.isFinite(diff)) {
       throw new Error(`supplier_offers.csv line ${line}: bad differential`);
     }
+    if (!TIER_BAND_WIDTH[tier]) {
+      throw new Error(`supplier_offers.csv line ${line}: unknown tier ${tier}`);
+    }
 
-    offers.push({ portKey, grade, supplier, diff });
+    offers.push({ portKey, grade, supplier, diff, tier });
   }
   return offers;
 }
@@ -271,17 +335,21 @@ function readOffers() {
  * desk actually wants to see — a supplier getting steadily keener or steadily
  * more expensive across the year.
  *
+ * `scale` sizes the amplitude to the market (see targetSpreadFor and the file
+ * header) — applied to shockScale/swingAmp/yearSlope only, since persistence,
+ * swingCycles and swingPhase are shape, not magnitude.
+ *
  * Normalised so the final element is exactly 0. See the file header.
  */
-function deviationSeries(seed, n) {
+function deviationSeries(seed, n, scale) {
   const r = rng(seed);
 
-  const shockScale = 0.8 + r() * 2.4;
+  const shockScale = (0.8 + r() * 2.4) * scale;
   const persistence = 0.62 + r() * 0.24;
-  const swingAmp = 0.8 + r() * 4.2;
+  const swingAmp = (0.8 + r() * 4.2) * scale;
   const swingCycles = 0.5 + r() * 1.5;
   const swingPhase = r() * Math.PI * 2;
-  const yearSlope = (r() * 2 - 1) * 2.5;
+  const yearSlope = (r() * 2 - 1) * 2.5 * scale;
 
   const raw = [];
   let shock = 0;
@@ -297,12 +365,85 @@ function deviationSeries(seed, n) {
   return raw.map((v) => v - last);
 }
 
+/**
+ * How far a market's weekly wander is allowed to swing across the year.
+ *
+ * 5% of the market's own trailing-year benchmark range, so amplitude scales
+ * with how volatile the commodity actually is — floored and capped at a
+ * multiple of the supplier's own TIER_BAND width, so a Tier 1 major can't get
+ * scaled into swinging like a trader just because e.g. MGO is a volatile
+ * grade. See the file header for which bound binds where.
+ */
+function targetSpreadFor(tier, weekly) {
+  const values = weekly.map((p) => p.value);
+  const benchmarkRange = Math.max(...values) - Math.min(...values);
+  const width = TIER_BAND_WIDTH[tier];
+  const raw = benchmarkRange * 0.05;
+  return Math.min(Math.max(raw, width * 1.5), width * 4);
+}
+
+/**
+ * A supplier's forward-looking daily path, continuing from the live offer.
+ *
+ * Deliberately gentler and slower-reverting than the historical weekly walk
+ * (higher persistence, smaller per-step shock) — a 10-30 day forecast should
+ * wander less per day than a 52-week history does per week. Starts from
+ * anchorDiff (the live offer, i.e. the same value the last historical row
+ * already reconciles to) so the dashed line has no opening jump; own seed
+ * suffix so the forward path isn't just a mirror of the historical one.
+ */
+function dailyForecastSeries(seed, days, anchorDiff, targetSpread) {
+  const r = rng(`${seed}|forecast`);
+  const dailyShock = targetSpread * 0.05;
+  const persistence = 0.9 + r() * 0.06;
+
+  let diff = anchorDiff;
+  const out = [];
+  for (let d = 1; d <= days; d++) {
+    diff = anchorDiff + (diff - anchorDiff) * persistence + (r() * 2 - 1) * dailyShock;
+    out.push(diff);
+  }
+  return out;
+}
+
+/**
+ * A plain linear extension of the trailing benchmark slope, for the
+ * forecast rows' Benchmark_USD_Per_MT column.
+ *
+ * This exists only so Quote = Benchmark + Diff stays consistent within this
+ * file — it is NOT what the live chart's benchmark forecast line uses (that
+ * is computeSeasonalForecast in src/lib/priceForecast.ts, a materially
+ * better model). Deliberately kept simple rather than reimplementing that
+ * model here a second time.
+ */
+function projectBenchmark(weekly, days) {
+  const tail = weekly.slice(-8);
+  const first = tail[0].value;
+  const last = tail[tail.length - 1].value;
+  const slopePerWeek = tail.length > 1 ? (last - first) / (tail.length - 1) : 0;
+  const slopePerDay = slopePerWeek / 7;
+
+  const out = [];
+  for (let d = 1; d <= days; d++) {
+    out.push(Math.max(0.01, last + slopePerDay * d));
+  }
+  return out;
+}
+
+/** YYYY-MM-DD, `days` after `date`. */
+function addDays(date, days) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // --- run -------------------------------------------------------------------
 
 const prices = readPriceSeries();
 const offers = readOffers();
 const rows = [];
 const excluded = [];
+const targetSpreads = new Map();
 
 // The window every market is sampled against. One anchor for the whole file, so
 // a chart's x-axis means the same thing at every port.
@@ -335,10 +476,12 @@ for (const offer of offers) {
     continue;
   }
 
-  const deviation = deviationSeries(
-    `${offer.portKey}|${offer.grade}|${offer.supplier}`,
-    weekly.length,
-  );
+  const marketKey = `${offer.portKey}|${offer.grade}|${offer.supplier}`;
+  const targetSpread = targetSpreadFor(offer.tier, weekly);
+  targetSpreads.set(marketKey, targetSpread);
+  const scale = targetSpread / REFERENCE_SPREAD;
+
+  const deviation = deviationSeries(marketKey, weekly.length, scale);
 
   for (const [i, point] of weekly.entries()) {
     const diff = Math.round((offer.diff + deviation[i]) * 100) / 100;
@@ -352,6 +495,37 @@ for (const offer of offers) {
       diff,
       anchorDiff: offer.diff,
       isLast: i === weekly.length - 1,
+      sourceBasis: "simulated",
+    });
+  }
+
+  // Forward-looking rows. Anchored to this market's own last historical date
+  // (not the global newestDate) so a market that lags the anchor by a few
+  // days — a less-liquid series — still gets true day-1 continuity from its
+  // own last point, not a gap or overlap.
+  const lastPoint = weekly[weekly.length - 1];
+  const forecastDiffs = dailyForecastSeries(
+    marketKey,
+    FORECAST_DAYS,
+    offer.diff,
+    targetSpread,
+  );
+  const forecastBenchmarks = projectBenchmark(weekly, FORECAST_DAYS);
+
+  for (let d = 0; d < FORECAST_DAYS; d++) {
+    const diff = Math.round(forecastDiffs[d] * 100) / 100;
+    const benchmark = Math.round(forecastBenchmarks[d] * 100) / 100;
+    rows.push({
+      date: addDays(lastPoint.date, d + 1),
+      portKey: offer.portKey,
+      grade: offer.grade,
+      supplier: offer.supplier,
+      quote: Math.round((benchmark + diff) * 100) / 100,
+      benchmark,
+      diff,
+      anchorDiff: offer.diff,
+      isLast: false,
+      sourceBasis: "simulated-forecast",
     });
   }
 }
@@ -390,8 +564,12 @@ for (const row of rows) {
     );
   }
 
-  const market = `${row.portKey}|${row.grade}|${row.supplier}`;
-  marketWeeks.set(market, (marketWeeks.get(market) ?? 0) + 1);
+  // Only historical rows count toward the per-market bookkeeping below —
+  // forecast rows are a fixed FORECAST_DAYS per market and checked separately.
+  if (row.sourceBasis === "simulated") {
+    const market = `${row.portKey}|${row.grade}|${row.supplier}`;
+    marketWeeks.set(market, (marketWeeks.get(market) ?? 0) + 1);
+  }
 }
 
 if (marketWeeks.size !== offers.length - excluded.length) {
@@ -412,21 +590,72 @@ if (excludedMarkets.size > MAX_EXCLUDED_MARKETS) {
 
 // Parallel lines are the failure this file exists to avoid: if no supplier at a
 // market ever changes its standing relative to the benchmark, the chart is a
-// stack of identical shapes and tells the desk nothing.
+// stack of identical shapes and tells the desk nothing. Threshold is relative
+// to each market's own targetSpread (see targetSpreadFor) rather than a flat
+// figure, since amplitude is now tier/volatility-scaled per market. 0.2 rather
+// than something closer to 1 because the realised spread of a mean-reverting
+// AR(1) + sinusoid is a random variable around targetSpread, not a guarantee —
+// a threshold too close to the target itself throws on ordinary variance.
 const flat = [];
 for (const [market] of marketWeeks) {
   const series = rows.filter(
-    (r) => `${r.portKey}|${r.grade}|${r.supplier}` === market,
+    (r) =>
+      r.sourceBasis === "simulated" &&
+      `${r.portKey}|${r.grade}|${r.supplier}` === market,
   );
   const spread =
     Math.max(...series.map((r) => r.diff)) -
     Math.min(...series.map((r) => r.diff));
-  if (spread < 1) flat.push(`${market} (${spread.toFixed(2)} $/mt)`);
+  const minSpread = targetSpreads.get(market) * 0.2;
+  if (spread < minSpread) {
+    flat.push(
+      `${market} (${spread.toFixed(2)} $/mt, wanted >= ${minSpread.toFixed(2)})`,
+    );
+  }
 }
 if (flat.length > 0) {
   throw new Error(
     `${flat.length} supplier-market(s) barely move across the year, so the ` +
       `chart would draw them parallel: ${flat.slice(0, 3).join(", ")}`,
+  );
+}
+
+// Forecast rows: each surviving market gets exactly FORECAST_DAYS of them,
+// starting close to the live offer (a loose bound, not equality — day 1 is
+// already one AR(1) step away from the anchor).
+const forecastRows = rows.filter((r) => r.sourceBasis === "simulated-forecast");
+const forecastCounts = new Map();
+for (const row of forecastRows) {
+  const market = `${row.portKey}|${row.grade}|${row.supplier}`;
+  forecastCounts.set(market, (forecastCounts.get(market) ?? 0) + 1);
+}
+for (const [market, count] of forecastCounts) {
+  if (count !== FORECAST_DAYS) {
+    throw new Error(
+      `${market}: ${count} forecast rows, expected ${FORECAST_DAYS}`,
+    );
+  }
+}
+if (forecastCounts.size !== marketWeeks.size) {
+  throw new Error(
+    `${forecastCounts.size} markets carry forecast rows but ${marketWeeks.size} ` +
+      "carry historical rows — every surviving market needs both",
+  );
+}
+const badContinuity = [];
+for (const [market] of forecastCounts) {
+  const first = forecastRows.find(
+    (r) => `${r.portKey}|${r.grade}|${r.supplier}` === market,
+  );
+  const bound = targetSpreads.get(market) * 0.15;
+  if (Math.abs(first.diff - first.anchorDiff) >= bound) {
+    badContinuity.push(market);
+  }
+}
+if (badContinuity.length > 0) {
+  throw new Error(
+    `${badContinuity.length} market(s) open their forecast too far from the ` +
+      `live offer: ${badContinuity.slice(0, 3).join(", ")}`,
   );
 }
 
@@ -446,6 +675,12 @@ const HEADER = [
 
 const csvCell = (v) => (String(v).includes(",") ? `"${v}"` : String(v));
 
+const HISTORICAL_NOTE =
+  "Benchmark is real; the supplier spread is not. See data/README.md";
+const FORECAST_NOTE =
+  "Illustrative forward continuation, not a quote or a market forecast. " +
+  "See data/README.md";
+
 const lines = [HEADER.join(",")];
 for (const row of rows) {
   lines.push(
@@ -457,19 +692,24 @@ for (const row of rows) {
       row.quote,
       row.benchmark,
       row.diff,
-      "simulated",
-      csvCell("Benchmark is real; the supplier spread is not. See data/README.md"),
+      row.sourceBasis,
+      csvCell(
+        row.sourceBasis === "simulated" ? HISTORICAL_NOTE : FORECAST_NOTE,
+      ),
     ].join(","),
   );
 }
 
 fs.writeFileSync(OUT, lines.join("\n") + "\n", "utf8");
 
-const weeks = new Set(rows.map((r) => r.date)).size;
+const historicalRows = rows.filter((r) => r.sourceBasis === "simulated");
+const weeks = new Set(historicalRows.map((r) => r.date)).size;
 console.log(
-  `supplier_quote_history.csv: ${rows.length} quotes across ` +
-    `${marketWeeks.size} supplier-markets over ${weeks} distinct dates, ` +
-    `window ending ${newestDate}`,
+  `supplier_quote_history.csv: ${historicalRows.length} historical quotes ` +
+    `across ${marketWeeks.size} supplier-markets over ${weeks} distinct ` +
+    `dates, window ending ${newestDate}; plus ${forecastRows.length} ` +
+    `forecast rows (${FORECAST_DAYS}/market across ${forecastCounts.size} ` +
+    `markets)`,
 );
 
 for (const market of excludedMarkets) {

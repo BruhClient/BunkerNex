@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SupplierPriceHistory from "./SupplierPriceHistory";
 import SupplierScatter from "./SupplierScatter";
 import SupplierScorecard from "./SupplierScorecard";
@@ -39,12 +40,32 @@ export default function HqDesk({
   ports: HqPortOption[];
   asOf: string | null;
 }) {
+  // Seeded once from the URL, so a deep link from the port panel ("view this
+  // supplier's full record") lands on the right market instead of always
+  // opening at the desk's own default. An invalid or absent param falls
+  // through to the same defaults as a bare "/hq" visit — never a blank panel.
+  const searchParams = useSearchParams();
+  const initialPort = searchParams.get("port");
+  const initialGrade = searchParams.get("grade");
+  const initialSupplier = searchParams.get("supplier");
+
   const [portKey, setPortKey] = useState(
-    () => ports.find((p) => p.key === DEFAULT_PORT)?.key ?? ports[0]?.key ?? "",
+    () =>
+      ports.find((p) => p.key === initialPort)?.key ??
+      ports.find((p) => p.key === DEFAULT_PORT)?.key ??
+      ports[0]?.key ??
+      "",
   );
-  const [grade, setGrade] = useState<Grade | null>(null);
+  // Validated the same way a manual selection is: activeGrade below falls
+  // back to the port's first grade if this doesn't match.
+  const [grade, setGrade] = useState<Grade | null>(
+    (initialGrade as Grade | null) ?? null,
+  );
   const [supplier, setSupplier] = useState<string | null>(null);
   const [horizon, setHorizon] = useState<Horizon>(10);
+  // Applied once the market's supplier list is known, and only once — after
+  // that a manual deselect (clicking the same row again) must stick.
+  const appliedInitialSupplier = useRef(false);
 
   const [data, setData] = useState<HqAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,6 +124,17 @@ export default function HqDesk({
     if (!data) return [];
     return [...new Set(data.quoteHistory.map((q) => q.supplier))].sort();
   }, [data]);
+
+  // Deep-linked supplier, applied once the first market's roster is known.
+  // Runs at most once per page load, so it never fights a later manual
+  // selection or the reset-on-market-change effect above.
+  useEffect(() => {
+    if (appliedInitialSupplier.current || suppliers.length === 0) return;
+    appliedInitialSupplier.current = true;
+    if (initialSupplier && suppliers.includes(initialSupplier)) {
+      setSupplier(initialSupplier);
+    }
+  }, [suppliers, initialSupplier]);
 
   const forecast = horizon === 10 ? data?.forecast10 : data?.forecast30;
 
@@ -220,6 +252,7 @@ export default function HqDesk({
                   <SupplierScatter
                     market={data.market}
                     fleet={data.fleet}
+                    suppliers={suppliers}
                     selected={supplier}
                     onSelect={setSupplier}
                   />
@@ -240,6 +273,7 @@ export default function HqDesk({
                 </div>
                 <SupplierPriceHistory
                   quoteHistory={data.quoteHistory}
+                  supplierDiffForecast={data.supplierDiffForecast}
                   forecast={forecast ?? null}
                   suppliers={suppliers}
                   selected={supplier}

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import HqDesk from "@/components/hq/HqDesk";
 import { sortGrades } from "@/lib/colors";
 import { portMeta } from "@/lib/ports";
@@ -47,5 +48,13 @@ export default function HqPage() {
 
   ports.sort((a, b) => a.name.localeCompare(b.name));
 
-  return <HqDesk ports={ports} asOf={latestDataDate()} />;
+  return (
+    // HqDesk reads its initial port/grade/supplier off the URL via
+    // useSearchParams(), which requires a Suspense boundary in the app
+    // router — otherwise `next build` bails the whole route to client-side
+    // rendering.
+    <Suspense fallback={null}>
+      <HqDesk ports={ports} asOf={latestDataDate()} />
+    </Suspense>
+  );
 }

@@ -5,6 +5,7 @@ import { getPortPrices } from "@/lib/prices";
 import { getPortMarkets } from "@/lib/suppliers";
 import {
   buildScorecards,
+  getMarketQuoteForecast,
   getMarketQuoteHistory,
   getMarketTransactions,
   getPortFleet,
@@ -12,6 +13,7 @@ import {
 import type { SeasonalForecast } from "@/lib/priceForecast";
 import type {
   SupplierFleet,
+  SupplierForecastPoint,
   SupplierQuotePoint,
   SupplierScorecard,
   SupplierTransaction,
@@ -38,6 +40,14 @@ export interface HqAnalyticsResponse {
   fleet: SupplierFleet[];
   /** Weekly quotes with the benchmark alongside. May be empty. */
   quoteHistory: SupplierQuotePoint[];
+  /**
+   * Each supplier's own forward-looking differential, keyed by supplier name.
+   * SupplierPriceHistory reads this by INDEX (day 1, day 2, ...) against
+   * forecast10/forecast30's own points, not by matching dates — the two
+   * series can anchor a few days apart for a less-liquid market. May be
+   * empty (same markets quoteHistory is empty for).
+   */
+  supplierDiffForecast: Record<string, SupplierForecastPoint[]>;
   /** Settled stems, most recent first. May be empty. */
   transactions: SupplierTransaction[];
   /** Per-supplier variance figures, best realised price first. */
@@ -70,6 +80,9 @@ export async function GET(
   }
 
   const quoteHistory = getMarketQuoteHistory(portKey, grade);
+  const supplierDiffForecast = Object.fromEntries(
+    getMarketQuoteForecast(portKey, grade),
+  );
   const transactions = getMarketTransactions(portKey, grade);
 
   const benchmark = getPortPrices(portKey)[grade] ?? [];
@@ -84,6 +97,7 @@ export async function GET(
     grade,
     fleet: getPortFleet(portKey),
     quoteHistory,
+    supplierDiffForecast,
     transactions,
     scorecards: buildScorecards(transactions),
     market,

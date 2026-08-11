@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { GRADE_COLORS, GRADE_LABELS } from "@/lib/colors";
 import { formatDate, formatDays, formatMt, formatPrice } from "@/lib/format";
@@ -12,8 +13,22 @@ import type { Grade, PortMarket, SupplierOffer } from "@/lib/types";
  * first, so this only picks a grade and renders. Laid out as a table rather
  * than a list because the panel exists to be compared down a column — the same
  * reason BunkerLog is a table.
+ *
+ * This table is deliberately thin — one current quote per supplier. The full
+ * evaluation (a year of quote history, delivery-capability scatter, realised
+ * scorecard, settled-stem history) lives at /hq, built at full page width
+ * because it does not fit this panel's 420px cap. The links below are the
+ * bridge between the two: they carry the port/grade/supplier already chosen
+ * here straight into that view, so the panel/desk read as one flow rather
+ * than two disconnected features.
  */
-export default function SupplierOffers({ markets }: { markets: PortMarket[] }) {
+export default function SupplierOffers({
+  markets,
+  portKey,
+}: {
+  markets: PortMarket[];
+  portKey: string;
+}) {
   const [grade, setGrade] = useState<Grade | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -106,6 +121,8 @@ export default function SupplierOffers({ markets }: { markets: PortMarket[] }) {
               <OfferRows
                 key={offer.supplier}
                 offer={offer}
+                portKey={portKey}
+                grade={market.grade}
                 isBest={offer.price === best}
                 open={open}
                 onToggle={() => setExpanded(open ? null : offer.supplier)}
@@ -115,20 +132,32 @@ export default function SupplierOffers({ markets }: { markets: PortMarket[] }) {
         </tbody>
       </table>
 
-      <p className="px-4 py-2 text-right text-[10px] text-faint">
-        Select a supplier for delivery terms
-      </p>
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
+        <span className="text-[10px] text-faint">
+          Select a supplier for delivery terms
+        </span>
+        <Link
+          href={`/hq?port=${portKey}&grade=${market.grade}`}
+          className="shrink-0 text-[10px] font-medium text-accent transition-colors hover:text-fg"
+        >
+          Full price history &amp; supplier scorecards →
+        </Link>
+      </div>
     </div>
   );
 }
 
 function OfferRows({
   offer,
+  portKey,
+  grade,
   isBest,
   open,
   onToggle,
 }: {
   offer: SupplierOffer;
+  portKey: string;
+  grade: Grade;
   isBest: boolean;
   open: boolean;
   onToggle: () => void;
@@ -193,6 +222,12 @@ function OfferRows({
               {formatMt(offer.minMt)}–{formatMt(offer.maxMt)} MT ·{" "}
               {offer.availability}
             </p>
+            <Link
+              href={`/hq?port=${portKey}&grade=${grade}&supplier=${encodeURIComponent(offer.supplier)}`}
+              className="mt-2 inline-block text-[10px] font-medium text-accent transition-colors hover:text-fg"
+            >
+              View {offer.supplier}&apos;s full record →
+            </Link>
           </td>
         </tr>
       )}

@@ -157,6 +157,44 @@ function monthOf(date: string): number {
   return Number(date.slice(5, 7)) - 1;
 }
 
+/** Days in `date`'s own calendar month, for that specific year (handles leap Feb). */
+function daysInMonthOf(date: string): number {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7)) - 1;
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
+/**
+ * Continuous 0-12 position of `date`, with each month's factor anchored at
+ * that month's own midpoint (m + 0.5) rather than day-of-year 1-366 — so a
+ * leap February doesn't shift every later month's anchor for the year.
+ */
+function monthPosition(date: string): number {
+  const month = Number(date.slice(5, 7)) - 1;
+  const dayOfMonth = Number(date.slice(8, 10));
+  return month + (dayOfMonth - 0.5) / daysInMonthOf(date);
+}
+
+/**
+ * The 12 discrete month-of-year factors read back as a smooth, periodic
+ * curve rather than a calendar-month step function. A 10-30 day forecast
+ * horizon usually sits inside one calendar month, where a raw lookup by
+ * month returns the identical factor every day and contributes zero
+ * curvature — this is what made the projection a straight line. The two
+ * nearest month MIDPOINTS are cosine-eased together (zero derivative at
+ * each anchor, so there is no visible kink where two months meet), and
+ * Dec/Jan wrap through modular arithmetic, not a special case.
+ */
+function interpolatedFactor(date: string, factors: number[]): number {
+  const p = monthPosition(date) - 0.5;
+  const lower = Math.floor(p);
+  const t = p - lower;
+  const m0 = ((lower % 12) + 12) % 12;
+  const m1 = (((lower + 1) % 12) + 12) % 12;
+  const blend = (1 - Math.cos(t * Math.PI)) / 2;
+  return factors[m0] + (factors[m1] - factors[m0]) * blend;
+}
+
 /**
  * Theil-Sen: the median of all pairwise slopes.
  *
@@ -298,13 +336,17 @@ export function computeSeasonalForecast(
   const lastValue = last.value as number;
   const lastDay = dayNumber(last.date);
 
-  // Divide by the anchor month's own factor so the projection leaves the last
-  // actual point at exactly its traded value — a forecast that opens with a
-  // jump reads as a bug however defensible the seasonal term is.
-  const anchorFactor = seasonal ? seasonal.factors[monthOf(last.date)] : 1;
+  // Divide by the anchor date's own interpolated factor so the projection
+  // leaves the last actual point at exactly its traded value — a forecast
+  // that opens with a jump reads as a bug however defensible the seasonal
+  // term is. Deriving this from the same interpolatedFactor() call seasonalAt
+  // itself makes is what keeps seasonalAt(last.date) exactly 1 (x / x).
+  const anchorFactor = seasonal
+    ? interpolatedFactor(last.date, seasonal.factors)
+    : 1;
 
   const seasonalAt = (date: string): number =>
-    seasonal ? seasonal.factors[monthOf(date)] / anchorFactor : 1;
+    seasonal ? interpolatedFactor(date, seasonal.factors) / anchorFactor : 1;
 
   // Fit residuals on the trailing window to size the band. Using the model's
   // own error rather than a fixed percentage means a quiet market gets a tight
@@ -347,7 +389,7 @@ export function computeSeasonalForecast(
   }
 
   const seasonalNote = seasonal
-    ? `, plus a month-of-year shape explaining ` +
+    ? `, plus a smoothed month-of-year shape explaining ` +
       `${(seasonalStrength * 100).toFixed(0)}% of the detrended variance`
     : `, with no seasonal term (needs ${MIN_SEASONAL_YEARS} years of history)`;
 

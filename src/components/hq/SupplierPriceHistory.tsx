@@ -14,7 +14,10 @@ import {
 import { THEME } from "@/lib/colors";
 import { formatDateShort, formatPrice } from "@/lib/format";
 import type { SeasonalForecast } from "@/lib/priceForecast";
-import type { SupplierQuotePoint } from "@/lib/supplierAnalytics";
+import type {
+  SupplierForecastPoint,
+  SupplierQuotePoint,
+} from "@/lib/supplierAnalytics";
 
 /**
  * A year of every supplier's quote at one market, against the benchmark, with
@@ -25,12 +28,21 @@ import type { SupplierQuotePoint } from "@/lib/supplierAnalytics";
  * stack of parallel lines. These cross, converge and diverge, which is the
  * behaviour a desk is actually judging.
  *
- * THE FORECAST IS FITTED ON THE BENCHMARK, NOT PER SUPPLIER. Each supplier's
- * dashed continuation is the projected benchmark plus that supplier's own
- * latest differential — i.e. "if this house holds its current standing". It is
- * not a claim about what any individual supplier will do, and the caption says
- * so. Fitting five separate forecasts off ~52 weekly points each would imply a
- * per-counterparty precision the data cannot support.
+ * THE BENCHMARK FORECAST IS FITTED PROPERLY; THE SUPPLIER CONTINUATIONS ARE
+ * NOT A SECOND FORECAST. Each supplier's dashed line is the projected
+ * benchmark plus that supplier's own projected differential —
+ * `supplierDiffForecast`, a gentle day-by-day wander generated alongside the
+ * historical quote history (see gen-supplier-quote-history.mjs), not a fit
+ * against ~52 weekly points the way the benchmark's is. It is not a claim
+ * about what any individual supplier will do, and the caption says so.
+ *
+ * MATCHED BY INDEX, NOT BY DATE. `forecast.forecast[i]` (i=1..horizonDays) and
+ * `supplierDiffForecast[supplier][i-1]` both mean "day i of the horizon", but
+ * their absolute dates can differ by a few days for a less-liquid market — the
+ * generator anchors a market's forecast rows to its own last historical point,
+ * while computeSeasonalForecast anchors to the true last point of the
+ * benchmark series. Joining on date string would silently drop the supplier
+ * offset for those markets.
  */
 
 /**
@@ -79,19 +91,22 @@ const projectedKey = (supplier: string) => `p:${supplier}`;
 
 export default function SupplierPriceHistory({
   quoteHistory,
+  supplierDiffForecast,
   forecast,
   suppliers,
   selected,
   onSelect,
 }: {
   quoteHistory: SupplierQuotePoint[];
+  /** Keyed by supplier, ascending by date. See the file header. */
+  supplierDiffForecast: Record<string, SupplierForecastPoint[]>;
   forecast: SeasonalForecast | null;
   /** Alphabetical, and the colour order. */
   suppliers: string[];
   selected: string | null;
   onSelect: (supplier: string | null) => void;
 }) {
-  const { rows, joinDate, latestDiff } = useMemo(() => {
+  const { rows, joinDate } = useMemo(() => {
     const byDate = new Map<string, Row>();
     const diffs = new Map<string, number>();
 
@@ -134,14 +149,19 @@ export default function SupplierPriceHistory({
         target.bmProjected = point.value;
         target.band = [point.lower, point.upper];
         for (const [supplier, diff] of diffs) {
-          target[projectedKey(supplier)] = Math.max(0, point.value + diff);
+          // Index-based, not date-based — see the file header. i is the
+          // horizon day (1..horizonDays); supplierDiffForecast[i-1] is that
+          // supplier's own projected offset for that same day.
+          const projected = supplierDiffForecast[supplier]?.[i - 1];
+          const offset = projected ? projected.diffUsdPerMt : diff;
+          target[projectedKey(supplier)] = Math.max(0, point.value + offset);
         }
         if (i > 0) ordered.push(target);
       }
     }
 
-    return { rows: ordered, joinDate: join, latestDiff: diffs };
-  }, [quoteHistory, forecast]);
+    return { rows: ordered, joinDate: join };
+  }, [quoteHistory, forecast, supplierDiffForecast]);
 
   if (rows.length === 0) {
     return (
@@ -204,9 +224,9 @@ export default function SupplierPriceHistory({
               minTickGap={36}
             />
             <YAxis
-              width={48}
-              tick={{ fill: THEME.faint, fontSize: 10 }}
-              axisLine={false}
+              width={56}
+              tick={{ fill: THEME.muted, fontSize: 10 }}
+              axisLine={{ stroke: THEME.line }}
               tickLine={false}
               domain={["auto", "auto"]}
               tickFormatter={(v: number) => Math.round(v).toString()}
@@ -305,9 +325,9 @@ export default function SupplierPriceHistory({
         {forecast && (
           <p className="text-[10px] leading-relaxed text-faint">
             Dashed is projection, not quotes. {forecast.note} Supplier
-            continuations hold each house&apos;s latest differential
-            {latestDiff.size > 0 ? "" : ""} against the projected benchmark —
-            not a per-supplier forecast.
+            continuations show each house&apos;s own projected differential
+            against the projected benchmark — not a claim about what any
+            individual supplier will do.
           </p>
         )}
       </div>

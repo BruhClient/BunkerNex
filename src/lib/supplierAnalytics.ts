@@ -17,8 +17,12 @@ import type { Grade, SupplierTier } from "./types";
  * these numbers must say so.
  *
  * Everything is indexed once into module-level Maps. supplier_quote_history.csv
- * is ~29k rows and supplier_transactions.csv ~7.8k, so a per-request linear
- * scan would be the most expensive thing in the route by a wide margin.
+ * is ~44k rows (~28k historical "simulated" + ~16k future-dated
+ * "simulated-forecast", 30 per surviving supplier-market — see
+ * gen-supplier-quote-history.mjs) and supplier_transactions.csv ~7.8k, so a
+ * per-request linear scan would be the most expensive thing in the route by a
+ * wide margin. buildHistoryAndForecastIndexes() splits the two Source_Basis
+ * populations out of supplier_quote_history.csv in one pass.
  */
 
 const FLEET_FILE = "contracts/supplier_fleet.csv";
@@ -69,8 +73,15 @@ export interface SupplierTransaction {
   fromFleetStem: boolean;
 }
 
+/** One supplier's forward-looking differential, on one future date. */
+export interface SupplierForecastPoint {
+  date: string;
+  diffUsdPerMt: number;
+}
+
 let fleetCache: Map<string, SupplierFleet[]> | null = null;
 let historyCache: Map<string, SupplierQuotePoint[]> | null = null;
+let forecastCache: Map<string, Map<string, SupplierForecastPoint[]>> | null = null;
 let transactionCache: Map<string, SupplierTransaction[]> | null = null;
 
 /** Market key. Port and grade together — never one without the other. */
@@ -109,8 +120,19 @@ function buildFleetIndex(): Map<string, SupplierFleet[]> {
   return index;
 }
 
-function buildHistoryIndex(): Map<string, SupplierQuotePoint[]> {
-  const index = new Map<string, SupplierQuotePoint[]>();
+/**
+ * Splits supplier_quote_history.csv into its two Source_Basis populations in
+ * one pass: "simulated" (a year of real-dated weekly quotes — historyIndex)
+ * and "simulated-forecast" (future-dated per-supplier continuations — an
+ * inner Map keyed supplier -> ascending points, forecastIndex). One scan
+ * rather than two, since the file is ~44k rows.
+ */
+function buildHistoryAndForecastIndexes(): {
+  historyIndex: Map<string, SupplierQuotePoint[]>;
+  forecastIndex: Map<string, Map<string, SupplierForecastPoint[]>>;
+} {
+  const historyIndex = new Map<string, SupplierQuotePoint[]>();
+  const forecastIndex = new Map<string, Map<string, SupplierForecastPoint[]>>();
 
   for (const row of readCsv(HISTORY_FILE).rows) {
     const date = str(row, "Date");
@@ -120,6 +142,7 @@ function buildHistoryIndex(): Map<string, SupplierQuotePoint[]> {
     const quote = num(row, "Quote_USD_Per_MT");
     const benchmark = num(row, "Benchmark_USD_Per_MT");
     const diff = num(row, "Diff_USD_Per_MT");
+    const sourceBasis = str(row, "Source_Basis");
 
     // diff is checked for null, not falsiness: 0 is parity with the benchmark
     // and a perfectly ordinary quote. Number("") is 0, which is why str/num
@@ -132,7 +155,22 @@ function buildHistoryIndex(): Map<string, SupplierQuotePoint[]> {
     }
 
     const key = marketKey(portCode, grade);
-    const list = index.get(key) ?? [];
+
+    if (sourceBasis === "simulated-forecast") {
+      const bySupplier = forecastIndex.get(key) ?? new Map();
+      const points = bySupplier.get(supplier) ?? [];
+      points.push({ date, diffUsdPerMt: diff });
+      bySupplier.set(supplier, points);
+      forecastIndex.set(key, bySupplier);
+      continue;
+    }
+
+    // Anything other than "simulated" (including a blank/unrecognised value)
+    // is excluded from the historical series rather than guessed into it —
+    // getMarketQuoteHistory's contract is strictly "a year of weekly quotes".
+    if (sourceBasis !== "simulated") continue;
+
+    const list = historyIndex.get(key) ?? [];
     list.push({
       date,
       supplier,
@@ -140,10 +178,16 @@ function buildHistoryIndex(): Map<string, SupplierQuotePoint[]> {
       benchmarkUsdPerMt: benchmark,
       diffUsdPerMt: diff,
     });
-    index.set(key, list);
+    historyIndex.set(key, list);
   }
 
-  return index;
+  for (const bySupplier of forecastIndex.values()) {
+    for (const points of bySupplier.values()) {
+      points.sort((a, b) => a.date.localeCompare(b.date));
+    }
+  }
+
+  return { historyIndex, forecastIndex };
 }
 
 function buildTransactionIndex(): Map<string, SupplierTransaction[]> {
@@ -208,11 +252,36 @@ export function getMarketQuoteHistory(
   portKey: string,
   grade: Grade,
 ): SupplierQuotePoint[] {
-  if (!historyCache) historyCache = buildHistoryIndex();
+  if (!historyCache || !forecastCache) {
+    const built = buildHistoryAndForecastIndexes();
+    historyCache = built.historyIndex;
+    forecastCache = built.forecastIndex;
+  }
   const rows = historyCache.get(marketKey(portKey, grade)) ?? [];
   return [...rows].sort(
     (a, b) => a.date.localeCompare(b.date) || a.supplier.localeCompare(b.supplier),
   );
+}
+
+/**
+ * Each supplier's forward-looking differential at one port × grade, ascending
+ * by date. Empty where the market has no quote history at all (the same
+ * markets getMarketQuoteHistory returns nothing for).
+ *
+ * This is NOT a per-supplier price forecast — see SupplierPriceHistory.tsx's
+ * doc comment. It is how far each supplier's own quote is projected to sit
+ * off the (separately, and more rigorously, forecast) benchmark.
+ */
+export function getMarketQuoteForecast(
+  portKey: string,
+  grade: Grade,
+): Map<string, SupplierForecastPoint[]> {
+  if (!historyCache || !forecastCache) {
+    const built = buildHistoryAndForecastIndexes();
+    historyCache = built.historyIndex;
+    forecastCache = built.forecastIndex;
+  }
+  return forecastCache.get(marketKey(portKey, grade)) ?? new Map();
 }
 
 /** Settled stems for one port × grade, most recent first. */

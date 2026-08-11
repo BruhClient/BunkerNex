@@ -172,6 +172,13 @@ function readOffers() {
 function readQuoteHistory() {
   const index = new Map();
   for (const [i, row] of parse(HISTORY).rows.entries()) {
+    // supplier_quote_history.csv also carries "simulated-forecast" rows —
+    // future-dated, illustrative continuations for the HQ chart's dashed
+    // line. Ledger transactions are historical settlements, so those rows
+    // must not feed in here: they'd date transactions in the future and
+    // corrupt the "N weeks back" forecast-at-time window below.
+    if ((row.Source_Basis ?? "").trim() !== "simulated") continue;
+
     const date = (row.Date ?? "").trim();
     const portKey = (row.Port_Code ?? "").trim();
     const grade = (row.Grade ?? "").trim();

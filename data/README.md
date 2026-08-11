@@ -557,7 +557,7 @@ list is prose with no rates and no port coverage. These files therefore support
 | `suppliers.csv` | one row per supplier (73), tiered as the source groups them |
 | `supplier_offers.csv` | one row per port × grade × supplier (547), **generated** |
 | `supplier_fleet.csv` | one row per supplier × port (318), **generated** |
-| `supplier_quote_history.csv` | one row per port × grade × supplier × week (28,075), **generated** |
+| `supplier_quote_history.csv` | 52 weekly rows + 30 daily forward-looking rows per port × grade × supplier (28,075 + 16,260 = 44,335), **generated** |
 | `supplier_transactions.csv` | one row per settled stem (7,645), **generated** |
 | `term_terms.csv` | one row per negotiable commercial parameter, with its clause |
 
@@ -677,6 +677,10 @@ gen-supplier-quote-history.mjs →  supplier_quote_history.csv  (reads offers + 
 gen-supplier-transactions.mjs  →  supplier_transactions.csv   (reads quote history)
 ```
 
+`gen-supplier-transactions.mjs` reads only `Source_Basis === "simulated"` rows out of
+`supplier_quote_history.csv` — the `"simulated-forecast"` rows described below are
+future-dated and would otherwise be read as real settlement history.
+
 `gen-supplier-transactions.mjs` throws on a missing quote-history file rather than
 emitting a stale ledger. The quote history copies the benchmark column in, so — unlike
 `supplier_offers.csv` — **it does go stale on a price refresh** and must be re-run with
@@ -705,19 +709,53 @@ against it rather than against barge tonnage.
 
 #### `supplier_quote_history.csv` — the axis `supplier_offers.csv` does not have
 
-52 weekly points per supplier-market, against the port's own benchmark on the same date.
-`supplier_offers.csv` has no `Date` column at all.
+52 weekly points per supplier-market, against the port's own benchmark on the same date,
+plus 30 daily forward-looking points per market (below). `supplier_offers.csv` has no
+`Date` column at all.
 
 **The deviation is the whole point.** Repeating the static differential across 52 weeks
 would draw perfectly parallel lines, which say nothing the single current number does
 not. Each supplier-market gets a mean-reverting weekly shock plus a slow competitiveness
 swing, so suppliers cross each other and can be read as getting keener or dearer across
-the year. The generator asserts that no market moves less than $1/mt across the year,
-precisely to catch a regression back to parallel lines.
+the year.
 
-**The last row reconciles exactly to `supplier_offers.csv`.** The deviation series is
-normalised to be zero on the final date, and that is asserted. Without it the chart's
-right-hand edge would contradict the price the port panel quotes, two screens apart.
+**Amplitude is scaled per market, not a flat $ range.** A flat wander (the original
+figure, ~$0.8-5/mt) is invisible against a benchmark that swings hundreds of dollars a
+year — the chart read as flat lines even though the differential genuinely moved.
+`targetSpreadFor()` sizes each market's amplitude off two things: 5% of that market's own
+trailing-year benchmark range (scales with how volatile the commodity actually is), and a
+floor/cap at 1.5x/4x the supplier's own `TIER_BAND` width from `gen-supplier-offers.mjs`
+(so a Tier 1 major can't get scaled into swinging like a trader just because e.g. MGO is
+volatile). For the volatile grades (VLSFO/HSFO/MGO) the tier cap typically binds; for
+calmer or thinner markets the tier floor binds, keeping suppliers visibly distinct even
+off a quiet benchmark. The "no parallel lines" assertion is relative to each market's own
+target (`spread >= targetSpread * 0.2`) rather than a flat $1/mt floor.
+
+**The last historical row reconciles exactly to `supplier_offers.csv`.** The deviation
+series is normalised to be zero on the final date, and that is asserted. Without it the
+chart's right-hand edge would contradict the price the port panel quotes, two screens
+apart.
+
+**Forward-looking rows, `Source_Basis = "simulated-forecast"`.** The HQ desk's chart
+(`SupplierPriceHistory.tsx`) forecasts the benchmark properly
+(`computeSeasonalForecast`, `src/lib/priceForecast.ts` — Theil-Sen trend, seasonality, a
+±1σ band widening with √days) but has no per-supplier data to vary each supplier's own
+dashed continuation with — without it, every supplier's forecast is the projected
+benchmark plus one flat static offset, drawing as parallel copies of the same curve. Each
+surviving market gets 30 daily rows continuing from the live offer
+(`dailyForecastSeries` — a gentler, slower-reverting daily walk than the historical
+weekly one, seeded on `${market}|forecast`), so day 1 opens close to the live
+differential and each supplier wanders independently from there. `Benchmark_USD_Per_MT`
+on these rows is a plain linear extension of the trailing benchmark slope
+(`projectBenchmark`) — it exists only so `Quote = Benchmark + Diff` stays internally
+consistent in this file, and deliberately does not try to match
+`computeSeasonalForecast`'s math, which is what the live chart's benchmark line actually
+uses. `src/lib/supplierAnalytics.ts` reads these rows into a separate
+`getMarketQuoteForecast()`, keyed by supplier; `getMarketQuoteHistory()` excludes them, so
+its "a year of weekly quotes" contract is unchanged. **`gen-supplier-transactions.mjs`
+filters to `Source_Basis === "simulated"` when it reads this file** — without that filter
+these future-dated rows would be read as real settlement history and corrupt the
+transaction ledger on a rerun.
 
 Two sampling rules worth knowing:
 
