@@ -137,12 +137,21 @@ export default function RoutePlanDesk({
   // default scrubber position — except on first mount, where a handoff from
   // SpotBunkerPanel may have seeded a specific position via initialStepIndex
   // and this must not stomp it back to 0 before the engineer sees it.
-  const mountedRef = useRef(false);
+  //
+  // Compares against the previous vesselName rather than a `hasMounted`
+  // boolean ref: under React 18 Strict Mode's dev-only double-invoke of
+  // effects, a boolean ref that flips true on its first run reads true again
+  // on the synthetic second run of that SAME mount, so a `!mountedRef.current`
+  // guard fires its "vessel changed" branch on first paint too — snapping
+  // stepIndex back to 0 and, via the seeding effect below keying off ctx,
+  // silently discarding the Chief Engineer's handed-off nomination quantity
+  // for a fresh headroom-at-step-0 prefill. Comparing to the actual previous
+  // value is idempotent across the double-invoke: both runs see the same
+  // vesselName and no-op.
+  const prevVesselNameRef = useRef(vesselName);
   useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
+    if (prevVesselNameRef.current === vesselName) return;
+    prevVesselNameRef.current = vesselName;
     setStepIndex(0);
     setData(null);
     setSelectedPlanId(null);
