@@ -39,6 +39,7 @@ import {
   type SpotIssue,
   type Surveyor,
 } from "@/lib/spotBunker";
+import { generateSpotBunkerPdf } from "@/lib/spotBunkerPdf";
 import type { VesselSpec, VesselTrack } from "@/lib/types";
 
 /**
@@ -1170,14 +1171,23 @@ export default function SpotBunkerPanel({
             attention →
           </button>
         )}
-        <button
-          type="button"
-          disabled={errorCount > 0}
-          onClick={() => onSubmit(value, ctx)}
-          className="w-full rounded border border-line-strong bg-accent/15 px-3 py-2 text-[12px] font-semibold text-accent transition-colors hover:bg-accent/25 disabled:cursor-default disabled:bg-surface-2 disabled:text-faint/60 disabled:hover:bg-surface-2"
-        >
-          See bunkering combinations →
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => generateSpotBunkerPdf(spec, ctx, value, issues)}
+            className="rounded border border-line-strong bg-surface-2 px-3 py-2 text-[12px] font-semibold text-fg transition-colors hover:border-faint"
+          >
+            Generate PDF
+          </button>
+          <button
+            type="button"
+            disabled={errorCount > 0}
+            onClick={() => onSubmit(value, ctx)}
+            className="flex-1 rounded border border-line-strong bg-accent/15 px-3 py-2 text-[12px] font-semibold text-accent transition-colors hover:bg-accent/25 disabled:cursor-default disabled:bg-surface-2 disabled:text-faint/60 disabled:hover:bg-surface-2"
+          >
+            See bunkering combinations →
+          </button>
+        </div>
       </div>
     </aside>
   );

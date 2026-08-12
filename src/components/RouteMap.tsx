@@ -148,6 +148,24 @@ interface Props {
    * everywhere else — Explorer's own call site never sets this.
    */
   bunkerPlanPortCodes?: Set<string> | null;
+  /**
+   * Route Plan page only: the port carrying the Chief Engineer's own fixed
+   * next-port nomination, badged with a violet ring (.is-fixed-nomination) —
+   * distinct from bunkerPlanPortCodes above, which are this recommender's own
+   * suggestions rather than an already-committed stem. Undefined/null
+   * everywhere else.
+   */
+  fixedNominationPortCode?: string | null;
+  /**
+   * Disables every programmatic camera move — the initial trade-lane
+   * fitBounds, the resize-triggered re-fit, and the pan-to-selection eases.
+   * Explorer leaves this on (default true): the whole-fleet map needs it to
+   * frame whatever is toggled visible. The Route Plan page's single-vessel
+   * map turns it off — one fixed vessel/service on screen makes every one of
+   * those moves an unwanted jump rather than useful framing, and the engineer
+   * should be free to pan/zoom without the view fighting back.
+   */
+  autoFit?: boolean;
 }
 
 /** CSS pixels; `icon-size` stays at 1 so this is the size actually drawn. */
@@ -215,6 +233,8 @@ export default function RouteMap({
   onSelectPort,
   onSelectVessel,
   bunkerPlanPortCodes = null,
+  fixedNominationPortCode = null,
+  autoFit = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -243,6 +263,10 @@ export default function RouteMap({
   onSelectRef.current = onSelectPort;
   const onSelectVesselRef = useRef(onSelectVessel);
   onSelectVesselRef.current = onSelectVessel;
+  // Read by the ResizeObserver installed in the mount-once effect below, so
+  // toggling autoFit doesn't need to recreate the map.
+  const autoFitRef = useRef(autoFit);
+  autoFitRef.current = autoFit;
   /**
    * Focus state for the ResizeObserver, assigned during render like the
    * callbacks above rather than inside the focus effect below.
@@ -626,6 +650,7 @@ export default function RouteMap({
     // Re-fit on every size change until the user takes over the view.
     const observer = new ResizeObserver(() => {
       map.resize();
+      if (!autoFitRef.current) return;
       // Focus mode owns the camera. Unmounting the services sidebar is itself a
       // size change, so without this guard entering focus would refit the whole
       // trade lane on the very tick the zoom is being set up. resize() preserves
@@ -736,12 +761,12 @@ export default function RouteMap({
       // Focus mode owns the camera, and entering it narrows visibleServices to
       // the one service — which lands here. Refitting the lane would fight the
       // vessel zoom the focus effect is setting up.
-      if (focusVesselRef.current === null) fitRef.current?.();
+      if (autoFit && focusVesselRef.current === null) fitRef.current?.();
     };
 
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [visibleKey, ports, serviceCodes, visiblePortKeys]);
+  }, [visibleKey, ports, serviceCodes, visiblePortKeys, autoFit]);
 
   // --- Bring the focused service forward, push the rest back ---
   // Also owns chevron visibility: direction marks belong to one service at a
@@ -895,14 +920,24 @@ export default function RouteMap({
     }
   }, [bunkerPlanPortCodes]);
 
+  // --- Route Plan page: badge the Chief Engineer's own fixed-nomination port ---
+  useEffect(() => {
+    for (const [key, el] of markersRef.current) {
+      el.classList.toggle("is-fixed-nomination", key === fixedNominationPortCode);
+    }
+  }, [fixedNominationPortCode]);
+
   // --- Focus mode: hold the camera on one vessel ---
   // Programmatic moves never set userMovedRef — zoomstart checks
   // e.originalEvent, and easeTo fires no dragstart — so entering focus does not
   // permanently disable the trade-lane refit for the rest of the session.
   // stepIndex is frozen while focused, so this settles after one pass.
+  // autoFit=false (the Route Plan page's single-vessel map) skips this
+  // entirely — focusVesselName is always null there anyway, but the guard
+  // keeps the contract explicit rather than relying on that being true.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !autoFit) return;
 
     const apply = () => {
       if (!focusVesselName) {
@@ -938,7 +973,7 @@ export default function RouteMap({
 
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [focusVesselName, focusOffsetX, stepIndex, resolvers]);
+  }, [focusVesselName, focusOffsetX, stepIndex, resolvers, autoFit]);
 
   // --- Selected marker styling + always-on label ---
   useEffect(() => {
@@ -982,7 +1017,7 @@ export default function RouteMap({
   // the camera, so the two don't fight over the view.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !selectedVesselName || focusVesselName) return;
+    if (!map || !selectedVesselName || focusVesselName || !autoFit) return;
     const apply = () => {
       const fix =
         resolvers.get(selectedVesselName)?.(stepIndexRef.current) ?? null;
@@ -991,13 +1026,13 @@ export default function RouteMap({
     };
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [selectedVesselName, focusVesselName, resolvers]);
+  }, [selectedVesselName, focusVesselName, resolvers, autoFit]);
 
   // --- Pan toward a freshly selected port ---
   useEffect(() => {
     const map = mapRef.current;
     const port = selectedKey ? portsByKey.get(selectedKey) : null;
-    if (!map || !port) return;
+    if (!map || !port || !autoFit) return;
     const apply = () => {
       map.easeTo({
         center: [port.lon, port.lat],
@@ -1007,7 +1042,7 @@ export default function RouteMap({
     };
     if (readyRef.current) apply();
     else map.once("load", apply);
-  }, [selectedKey, portsByKey]);
+  }, [selectedKey, portsByKey, autoFit]);
 
   // Sized with height rather than absolute insets: MapLibre ships unlayered
   // CSS (.maplibregl-map { position: relative }) which outranks any Tailwind

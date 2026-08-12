@@ -437,7 +437,8 @@ export default function RoutePlanDesk({
                   <div className="flex items-baseline justify-between gap-3 px-1 pb-2">
                     <span className="label">Selected combination on the route</span>
                     <span className="text-[10px] text-faint">
-                      gold ring marks a recommended stop
+                      gold ring marks a recommended stop · violet ring marks the
+                      fixed nomination
                     </span>
                   </div>
                   <div className="h-[420px] overflow-hidden rounded border border-line">
@@ -447,6 +448,9 @@ export default function RoutePlanDesk({
                       track={track}
                       stepIndex={stepIndex}
                       bunkerPlanPortCodes={bunkerPlanPortCodes}
+                      fixedNominationPortCode={
+                        fixedGrade && fixedQtyMt && fixedQtyMt > 0 ? ctx?.portCode ?? null : null
+                      }
                     />
                   </div>
                 </section>

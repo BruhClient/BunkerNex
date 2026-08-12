@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
+    "jspdf": "^4.2.1",
     "maplibre-gl": "^5.6.1",
     "next": "^15.5.4",
     "papaparse": "^5.5.3",

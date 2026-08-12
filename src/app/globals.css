@@ -227,6 +227,23 @@ body {
     0 2px 6px rgba(0, 0, 0, 0.65);
 }
 
+/* Route Plan page only: flags the port carrying the Chief Engineer's own
+   fixed next-port nomination — already committed, not something this
+   recommender chose. A violet ring, distinct from both the accent cyan of
+   .is-selected and the gold of .is-bunker-plan, so the map never reads a
+   CE-fixed stem as one of the optimizer's own recommended stops. */
+.bn-marker.is-fixed-nomination .bn-pulse {
+  border-color: #a78bfa;
+  animation: selected-pulse 1.8s ease-out infinite;
+}
+
+.bn-marker.is-fixed-nomination .bn-dot {
+  box-shadow:
+    0 0 0 3px #a78bfa,
+    0 0 14px 3px rgba(167, 139, 250, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
 /* ---------------------------------------------------------------
    Vessel markers. A solid hull silhouette rather than a disc or an
    arrow: a ship must never be mistaken for a fixed port, nor for the

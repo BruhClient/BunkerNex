@@ -245,6 +245,13 @@ export async function POST(request: Request) {
     carriedGrades,
     startResidualRobMt,
     startComplianceRobMt,
+    fixedNomination: fixedNomination
+      ? {
+          grade: fixedNomination.grade,
+          quantityMt: fixedNomination.quantityMt,
+          portLabel: ctx.portName ?? ctx.portCode ?? "next port",
+        }
+      : null,
   });
 
   const { narrative, error: narrativeError } = await generateNarrative(plans);

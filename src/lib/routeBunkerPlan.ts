@@ -411,13 +411,27 @@ export function buildRouteRobTimeline(params: {
   calls: PlanCall[];
   /** This tank's stops only. */
   stops: PlannedStop[];
+  /** What the first point's label says. Defaults to "Now" — the Chief
+   * Engineer's fixed next-port nomination (see planRouteBunkering) passes a
+   * label naming its own port/grade/quantity instead, so the graph never
+   * silently absorbs that stem into an unlabelled starting figure. */
+  startLabel?: string;
 }): RobTimelinePoint[] {
-  const { startRobMt, safeCapMt, floorMt, burnTransitFor, burnBerthFor, calls, stops } = params;
+  const {
+    startRobMt,
+    safeCapMt,
+    floorMt,
+    burnTransitFor,
+    burnBerthFor,
+    calls,
+    stops,
+    startLabel = "Now",
+  } = params;
   const stopByIndex = new Map(stops.map((s) => [s.callIndex, s]));
 
   const points: RobTimelinePoint[] = [
     {
-      label: "Now",
+      label: startLabel,
       timestamp: null,
       robMt: round1(startRobMt),
       capMt: round1(safeCapMt),
@@ -484,6 +498,14 @@ export interface RouteBunkerPlanInputs {
    * i.e. where this planner's horizon actually starts from. */
   startResidualRobMt: number;
   startComplianceRobMt: number;
+  /**
+   * The Chief Engineer's own fixed next-port stem, already folded into
+   * startResidualRobMt/startComplianceRobMt above — this is carried through
+   * separately purely so the ROB timeline's first point can name it (port,
+   * grade, exact MT) rather than showing an unlabelled starting ROB. Null on
+   * a direct /route-plan visit with no nomination entered.
+   */
+  fixedNomination: { grade: SpotFuelGrade; quantityMt: number; portLabel: string } | null;
 }
 
 const STRATEGY_LABELS: Record<RouteBunkerPlan["id"], string> = {
@@ -516,7 +538,23 @@ function residualGradesFor(carried: ReadonlySet<SpotFuelGrade>): SpotFuelGrade[]
  * a re-simulation of it.
  */
 export function planRouteBunkering(input: RouteBunkerPlanInputs): RouteBunkerPlan[] {
-  const { spec, calls, carriedGrades, startResidualRobMt, startComplianceRobMt } = input;
+  const {
+    spec,
+    calls,
+    carriedGrades,
+    startResidualRobMt,
+    startComplianceRobMt,
+    fixedNomination,
+  } = input;
+
+  const residualStartLabel =
+    fixedNomination && residualGradesFor(carriedGrades).includes(fixedNomination.grade)
+      ? `${fixedNomination.portLabel} +${round1(fixedNomination.quantityMt)} MT ${fixedNomination.grade} (CE fixed)`
+      : "Now";
+  const complianceStartLabel =
+    fixedNomination && fixedNomination.grade === "MGO"
+      ? `${fixedNomination.portLabel} +${round1(fixedNomination.quantityMt)} MT MGO (CE fixed)`
+      : "Now";
 
   const residualCapMt = spec.maxRobMt === null ? 0 : spec.maxRobMt * SAFE_FILL_RATIO;
   const residualFloorMt = spec.minRobMt ?? 0;
@@ -598,6 +636,7 @@ export function planRouteBunkering(input: RouteBunkerPlanInputs): RouteBunkerPla
           burnBerthFor: residualBurnBerth,
           calls,
           stops: residual.stops,
+          startLabel: residualStartLabel,
         }),
         compliance: buildRouteRobTimeline({
           startRobMt: startComplianceRobMt,
@@ -607,6 +646,7 @@ export function planRouteBunkering(input: RouteBunkerPlanInputs): RouteBunkerPla
           burnBerthFor: complianceBurnBerth,
           calls,
           stops: compliance.stops,
+          startLabel: complianceStartLabel,
         }),
       },
     };
