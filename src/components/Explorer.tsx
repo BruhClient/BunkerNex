@@ -86,9 +86,9 @@ export default function Explorer({
   // Collapsed by default: the map is the point, and a shut drawer costs
   // nothing per playback tick since only its header renders.
   const [logOpen, setLogOpen] = useState(false);
-  // Open by default, unlike the log — this is the thing to check before
-  // the log is even worth opening.
-  const [forecastOpen, setForecastOpen] = useState(true);
+  // Collapsed by default, same as the log — only its header renders
+  // when shut, so there's no per-tick cost to leaving it closed.
+  const [forecastOpen, setForecastOpen] = useState(false);
 
   // Filter sidebar state, beyond visibleServices above. Region/service stay
   // one axis (visibleServices) — these two are the genuinely new ones:
