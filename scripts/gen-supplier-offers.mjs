@@ -387,12 +387,12 @@ function buildOffer(portKey, grade, supplier, thin) {
 
   const range =
     tier === 1
-      ? [pick(r, 500, 1000, 50), pick(r, 4000, 6000, 500)]
+      ? [100, pick(r, 4000, 6000, 500)]
       : tier === 2
-        ? [pick(r, 200, 500, 50), pick(r, 2000, 4000, 500)]
+        ? [100, pick(r, 2000, 4000, 500)]
         : tier === 3
-          ? [pick(r, 100, 200, 50), pick(r, 800, 1500, 100)]
-          : [pick(r, 100, 300, 50), pick(r, 1500, 3000, 500)];
+          ? [100, pick(r, 800, 1500, 100)]
+          : [100, pick(r, 1500, 3000, 500)];
 
   // Clause 3.3 warrants 400-800 MT/hour. A shore line beats a barge hose.
   const pumpRate =

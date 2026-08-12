@@ -42,6 +42,7 @@ export default function PortPanel({
   const [data, setData] = useState<PricesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pricesOpen, setPricesOpen] = useState(false);
 
   const portKey = port?.key ?? null;
 
@@ -148,38 +149,68 @@ export default function PortPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <section>
-          <div className="flex items-center justify-between px-4 pb-2 pt-3.5">
-            <span className="label">Bunker prices</span>
-          </div>
+          <h2>
+            <button
+              type="button"
+              onClick={() => setPricesOpen((v) => !v)}
+              aria-expanded={pricesOpen}
+              className="flex w-full items-center justify-between px-4 pb-2 pt-3.5 text-left"
+            >
+              <span className="label">Bunker prices</span>
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 10 10"
+                aria-hidden
+                className={`shrink-0 text-faint transition-transform ${
+                  pricesOpen ? "" : "rotate-180"
+                }`}
+              >
+                <path
+                  d="M1 6.5 L5 2.5 L9 6.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              </svg>
+            </button>
+          </h2>
 
-          {loading && (
-            <p className="px-4 pb-4 text-xs text-faint">Loading prices…</p>
-          )}
-
-          {error && !loading && (
-            <p className="px-4 pb-4 text-xs text-down">{error}</p>
-          )}
-
-          {!loading && !error && !hasPrices && (
-            /* 12 of the 14 route ports have no quotes in the dataset. Say so
-               plainly rather than showing an empty chart frame. */
-            <div className="mx-4 mb-4 rounded border border-dashed border-line px-3 py-4">
-              <p className="text-xs text-muted">
-                No bunker pricing in this dataset.
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-faint">
-                Prices cover a separate set of global bunker hubs. Of the ports
-                on these services, only Singapore and Shanghai are quoted.
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && hasPrices && data && (
+          {pricesOpen && (
             <>
-              <PriceTiles grades={data.grades} />
-              <div className="mt-4">
-                <PriceChart grades={data.grades} brent={data.brent} />
-              </div>
+              {loading && (
+                <p className="px-4 pb-4 text-xs text-faint">
+                  Loading prices…
+                </p>
+              )}
+
+              {error && !loading && (
+                <p className="px-4 pb-4 text-xs text-down">{error}</p>
+              )}
+
+              {!loading && !error && !hasPrices && (
+                /* 12 of the 14 route ports have no quotes in the dataset. Say so
+                   plainly rather than showing an empty chart frame. */
+                <div className="mx-4 mb-4 rounded border border-dashed border-line px-3 py-4">
+                  <p className="text-xs text-muted">
+                    No bunker pricing in this dataset.
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-faint">
+                    Prices cover a separate set of global bunker hubs. Of the
+                    ports on these services, only Singapore and Shanghai are
+                    quoted.
+                  </p>
+                </div>
+              )}
+
+              {!loading && !error && hasPrices && data && (
+                <>
+                  <PriceTiles grades={data.grades} />
+                  <div className="mt-4">
+                    <PriceChart grades={data.grades} brent={data.brent} />
+                  </div>
+                </>
+              )}
             </>
           )}
         </section>
