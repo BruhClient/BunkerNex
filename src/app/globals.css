@@ -211,6 +211,22 @@ body {
     0 0 14px 2px rgba(34, 211, 238, 0.5);
 }
 
+/* Route Plan page only: flags a port as a stop in the selected bunkering
+   combination. A distinct gold ring rather than the accent cyan .is-selected
+   already uses, so a port can carry both states (selected AND a plan stop)
+   without one reading as the other. */
+.bn-marker.is-bunker-plan .bn-pulse {
+  border-color: #fbbf24;
+  animation: selected-pulse 1.8s ease-out infinite;
+}
+
+.bn-marker.is-bunker-plan .bn-dot {
+  box-shadow:
+    0 0 0 3px #fbbf24,
+    0 0 14px 3px rgba(251, 191, 36, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
 /* ---------------------------------------------------------------
    Vessel markers. A solid hull silhouette rather than a disc or an
    arrow: a ship must never be mistaken for a fixed port, nor for the

@@ -470,12 +470,20 @@ export default function Explorer({
               away mid-form would drop the in-progress spot bunker draft,
               which Explorer holds only in memory. */}
           {!spotFocus && (
-            <Link
-              href="/hq"
-              className="hidden items-center rounded border border-line px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-fg sm:inline-flex"
-            >
-              Supplier HQ
-            </Link>
+            <>
+              <Link
+                href="/hq"
+                className="hidden items-center rounded border border-line px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-fg sm:inline-flex"
+              >
+                Supplier HQ
+              </Link>
+              <Link
+                href="/route-plan"
+                className="hidden items-center rounded border border-line px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-fg sm:inline-flex"
+              >
+                Route Plan
+              </Link>
+            </>
           )}
         </div>
         {/* The map key lives in the sidebar footer, where there is room to

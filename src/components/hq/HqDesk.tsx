@@ -151,6 +151,12 @@ export default function HqDesk({
           <span className="hidden text-xs text-muted sm:inline">
             HQ bunker desk · supplier evaluation
           </span>
+          <Link
+            href="/route-plan"
+            className="hidden items-center rounded border border-line px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-fg sm:inline-flex"
+          >
+            Route Plan
+          </Link>
         </div>
         <div className="shrink-0 text-right">
           <div className="label leading-none">Prices as of</div>

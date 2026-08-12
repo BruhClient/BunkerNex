@@ -142,6 +142,12 @@ interface Props {
   focusOffsetX: number;
   onSelectPort: (key: string | null) => void;
   onSelectVessel: (name: string | null) => void;
+  /**
+   * Route Plan page only: port codes in the currently-selected bunkering
+   * combination, badged with a gold ring (.is-bunker-plan). Undefined/null
+   * everywhere else — Explorer's own call site never sets this.
+   */
+  bunkerPlanPortCodes?: Set<string> | null;
 }
 
 /** CSS pixels; `icon-size` stays at 1 so this is the size actually drawn. */
@@ -208,6 +214,7 @@ export default function RouteMap({
   focusOffsetX,
   onSelectPort,
   onSelectVessel,
+  bunkerPlanPortCodes = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -880,6 +887,13 @@ export default function RouteMap({
       el.classList.toggle("is-selected", name === selectedVesselName);
     }
   }, [selectedVesselName]);
+
+  // --- Route Plan page: badge the selected combination's stop ports ---
+  useEffect(() => {
+    for (const [key, el] of markersRef.current) {
+      el.classList.toggle("is-bunker-plan", bunkerPlanPortCodes?.has(key) ?? false);
+    }
+  }, [bunkerPlanPortCodes]);
 
   // --- Focus mode: hold the camera on one vessel ---
   // Programmatic moves never set userMovedRef — zoomstart checks

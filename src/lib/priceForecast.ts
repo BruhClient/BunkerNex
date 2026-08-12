@@ -411,3 +411,202 @@ export function computeSeasonalForecast(
         : ""),
   };
 }
+
+/* -------------------------------------------------------------------------
+   EWMA mean-reversion forecast
+   ------------------------------------------------------------------------- */
+
+export interface MeanReversionForecastPoint {
+  date: string;
+  value: number;
+  /** Band edges. Same √horizon widening convention as the seasonal model. */
+  lower: number;
+  upper: number;
+}
+
+export interface MeanReversionForecast {
+  actual: PricePoint[];
+  forecast: MeanReversionForecastPoint[];
+  method: "ewma-mean-reversion";
+  horizonDays: number;
+  baselineHalfLifeDays: number;
+  /** The EWMA level at the anchor date — what the projection reverts toward. */
+  baselineUsdPerMt: number;
+  note: string;
+}
+
+/** How long a price move takes to roll out of the EWMA baseline. */
+const DEFAULT_BASELINE_HALF_LIFE_DAYS = 60;
+/** How fast today's gap to that baseline is expected to close. */
+const REVERSION_HALF_LIFE_DAYS = 12;
+
+/**
+ * Cadence-aware EWMA over `quoted` — each step's weight depends on the actual
+ * day-gap since the previous quote, not point count, for the same reason
+ * computeSeasonalForecast reads cadenceDays off the dates rather than
+ * assuming daily spacing: a naive per-point EWMA run over the weekly
+ * methanol column would decay seven times slower per quote than the same
+ * half-life applied to a daily column.
+ */
+function ewmaSeries(quoted: PricePoint[], halfLifeDays: number): number[] {
+  const level = new Array<number>(quoted.length);
+  level[0] = quoted[0].value as number;
+  for (let i = 1; i < quoted.length; i++) {
+    const gapDays = Math.max(
+      dayNumber(quoted[i].date) - dayNumber(quoted[i - 1].date),
+      0,
+    );
+    const alpha = 1 - Math.exp((Math.log(0.5) * gapDays) / halfLifeDays);
+    level[i] = alpha * (quoted[i].value as number) + (1 - alpha) * level[i - 1];
+  }
+  return level;
+}
+
+/**
+ * A mean-reversion projection: today's price, relative to a long EWMA
+ * baseline, decays back toward that baseline over the forecast horizon.
+ *
+ * Deliberately a THIRD, differently-shaped model next to computePriceForecast
+ * (extends the recent slope forward in a straight line) and
+ * computeSeasonalForecast (extends the slope too, reshaped by a
+ * month-of-year factor). Neither of those can express a spike or dip fading
+ * back toward its own recent normal — a straight trend line keeps
+ * extrapolating the move, and the seasonal model only bends it by calendar
+ * month, not by how far today's price has strayed from its own baseline.
+ * This model captures exactly that: the further today's quote sits from its
+ * `baselineHalfLifeDays`-day EWMA, the more of that gap the projection
+ * expects to close, at a fixed `REVERSION_HALF_LIFE_DAYS`-day half-life.
+ *
+ * Returns null below the same MIN_POINTS gate as computeSeasonalForecast —
+ * a consistent "can this port even be modelled" answer across all three
+ * models, so the ensemble degrades the same way regardless of which model
+ * dropped out.
+ */
+export function computeMeanReversionForecast(
+  points: PricePoint[],
+  options: { horizonDays?: number; baselineHalfLifeDays?: number } = {},
+): MeanReversionForecast | null {
+  const horizonDays = options.horizonDays ?? 10;
+  const baselineHalfLifeDays =
+    options.baselineHalfLifeDays ?? DEFAULT_BASELINE_HALF_LIFE_DAYS;
+
+  const quoted = trimNulls(points).filter((p) => p.value !== null);
+  if (quoted.length < MIN_POINTS) return null;
+
+  const trendWindow = quoted.slice(-TREND_POINTS);
+  const level = ewmaSeries(trendWindow, baselineHalfLifeDays);
+
+  const last = trendWindow[trendWindow.length - 1];
+  const lastValue = last.value as number;
+  const baselineUsdPerMt = level[level.length - 1];
+  const deviation = lastValue - baselineUsdPerMt;
+
+  let squaredError = 0;
+  for (let i = 0; i < trendWindow.length; i++) {
+    squaredError += ((trendWindow[i].value as number) - level[i]) ** 2;
+  }
+  const sigma = Math.sqrt(squaredError / trendWindow.length);
+
+  const forecast: MeanReversionForecastPoint[] = [
+    { date: last.date, value: lastValue, lower: lastValue, upper: lastValue },
+  ];
+  for (let h = 1; h <= horizonDays; h++) {
+    const decay = Math.exp(-h / REVERSION_HALF_LIFE_DAYS);
+    const value = Math.max(0, baselineUsdPerMt + deviation * decay);
+    // sqrt(h): same random-walk-error convention as the seasonal band.
+    const spread = sigma * Math.sqrt(h);
+    forecast.push({
+      date: addDays(last.date, h),
+      value,
+      lower: Math.max(0, value - spread),
+      upper: value + spread,
+    });
+  }
+
+  return {
+    actual: quoted.slice(-HISTORY_DAYS),
+    forecast,
+    method: "ewma-mean-reversion",
+    horizonDays,
+    baselineHalfLifeDays,
+    baselineUsdPerMt,
+    note:
+      `Modelled projection, not a market forecast — reverts the current ` +
+      `${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)} $/mt gap to its ` +
+      `${baselineHalfLifeDays}-day baseline back at a ${REVERSION_HALF_LIFE_DAYS}-day ` +
+      `half-life, rather than extending the recent trend. Band is ±1σ of ` +
+      `the fit, widening with √days.`,
+  };
+}
+
+/* -------------------------------------------------------------------------
+   Three-model ensemble
+   ------------------------------------------------------------------------- */
+
+export interface ForecastEnsemblePoint {
+  date: string;
+  /** Median of whichever models have a point at this step. */
+  value: number;
+  lower: number | null;
+  upper: number | null;
+  /** How many of the 3 models contributed — 1 to 3. Never 0 (dropped instead). */
+  modelsUsed: number;
+}
+
+/**
+ * Pointwise median of the three forecasts above, aligned by array INDEX
+ * (the forecast step h) rather than by date string. Safe because all three
+ * functions are called against the same trimmed `quoted` series and so share
+ * the same anchor `last.date` at index 0 — `addDays(last.date, h)` then
+ * produces an identical date at index h in every model that reaches that far.
+ *
+ * Degrades gracefully: a step past a model's own horizonDays, or from a port
+ * where the seasonal/mean-reversion MIN_POINTS gate failed, just drops that
+ * model from the median at that step rather than failing the whole point.
+ * Only a step where every model is absent is omitted from the result.
+ */
+export function computeForecastEnsemble(
+  trend: PriceForecast | null,
+  seasonal: SeasonalForecast | null,
+  meanReversion: MeanReversionForecast | null,
+): ForecastEnsemblePoint[] {
+  const maxLen = Math.max(
+    trend?.forecast.length ?? 0,
+    seasonal?.forecast.length ?? 0,
+    meanReversion?.forecast.length ?? 0,
+  );
+
+  const points: ForecastEnsemblePoint[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    const tp = trend?.forecast[i];
+    const sp = seasonal?.forecast[i];
+    const mp = meanReversion?.forecast[i];
+    const date = sp?.date ?? mp?.date ?? tp?.date;
+    if (date === undefined) continue;
+
+    const values: number[] = [];
+    const lowers: number[] = [];
+    const uppers: number[] = [];
+    if (tp?.value != null) values.push(tp.value);
+    if (sp) {
+      values.push(sp.value);
+      lowers.push(sp.lower);
+      uppers.push(sp.upper);
+    }
+    if (mp) {
+      values.push(mp.value);
+      lowers.push(mp.lower);
+      uppers.push(mp.upper);
+    }
+    if (values.length === 0) continue;
+
+    points.push({
+      date,
+      value: median(values),
+      lower: lowers.length > 0 ? median(lowers) : null,
+      upper: uppers.length > 0 ? median(uppers) : null,
+      modelsUsed: values.length,
+    });
+  }
+  return points;
+}
