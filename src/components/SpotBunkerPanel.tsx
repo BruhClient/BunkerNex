@@ -63,7 +63,9 @@ import type { VesselSpec, VesselTrack } from "@/lib/types";
  *
  * There is no <form> element — Enter does nothing, only the button submits.
  * `onSubmit` hands the validated draft and its derived `ctx` to Explorer,
- * which swaps this panel for SpotMatchPanel and posts to /api/spot-match.
+ * which navigates to /route-plan preselected to this vessel, position and
+ * nomination — the route-wide bunkering optimizer, not a single-port
+ * supplier match.
  */
 
 interface Props {
@@ -1174,7 +1176,7 @@ export default function SpotBunkerPanel({
           onClick={() => onSubmit(value, ctx)}
           className="w-full rounded border border-line-strong bg-accent/15 px-3 py-2 text-[12px] font-semibold text-accent transition-colors hover:bg-accent/25 disabled:cursor-default disabled:bg-surface-2 disabled:text-faint/60 disabled:hover:bg-surface-2"
         >
-          Find best supplier fit
+          See bunkering combinations →
         </button>
       </div>
     </aside>

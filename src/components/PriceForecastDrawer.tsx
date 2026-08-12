@@ -24,7 +24,7 @@ const DEFAULT_GRADE: Grade = "VLSFO";
 
 /**
  * A global reference forecast, not tied to any selected vessel — unlike the
- * per-match forecast in SpotMatchPanel, this has no request to inherit a
+ * per-call forecasts on the route plan desk, this has no request to inherit a
  * port/grade from, so it carries its own picker and defaults to the
  * fleet's most liquid hub (Singapore VLSFO).
  */

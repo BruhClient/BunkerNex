@@ -47,6 +47,14 @@ interface Props {
   ports: Port[];
   portCalls: PortCall[];
   asOf: string | null;
+  /** Handoff from SpotBunkerPanel's submit (Explorer.goToRoutePlan), read
+   * off the /route-plan URL by the server page. Null on a direct visit —
+   * the desk falls back to its own defaults (first vessel, step 0, prefill
+   * from ctx) exactly as it did before this handoff existed. */
+  initialVesselName: string | null;
+  initialStepIndex: number | null;
+  initialGrade: SpotFuelGrade | null;
+  initialQtyMt: number | null;
 }
 
 /** Client-side, same construction Explorer.tsx already uses for its own
@@ -89,6 +97,10 @@ export default function RoutePlanDesk({
   ports,
   portCalls,
   asOf,
+  initialVesselName,
+  initialStepIndex,
+  initialGrade,
+  initialQtyMt,
 }: Props) {
   const specByName = useMemo(
     () => new Map(vesselSpecs.map((s) => [s.name, s])),
@@ -99,8 +111,16 @@ export default function RoutePlanDesk({
     [vesselTracks],
   );
 
-  const [vesselName, setVesselName] = useState(() => sortedTracks[0]?.name ?? "");
-  const [stepIndex, setStepIndex] = useState(0);
+  const [vesselName, setVesselName] = useState(() => {
+    if (
+      initialVesselName &&
+      sortedTracks.some((t) => t.name === initialVesselName)
+    ) {
+      return initialVesselName;
+    }
+    return sortedTracks[0]?.name ?? "";
+  });
+  const [stepIndex, setStepIndex] = useState(() => initialStepIndex ?? 0);
 
   const track = useMemo(
     () => sortedTracks.find((t) => t.name === vesselName) ?? null,
@@ -114,8 +134,15 @@ export default function RoutePlanDesk({
   );
 
   // A fresh vessel starts at the window's beginning, same as Explorer's
-  // default scrubber position.
+  // default scrubber position — except on first mount, where a handoff from
+  // SpotBunkerPanel may have seeded a specific position via initialStepIndex
+  // and this must not stomp it back to 0 before the engineer sees it.
+  const mountedRef = useRef(false);
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
     setStepIndex(0);
     setData(null);
     setSelectedPlanId(null);
@@ -128,15 +155,35 @@ export default function RoutePlanDesk({
   // desk has no persisted nomination to read back (see routeBunkerPlan.ts's
   // "not re-optimizing the CE's fixed nomination" scope note: this form IS
   // that fixed input, not a recommendation this page can second-guess).
-  const [fixedGrade, setFixedGrade] = useState<SpotFuelGrade | null>(null);
-  const [fixedQtyMt, setFixedQtyMt] = useState<number | null>(null);
+  //
+  // A handoff from SpotBunkerPanel's own submit carries the CE's actual
+  // typed grade/quantity in initialGrade/initialQtyMt — that wins over the
+  // ctx-derived prefill once, on the first vessel/port this desk resolves,
+  // then behaves exactly as a direct /route-plan visit would from there on.
+  const [fixedGrade, setFixedGrade] = useState<SpotFuelGrade | null>(initialGrade);
+  const [fixedQtyMt, setFixedQtyMt] = useState<number | null>(initialQtyMt);
   const seededRef = useRef<string | null>(null);
+  const initialNominationRef = useRef({
+    grade: initialGrade,
+    qtyMt: initialQtyMt,
+    consumed: false,
+  });
 
   useEffect(() => {
     if (!ctx) return;
     const seedKey = `${vesselName}|${ctx.portCode}`;
     if (seededRef.current === seedKey) return;
     seededRef.current = seedKey;
+
+    if (
+      !initialNominationRef.current.consumed &&
+      initialNominationRef.current.grade !== null
+    ) {
+      initialNominationRef.current.consumed = true;
+      setFixedGrade(initialNominationRef.current.grade);
+      setFixedQtyMt(initialNominationRef.current.qtyMt);
+      return;
+    }
 
     const draft = prefillSpotRequest(ctx);
     setFixedGrade(draft.grade);
@@ -358,9 +405,7 @@ export default function RoutePlanDesk({
             </p>
           </section>
 
-          {loading && (
-            <p className="py-16 text-center text-[11px] text-faint">Evaluating route…</p>
-          )}
+          {loading && <RoutePlanLoading />}
           {error && <p className="py-16 text-center text-[11px] text-down">{error}</p>}
 
           {!loading && !error && data && (
@@ -489,6 +534,83 @@ export default function RoutePlanDesk({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** What /api/route-plan actually does, in the order it does it — not a
+ * telemetry feed. The pipeline is one request/response with no progress
+ * events, so this is a timed staged animation standing in for it; it always
+ * settles on the last stage rather than claiming to know true progress. */
+const LOADING_STAGES: readonly string[] = [
+  "Reading the vessel's next calls, ECA windows and tank ROB…",
+  "Scoring suppliers on price, barge capacity and delivered variance…",
+  "Forecasting prices at every reachable call…",
+  "Ranking lowest-cost, fewest-stops and best-value combinations…",
+  "Writing the route explanation…",
+];
+
+const LOADING_STAGE_MS = 900;
+
+function RoutePlanLoading() {
+  const [stageIndex, setStageIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setStageIndex((i) => Math.min(i + 1, LOADING_STAGES.length - 1));
+    }, LOADING_STAGE_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-16">
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 22 22"
+        aria-hidden
+        className="animate-spin text-accent"
+      >
+        <circle
+          cx="11"
+          cy="11"
+          r="9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeOpacity="0.2"
+        />
+        <path
+          d="M20 11a9 9 0 0 0-9-9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <ul className="w-full space-y-1.5" aria-live="polite">
+        {LOADING_STAGES.map((label, i) => (
+          <li
+            key={label}
+            className={`flex items-start gap-2 text-[11px] leading-relaxed transition-colors ${
+              i < stageIndex
+                ? "text-muted"
+                : i === stageIndex
+                  ? "text-fg"
+                  : "text-faint/50"
+            }`}
+          >
+            <span aria-hidden className="mt-px w-3 shrink-0 text-center tnum">
+              {i < stageIndex ? "✓" : i === stageIndex ? "→" : "·"}
+            </span>
+            <span>{label}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-center text-[10px] text-faint">
+        Deterministic scoring runs first — the explanation above is the only
+        step that calls an LLM, and the plan is already final before it does.
+      </p>
     </div>
   );
 }

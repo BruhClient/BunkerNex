@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import BunkerLog from "./BunkerLog";
 import FilterSidebar from "./FilterSidebar";
@@ -12,17 +13,15 @@ import SpotBunkerPanel, {
   SPOT_PANEL_INLINE_MIN,
   SPOT_PANEL_WIDTH,
 } from "./SpotBunkerPanel";
-import SpotMatchPanel from "./SpotMatchPanel";
 import TimeScrubber from "./TimeScrubber";
 import VesselPanel from "./VesselPanel";
-import type { SpotMatchApiResponse } from "@/app/api/spot-match/route";
 import { allBunkerEvents } from "@/lib/bunkerEvents";
 import type { Co2eCostPoint, Co2eFactors } from "@/lib/emissions";
 import { computeFilterResult } from "@/lib/filterLogic";
 import { formatDate } from "@/lib/format";
-import { buildLegs, stepTimestamp } from "@/lib/vesselPosition";
+import { stepTimestamp } from "@/lib/vesselPosition";
 import type { BunkerPriceSnapshot } from "@/lib/bunkerEvents";
-import type { SpotBunkerRequest, SpotContext } from "@/lib/spotBunker";
+import type { SpotBunkerRequest } from "@/lib/spotBunker";
 import type {
   Port,
   PortCall,
@@ -84,22 +83,6 @@ export default function Explorer({
   // Held here rather than in the panel so stepping back to the vessel detail
   // and returning does not throw away everything the engineer typed.
   const [spotDraft, setSpotDraft] = useState<SpotBunkerRequest | null>(null);
-  // What SpotBunkerPanel swaps for once submitted. "matching" is the phase
-  // every exit path below is guarded against — see selectVessel, selectPort
-  // and exitSpotMode.
-  const [spotPhase, setSpotPhase] = useState<
-    "form" | "matching" | "result" | "error"
-  >("form");
-  const [spotResult, setSpotResult] = useState<SpotMatchApiResponse | null>(
-    null,
-  );
-  const [spotError, setSpotError] = useState<string | null>(null);
-  // The last request+ctx sent to /api/spot-match, kept only so "Try again"
-  // can resubmit without the panel re-deriving ctx a second time.
-  const [spotSubmission, setSpotSubmission] = useState<{
-    request: SpotBunkerRequest;
-    ctx: SpotContext;
-  } | null>(null);
   // Collapsed by default: the map is the point, and a shut drawer costs
   // nothing per playback tick since only its header renders.
   const [logOpen, setLogOpen] = useState(false);
@@ -264,24 +247,18 @@ export default function Explorer({
     [vesselQuery, portQuery, ports, vesselTracks],
   );
 
-  const selectPort = useCallback(
-    (key: string | null) => {
-      // A port marker on the map stays clickable in focus mode; don't let it
-      // silently blow away an in-flight match.
-      if (spotPhase === "matching") return;
-      setSelectedKey(key);
-      // The port, service and vessel detail panels share one slot — picking a
-      // port closes whichever of the others is open.
-      if (key) {
-        setSelectedServiceCode(null);
-        setSelectedVesselName(null);
-        setSpotFormOpen(false);
-        // A narrow screen only has room for one overlay at a time.
-        setSidebarOpen(false);
-      }
-    },
-    [spotPhase],
-  );
+  const selectPort = useCallback((key: string | null) => {
+    setSelectedKey(key);
+    // The port, service and vessel detail panels share one slot — picking a
+    // port closes whichever of the others is open.
+    if (key) {
+      setSelectedServiceCode(null);
+      setSelectedVesselName(null);
+      setSpotFormOpen(false);
+      // A narrow screen only has room for one overlay at a time.
+      setSidebarOpen(false);
+    }
+  }, []);
 
   const selectService = useCallback((code: string) => {
     setSelectedServiceCode(code);
@@ -293,30 +270,22 @@ export default function Explorer({
     setSidebarOpen(false);
   }, []);
 
-  const selectVessel = useCallback(
-    (name: string | null) => {
-      // Covers both the panel's own close (X) button and a map click on a
-      // different vessel while focus mode is active — both route through
-      // this one function, so the guard only needs to live here once.
-      if (spotPhase === "matching") return;
-      setSelectedVesselName(name);
-      // A draft belongs to the vessel it was started on. Clearing both here is
-      // what stops a stale flag reopening one engineer's requirement over
-      // somebody else's ship.
-      setSpotFormOpen(false);
-      setSpotDraft(null);
-      setSpotPhase("form");
-      setSpotResult(null);
-      setSpotError(null);
-      setSpotSubmission(null);
-      if (name) {
-        setSelectedKey(null);
-        setSelectedServiceCode(null);
-        setSidebarOpen(false);
-      }
-    },
-    [spotPhase],
-  );
+  const selectVessel = useCallback((name: string | null) => {
+    // Covers both the panel's own close (X) button and a map click on a
+    // different vessel while focus mode is active — both route through
+    // this one function, so the guard only needs to live here once.
+    setSelectedVesselName(name);
+    // A draft belongs to the vessel it was started on. Clearing it here is
+    // what stops a stale draft reopening one engineer's requirement over
+    // somebody else's ship.
+    setSpotFormOpen(false);
+    setSpotDraft(null);
+    if (name) {
+      setSelectedKey(null);
+      setSelectedServiceCode(null);
+      setSidebarOpen(false);
+    }
+  }, []);
 
   const openSidebar = useCallback(() => {
     setSidebarOpen(true);
@@ -328,79 +297,37 @@ export default function Explorer({
     setSpotFormOpen(true);
     // The drawer must not survive into a mode where the sidebar is unmounted.
     setSidebarOpen(false);
-    // Otherwise a second visit after a prior match would reopen straight onto
-    // that stale result instead of a fresh form.
-    setSpotPhase("form");
-    setSpotResult(null);
-    setSpotError(null);
-    setSpotSubmission(null);
   }, []);
 
   // Leaves `spotDraft` alone on purpose: selectVessel remains the only thing
   // that discards typed input, so stepping out and back keeps the requirement.
-  // Guarded the same way selectVessel is — this is the back arrow, the map
-  // chip, and (via SpotBunkerPanel's/SpotMatchPanel's own listener) Escape.
+  // This is the back arrow, the map chip, and (via SpotBunkerPanel's own
+  // listener) Escape.
   const exitSpotMode = useCallback(() => {
-    if (spotPhase === "matching") return;
     setSpotFormOpen(false);
-  }, [spotPhase]);
+  }, []);
 
-  const submitSpotMatch = useCallback(
-    async (req: SpotBunkerRequest, ctx: SpotContext) => {
+  const router = useRouter();
+
+  /**
+   * Submitting the CE nomination no longer runs a single-port supplier
+   * match — it hands the fixed grade/quantity off to the route-wide
+   * bunkering optimizer (/route-plan), preselected to this vessel and
+   * position, so the engineer lands straight on the ranked combinations
+   * for the calls ahead rather than a one-port supplier list.
+   */
+  const goToRoutePlan = useCallback(
+    (req: SpotBunkerRequest) => {
       if (!selectedVesselSpec) return;
-      setSpotSubmission({ request: req, ctx });
-      setSpotError(null);
-      setSpotPhase("matching");
-
-      // Every remaining port call on this vessel's simulated route, so the
-      // match service can forecast the nominated grade at each one — bounded
-      // by the track's own window, not an arbitrary cap.
-      const futureCalls = selectedVesselTrack
-        ? (() => {
-            const legs = buildLegs(selectedVesselTrack);
-            const currentLegIdx = legs.findIndex(
-              (l) => stepIndex >= l.start && stepIndex < l.start + l.length,
-            );
-            return legs.slice(currentLegIdx + 1).map((leg) => {
-              const arrivalStep = leg.start + leg.transitSteps;
-              return {
-                portCode: leg.toKey,
-                arrivalTimestamp: stepTimestamp(selectedVesselTrack, arrivalStep),
-                daysFromNow:
-                  ((arrivalStep - stepIndex) * selectedVesselTrack.stepHours) / 24,
-              };
-            });
-          })()
-        : [];
-
-      try {
-        const res = await fetch("/api/spot-match", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            request: req,
-            ctx,
-            spec: selectedVesselSpec,
-            futureCalls,
-          }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          setSpotError(payload?.error ?? `Match request failed (${res.status}).`);
-          setSpotPhase("error");
-          return;
-        }
-        const data = (await res.json()) as SpotMatchApiResponse;
-        setSpotResult(data);
-        setSpotPhase("result");
-      } catch {
-        setSpotError("Network error — could not reach the match service.");
-        setSpotPhase("error");
-      }
+      const params = new URLSearchParams({
+        vessel: selectedVesselSpec.name,
+        step: String(stepIndex),
+      });
+      if (req.grade) params.set("grade", req.grade);
+      if (req.nominationMt !== null) params.set("qty", String(req.nominationMt));
+      router.push(`/route-plan?${params.toString()}`);
     },
-    [selectedVesselSpec, selectedVesselTrack, stepIndex],
+    [selectedVesselSpec, stepIndex, router],
   );
 
   /**
@@ -570,14 +497,9 @@ export default function Explorer({
                 <button
                   type="button"
                   onClick={exitSpotMode}
-                  disabled={spotPhase === "matching"}
-                  className={`-mr-1 shrink-0 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
-                    spotPhase === "matching"
-                      ? "cursor-default text-faint/50"
-                      : "text-muted hover:bg-surface-2 hover:text-fg"
-                  }`}
+                  className="-mr-1 shrink-0 rounded px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
                 >
-                  {spotPhase === "matching" ? "Matching…" : "Exit"}
+                  Exit
                 </button>
               </div>
               <p className="tnum mt-0.5 truncate pl-3.5 text-[10px] text-faint">
@@ -626,40 +548,16 @@ export default function Explorer({
           // The requirement form is a sub-view of the vessel, so it takes the
           // same slot rather than stacking a second overlay over it.
           spotFormOpen ? (
-            spotPhase === "form" ? (
-              <SpotBunkerPanel
-                spec={selectedVesselSpec}
-                track={selectedVesselTrack}
-                stepIndex={stepIndex}
-                draft={spotDraft}
-                onChange={setSpotDraft}
-                onSubmit={submitSpotMatch}
-                onBack={exitSpotMode}
-                onClose={() => selectVessel(null)}
-              />
-            ) : (
-              <SpotMatchPanel
-                vesselName={selectedVesselSpec.name}
-                phase={spotPhase}
-                result={spotResult?.result ?? null}
-                simulation={spotResult?.simulation ?? null}
-                narrative={spotResult?.narrative ?? null}
-                narrativeError={spotResult?.narrativeError ?? null}
-                emissions={spotResult?.emissions ?? null}
-                priceForecast={spotResult?.priceForecast ?? null}
-                opportunisticTopUps={spotResult?.opportunisticTopUps ?? null}
-                routeOutlook={spotResult?.routeOutlook ?? null}
-                errorMessage={spotError}
-                onBack={exitSpotMode}
-                onClose={() => selectVessel(null)}
-                onEdit={() => setSpotPhase("form")}
-                onRetry={() => {
-                  if (spotSubmission) {
-                    void submitSpotMatch(spotSubmission.request, spotSubmission.ctx);
-                  }
-                }}
-              />
-            )
+            <SpotBunkerPanel
+              spec={selectedVesselSpec}
+              track={selectedVesselTrack}
+              stepIndex={stepIndex}
+              draft={spotDraft}
+              onChange={setSpotDraft}
+              onSubmit={goToRoutePlan}
+              onBack={exitSpotMode}
+              onClose={() => selectVessel(null)}
+            />
           ) : (
             <VesselPanel
               spec={selectedVesselSpec}
